@@ -67,6 +67,8 @@ export const chatApi: ChatApi = {
 
         return {
           id: conversation.id,
+          can_send: Boolean(product && !product.is_blocked && product.deleted_at === null),
+          unavailable_reason: product && !product.is_blocked && product.deleted_at === null ? null : "Tin đăng không còn khả dụng nên không thể nhắn tin mới.",
           counterparty: {
             id: other.id,
             name: other.full_name,
@@ -96,6 +98,19 @@ export const chatApi: ChatApi = {
     };
   },
 
+  async detail(id) {
+    const viewer = requireActive(currentViewer());
+    mustParticipate(findConversation(id), viewer);
+    let page = 1;
+    while (true) {
+      const result = await chatApi.conversations(page);
+      const item = result.items.find((entry) => entry.id === id);
+      if (item) return item;
+      if (page * 20 >= result.meta.total) notFound("Không tìm thấy cuộc trò chuyện này.");
+      page += 1;
+    }
+  },
+
   async open(productId) {
     const viewer = requireVerified(currentViewer());
     const database = db();
@@ -113,7 +128,7 @@ export const chatApi: ChatApi = {
     );
     if (existing) return { id: existing.id };
 
-    if (product.is_blocked || !["ACTIVE", "RESERVED", "SOLD"].includes(product.status)) {
+    if (product.is_blocked || product.deleted_at !== null || product.status !== "ACTIVE") {
       conflict("PRODUCT_NOT_AVAILABLE", "Tin đăng không còn khả dụng để nhắn tin.");
     }
 
@@ -215,7 +230,7 @@ export const chatApi: ChatApi = {
         message.conversation_id === conversationId &&
         message.sender_id !== viewer.id &&
         message.read_at === null &&
-        message.created_at <= last.created_at
+        (message.created_at < last.created_at || (message.created_at === last.created_at && message.id <= last.id))
       ) {
         message.read_at = now;
       }

@@ -407,7 +407,9 @@ export function toOrderItemSnapshot(item: OrderItem): import("@remarket/shared")
     title_snapshot: item.titleSnapshot,
     condition_snapshot: item.conditionSnapshot,
     image_path_snapshot: item.imagePathSnapshot,
-    image_url: item.imageUrl,
+    // Order DTOs are participant/admin scoped. Browser images cannot attach
+    // the memory-only bearer token, including when the listing was removed.
+    image_url: item.imagePathSnapshot ? createPrivateStorageUrl(item.imagePathSnapshot) : item.imageUrl,
     price: item.price.toString(),
   };
 }

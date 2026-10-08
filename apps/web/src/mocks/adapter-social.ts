@@ -192,7 +192,7 @@ export const reportsApi: ReportsApi = {
 
 export const notificationsApi: NotificationsApi = {
   async list(query) {
-    const viewer = requireActive(currentViewer());
+    const viewer = requireAuth(currentViewer());
     const database = db();
     const paging = parsePaging({ page: query.page, page_size: 20 });
 
@@ -207,14 +207,14 @@ export const notificationsApi: NotificationsApi = {
   },
 
   async unreadCount() {
-    const viewer = requireActive(currentViewer());
+    const viewer = requireAuth(currentViewer());
     return db().notifications.filter(
       (entry) => entry.user_id === viewer.id && entry.read_at === null,
     ).length;
   },
 
   async markRead(id) {
-    const viewer = requireActive(currentViewer());
+    const viewer = requireAuth(currentViewer());
     const database = db();
     const entry = database.notifications.find((item) => item.id === id);
     if (!entry || entry.user_id !== viewer.id) notFound("Không tìm thấy thông báo này.");
@@ -227,7 +227,7 @@ export const notificationsApi: NotificationsApi = {
   },
 
   async markAllRead() {
-    const viewer = requireActive(currentViewer());
+    const viewer = requireAuth(currentViewer());
     const database = db();
     const now = new Date().toISOString();
     let updated = 0;

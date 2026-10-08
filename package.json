@@ -5,7 +5,9 @@
   "description": "ReMarket - marketplace mua ban do cu truc tuyen (monorepo)",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "pnpm --filter @remarket/web dev",
+    "dev": "pnpm --parallel --filter @remarket/api --filter @remarket/web dev",
+    "dev:web": "pnpm --filter @remarket/web dev",
+    "dev:api": "pnpm --filter @remarket/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

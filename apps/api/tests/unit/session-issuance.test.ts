@@ -13,7 +13,7 @@ describe("single-statement session issuance", () => {
     expect((sql as TemplateStringsArray).join("?")).toContain('INSERT INTO "AuthToken"');
     expect(parameters).toContain(sha256(issued.refreshToken));
     expect(parameters).not.toContain(issued.refreshToken);
-    expect(verifyAccessToken(issued.accessToken)).toEqual({ userId: "user", sessionId: issued.sessionId });
+    expect(verifyAccessToken(issued.accessToken)).toMatchObject({ userId: "user", sessionId: issued.sessionId });
   });
   it("does not issue credentials if persistence fails", async () => {
     const failure = new Error("Write failed");

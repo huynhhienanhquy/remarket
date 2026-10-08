@@ -1,148 +1,66 @@
-﻿import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import { validateEmail } from "@remarket/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../app/SessionProvider";
-import { safeReturnTo } from "../../app/guards";
-import { isApiError } from "../../lib/errors";
+import { loginPathFor } from "../../app/guards";
+import { errorTitle } from "../../lib/errors";
 import { api } from "../../lib/api";
-import { Button, FormField, InlineAlert, Input } from "../../components/ui";
+import { queryKeys } from "../../lib/queryClient";
+import { Button, FormField, InlineAlert, Input, Skeleton, useToast } from "../../components/ui";
+import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
 
 export function VerifyEmailPage() {
-  const queryClient = useQueryClient();
-  const [params] = useSearchParams();
+  const client = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const [token] = useState(() => params.get("token"));
   const navigate = useNavigate();
-  const { viewer, refresh } = useSession();
-
-  const token = params.get("token");
-  const email = params.get("email");
-  const returnTo = safeReturnTo(params.get("returnTo") ?? "/", "");
-
-  const [verifyEmail, setVerifyEmail] = useState(email ?? "");
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const { viewer, status, refresh } = useSession();
+  const online = useConnectivity();
+  const toast = useToast();
+  const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState(false);
-
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  async function sendVerification() {
-    if (pending) return;
-    const nextEmailError = validateEmail(verifyEmail);
-    setEmailTouched(true);
-    setEmailError(nextEmailError);
-    if (nextEmailError !== null) {
-      emailRef.current?.focus();
-      return;
-    }
-    setPending(true);
-    setFormError(null);
+  useEffect(() => {
+    if (!params.has("token")) return;
+    const next = new URLSearchParams(params); next.delete("token");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+  const request = useQuery({
+    queryKey: queryKeys.emailVerification(viewer?.id ?? "guest"),
+    queryFn: () => api.auth.emailVerificationRequest(),
+    enabled: !!viewer && !token && !viewer.email_verified_at && viewer.status === "ACTIVE",
+    refetchInterval: 15000,
+  });
+  async function submit() {
+    if (pending || !online) return;
+    setPending(true); setError(null);
     try {
-      await api.auth.resendVerification(verifyEmail.trim());
-      setFormSuccess("Nếu email có trong hệ thống, liên kết xác minh đã được gửi lại.");
-    } catch (caught) {
-      setFormError(isApiError(caught) ? caught.message : "Không gửi được email xác minh.");
-    } finally {
-      setPending(false);
-    }
+      if (token) { await api.auth.verifyEmail(token); await refresh(); }
+      else await api.auth.requestEmailVerification();
+      void client.invalidateQueries({ queryKey: ["email-verification"] });
+      void client.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Đã gửi yêu cầu xác minh email", { description: "Vui lòng chờ admin xem xét và xác nhận." });
+      navigate("/", { replace: true });
+    } catch (caught) { setError(caught); }
+    finally { setPending(false); }
   }
-
-  async function verify() {
-    if (!token || pending) return;
-    setPending(true);
-    setFormError(null);
-    try {
-      await api.auth.verifyEmail(token);
-      await refresh();
-      queryClient.clear();
-      setFormSuccess("Email đã được xác minh.");
-      navigate(returnTo, { replace: true });
-    } catch (caught) {
-      if (isApiError(caught) && caught.code === "TOKEN_EXPIRED") {
-        setFormError("Liên kết xác minh đã hết hạn. Vui lòng yêu cầu gửi lại.");
-      } else {
-        setFormError(isApiError(caught) ? caught.message : "Xác minh email thất bại.");
-      }
-    } finally {
-      setPending(false);
-    }
-  }
-
-  const showResend = !token;
-  const showVerify = token !== null;
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="t-h1 text-ink">Xác minh email</h1>
-        <p className="mt-2 t-body text-muted">
-          {showVerify
-            ? "Nhấn nút bên dưới để xác minh địa chỉ email của bạn. Nút này chỉ hoạt động một lần."
-            : "Nhập email đã đăng ký để chúng tôi gửi lại liên kết xác minh."}
-        </p>
-      </div>
-
-      {formError !== null && <InlineAlert tone="danger" title={formError} />}
-      {formSuccess !== null && <InlineAlert tone="success" title={formSuccess} />}
-
-      {showVerify && (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); verify(); }} className="space-y-4">
-          <Button type="submit" size="lg" fullWidth loading={pending} variant="primary">
-            Xác minh email
-          </Button>
-          <p className="t-meta text-muted text-center">
-            Liên kết này chỉ sử dụng được một lần. Nếu đã hết hạn, hãy yêu cầu gửi lại bên dưới.
-          </p>
-        </form>
-      )}
-
-      {showResend && (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); sendVerification(); }} className="space-y-4">
-          <FormField
-            label="Email"
-            htmlFor="verify-resend-email"
-            required
-            error={emailError ?? undefined}
-          >
-            <Input
-              ref={emailRef}
-              id="verify-resend-email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="ban@example.com"
-              value={verifyEmail}
-              error={emailError !== null}
-              aria-describedby={emailError !== null ? "verify-resend-email-error" : undefined}
-              onChange={(event) => {
-                setVerifyEmail(event.target.value);
-                if (emailTouched) setEmailError(validateEmail(event.target.value));
-                if (formError !== null) setFormError(null);
-              }}
-              onBlur={() => {
-                setEmailTouched(true);
-                setEmailError(validateEmail(verifyEmail));
-              }}
-            />
-          </FormField>
-          <Button type="submit" size="lg" fullWidth loading={pending} variant="primary">
-            Gửi lại liên kết xác minh
-          </Button>
-          <p className="t-meta text-muted text-center">
-            Nếu email có trong hệ thống, bạn sẽ nhận được hướng dẫn xác minh.
-          </p>
-        </form>
-      )}
-
-      <p className="t-body text-muted text-center">
-        <Link
-          to={viewer ? returnTo : `/login?returnTo=${encodeURIComponent(returnTo)}`}
-          className="t-label text-brand hover:underline"
-        >
-          {viewer ? "← Quay lại" : "← Quay lại đăng nhập"}
-        </Link>
-      </p>
-    </div>
-  );
+  const waiting = request.data?.status === "PENDING";
+  return <div className="space-y-6">
+    <div><h1 className="t-h1 text-ink">Xác minh email</h1><p className="mt-2 t-body text-muted">Gửi yêu cầu để admin xem xét và xác nhận email. Sau khi gửi, bạn sẽ quay về trang chủ.</p></div>
+    <OfflineNotice online={online} />
+    {error !== null && <InlineAlert tone="danger" title="Chưa thể gửi yêu cầu">{errorTitle(error)}</InlineAlert>}
+    {status === "loading" ? <Skeleton className="h-32 w-full" /> : viewer?.email_verified_at ? <InlineAlert tone="success" title="Email đã được xác minh" /> : token ?
+      <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="space-y-4">
+        <p className="t-body text-muted">Liên kết này chỉ sử dụng một lần để gửi yêu cầu cho tài khoản sở hữu email. Email chưa được xác minh cho đến khi admin duyệt.</p>
+        <Button type="submit" fullWidth size="lg" loading={pending} disabled={!online || pending}>Gửi yêu cầu xác minh email</Button>
+        <Link to={loginPathFor("/verify-email", "")} className="block text-brand hover:underline">Liên kết hết hạn? Đăng nhập để gửi yêu cầu</Link>
+      </form> : !viewer ? <div className="space-y-3">
+        <InlineAlert tone="info" title="Đăng nhập để gửi yêu cầu">Yêu cầu chỉ được gửi cho email của chính tài khoản đang đăng nhập.</InlineAlert>
+        <Link to={loginPathFor("/verify-email", "")} className="block rounded-control bg-brand p-3 text-center t-label text-white">Đăng nhập để xác minh email</Link>
+      </div> : viewer.status === "LOCKED" ? <InlineAlert tone="warning" title="Tài khoản đang bị hạn chế">Liên hệ hỗ trợ để được hướng dẫn.</InlineAlert> : request.isPending ? <Skeleton className="h-32 w-full" /> : request.isError ? <QueryFailure error={request.error} retry={() => void request.refetch()} /> :
+      <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="space-y-4">
+        <FormField label="Email tài khoản" htmlFor="verification-email"><Input id="verification-email" value={viewer.email} readOnly type="email" /></FormField>
+        {waiting ? <InlineAlert tone="info" title="Yêu cầu đang chờ admin duyệt">Bạn không cần gửi lại. Kết quả sẽ được thông báo trong tài khoản.</InlineAlert> : <Button type="submit" fullWidth size="lg" loading={pending} disabled={!online || pending}>Gửi yêu cầu xác minh email</Button>}
+      </form>}
+    <Link to="/" className="block text-center t-label text-brand hover:underline">Về trang chủ</Link>
+  </div>;
 }

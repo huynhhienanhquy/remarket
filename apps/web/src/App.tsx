@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "./app/SessionProvider";
 import { AppRouter } from "./app/router";
 import { createQueryClient } from "./lib/queryClient";
+import { RealtimeProvider } from "./app/RealtimeProvider";
 
 const queryClient = createQueryClient();
 
@@ -15,7 +16,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <AppRouter />
+        <RealtimeProvider><AppRouter /></RealtimeProvider>
       </SessionProvider>
     </QueryClientProvider>
   );

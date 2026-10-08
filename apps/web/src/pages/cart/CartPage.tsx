@@ -5,6 +5,7 @@ import { addVnd, formatVnd } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { useSession } from "../../app/SessionProvider";
+import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
 import {
   Button,
   EmptyState,
@@ -17,6 +18,7 @@ export function CartPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { viewer: _viewer } = useSession();
+  const online = useConnectivity();
 
   const cart = useQuery({
     queryKey: queryKeys.cart,
@@ -26,7 +28,6 @@ export function CartPage() {
   const removeItem = useMutation({
     mutationFn: (productId: string) => api.cart.remove(productId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.cart }),
-    onError: (error) => console.error("Remove failed:", error),
   });
 
   const groups = useMemo(() => cart.data?.groups ?? [], [cart.data?.groups]);
@@ -104,6 +105,8 @@ export function CartPage() {
   return (
     <div className="rm-container py-6 lg:py-8">
       <h1 className="t-h1 text-ink mb-6">Giỏ hàng</h1>
+      <OfflineNotice online={online} />
+      {removeItem.isError && <QueryFailure error={removeItem.error} />}
 
       {groups.map((group) => (
         <section key={group.seller.id} className="mb-8">
@@ -165,18 +168,16 @@ export function CartPage() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  {item.available && !item.unavailable_reason ? (
+                  {(!item.available || item.unavailable_reason) && <StatusBadge label="Không khả dụng" tone="neutral" />}
                     <Button
                       variant="ghost"
                       size="md"
                       onClick={() => removeItem.mutate(item.product_id)}
+                      disabled={!online || removeItem.isPending}
                       aria-label={`Xóa ${item.title} khỏi giỏ hàng`}
                     >
                       Xóa
                     </Button>
-                  ) : (
-                    <StatusBadge label="Không khả dụng" tone="neutral" />
-                  )}
                 </div>
               </div>
             ))}
@@ -201,7 +202,7 @@ export function CartPage() {
             size="lg"
             fullWidth
             variant="primary"
-            disabled={selectedIds.length === 0}
+            disabled={selectedIds.length === 0 || !online}
             onClick={goToCheckout}
           >
             {selectedIds.length === 0

@@ -40,6 +40,7 @@ const SupportNewPage = lazy(() => import("../pages/support/SupportNewPage").then
 const SupportTicketPage = lazy(() => import("../pages/support/SupportTicketPage").then((m) => ({ default: m.SupportTicketPage })));
 const AdminDashboardPage = lazy(() => import("../pages/admin/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })));
 const AdminUsersPage = lazy(() => import("../pages/admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })));
+const AdminEmailVerificationsPage = lazy(() => import("../pages/admin/AdminEmailVerificationsPage").then((m) => ({ default: m.AdminEmailVerificationsPage })));
 const AdminProductsPage = lazy(() => import("../pages/admin/AdminProductsPage").then((m) => ({ default: m.AdminProductsPage })));
 const AdminCategoriesPage = lazy(() => import("../pages/admin/AdminCategoriesPage").then((m) => ({ default: m.AdminCategoriesPage })));
 const AdminReportsPage = lazy(() => import("../pages/admin/AdminReportsPage").then((m) => ({ default: m.AdminReportsPage })));
@@ -172,6 +173,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboardPage /> },
           { path: "users", element: <AdminUsersPage /> },
+          { path: "email-verifications", element: <AdminEmailVerificationsPage /> },
           { path: "products", element: <AdminProductsPage /> },
           { path: "categories", element: <AdminCategoriesPage /> },
           { path: "reports", element: <AdminReportsPage /> },

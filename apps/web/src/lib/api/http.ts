@@ -18,11 +18,18 @@ let accessToken: string | null = null;
 let restorationInFlight: Promise<SessionUser | null> | null = null;
 let validationInFlight: Promise<SessionUser | null> | null = null;
 let expiredNotified = false;
+const accessTokenListeners = new Set<(token: string | null) => void>();
+
+export function subscribeAccessToken(listener: (token: string | null) => void): () => void {
+  accessTokenListeners.add(listener);
+  return () => { accessTokenListeners.delete(listener); };
+}
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
   if (token) expiredNotified = false;
   else updateSessionUser(null);
+  for (const listener of accessTokenListeners) listener(token);
 }
 
 export function getAccessToken(): string | null {

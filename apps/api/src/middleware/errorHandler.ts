@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { API_ERROR_CODES } from "@remarket/shared";
 import { envelopeMeta } from "../shared/api-response.js";
+import { isTransactionConflict } from "../shared/database-errors.js";
 
 /**
  * Error envelope (detail-project 4/17). Nothing leaves this handler as a
@@ -136,7 +137,7 @@ export function errorHandler(
         meta: envelopeMeta(res),
       });
     }
-    if (err.code === "P2034" || err.code === "P2028") {
+    if (isTransactionConflict(err) || err.code === "P2028") {
       return res.status(409).json({
         success: false,
         error: {

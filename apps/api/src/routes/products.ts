@@ -329,12 +329,12 @@ async function assertSellerEligibleInTransaction(
   }
 }
 
-async function claimUploads(
+async function lockEligibleUploads(
   tx: Prisma.TransactionClient,
   userId: string,
   productId: string,
   images: readonly { storagePath: string }[],
-): Promise<void> {
+): Promise<string[]> {
   const paths = images.map((image) => image.storagePath);
   if (new Set(paths).size !== paths.length) {
     throw validationError("Ảnh bị trùng lặp.", { images: "Mỗi ảnh chỉ được dùng một lần." });
@@ -358,8 +358,13 @@ async function claimUploads(
       });
     }
   }
+  return assets.map((asset) => asset.id);
+}
+
+async function claimUploads(tx: Prisma.TransactionClient, userId: string, productId: string, images: readonly { storagePath: string }[]): Promise<void> {
+  const ids = await lockEligibleUploads(tx, userId, productId, images);
   await tx.uploadAsset.updateMany({
-    where: { id: { in: assets.map((asset) => asset.id) } },
+    where: { id: { in: ids } },
     data: { productId, attachedAt: new Date() },
   });
 }
@@ -690,8 +695,10 @@ async function createProduct(req: AuthRequest, res: Response): Promise<Response>
     const productId = crypto.randomUUID();
     await assertSellerEligibleInTransaction(tx, viewerId, true);
     await assertCategoryEligibleInTransaction(tx, normalized.categoryId);
-    await claimUploads(tx, viewerId, productId, normalized.images);
-    return tx.product.create({
+    const assetIds = await lockEligibleUploads(tx, viewerId, productId, normalized.images);
+    // UploadAsset.productId has an immediate FK: create the referenced row
+    // before claiming uploads, within the same rollback-safe transaction.
+    const product = await tx.product.create({
       data: {
       id: productId,
       title: normalized.title,
@@ -710,6 +717,8 @@ async function createProduct(req: AuthRequest, res: Response): Promise<Response>
       },
       include: PRODUCT_INCLUDE,
     });
+    await tx.uploadAsset.updateMany({ where: { id: { in: assetIds } }, data: { productId, attachedAt: new Date() } });
+    return product;
   });
 
   return respondWithDetail(created, req, res, 201);

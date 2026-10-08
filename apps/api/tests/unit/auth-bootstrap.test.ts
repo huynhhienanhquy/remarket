@@ -45,14 +45,12 @@ describe("cookie session discovery", () => {
     await request(createApp()).post("/api/v1/auth/bootstrap").set("Origin", "https://untrusted.example").set("Cookie", cookie).expect(403);
     expect(client.$transaction).not.toHaveBeenCalled();
   });
-  it("rotates once and returns the server role plus the new access token", async () => {
+  it("discovers the server role and access token without consuming the browser cookie", async () => {
     const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
     expect(response.body.data.user).toMatchObject({ id: user.id, role: "ADMIN", status: "ACTIVE" });
     expect(response.body.data.access_token).toBeTypeOf("string");
-    expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");
-    expect(client.$executeRaw).toHaveBeenCalledTimes(1);
-    expect((client.$executeRaw.mock.calls[0]![0] as TemplateStringsArray).join("?"))
-      .toContain('AND "consumedAt" IS NULL');
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(client.$executeRaw).not.toHaveBeenCalled();
     expect(client.$queryRaw).toHaveBeenCalledTimes(3);
     expect(client.$queryRaw.mock.calls.map(([query]) => (query as TemplateStringsArray).join("?")))
       .toEqual([
@@ -60,6 +58,9 @@ describe("cookie session discovery", () => {
         expect.stringContaining('FROM "Session"'),
         expect.stringContaining('FROM "AuthToken"'),
       ]);
+    await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(client.$executeRaw).not.toHaveBeenCalled();
+    expect(client.authToken.update).not.toHaveBeenCalled();
   });
   it("uses the profile and state returned by the locks without reading them again", async () => {
     client.user.findUnique.mockRejectedValue(new Error("Unexpected duplicate user read"));
@@ -95,7 +96,7 @@ describe("cookie session discovery", () => {
   });
   it("does not deliver a replacement cookie when the atomic writes fail", async () => {
     client.$executeRaw.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Conflict", { code: "P2002", clientVersion: "5.22.0" }));
-    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie);
+    const response = await request(createApp()).post("/api/v1/auth/refresh").set("Cookie", cookie);
     expect(response.status).toBeGreaterThanOrEqual(400);
     expect(response.headers["set-cookie"]).toBeUndefined();
   });

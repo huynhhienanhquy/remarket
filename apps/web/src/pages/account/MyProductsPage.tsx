@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { OwnProduct, ProductAction } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
@@ -12,15 +12,20 @@ import {
   ProductCardSkeleton,
   EmptyState,
   ConfirmDialog,
+  useToast,
 } from "../../components/ui";
 import { conditionLabel, formatVnd, formatRelative } from "@remarket/shared";
-import { toast } from "react-toastify";
+import { OfflineNotice, useConnectivity } from "../../components/features/PageFeedback";
 
 type StatusFilter = "ALL" | "PENDING" | "ACTIVE" | "REJECTED" | "INACTIVE" | "RESERVED" | "SOLD";
 
 export function MyProductsPage() {
   const navigate = useNavigate();
   const { viewer } = useSession();
+  const toast = useToast();
+  const client = useQueryClient();
+  const online = useConnectivity();
+  const refreshProducts = () => { for (const key of ["products", "profiles", "cart", "favorites"]) void client.invalidateQueries({ queryKey: [key] }); };
 
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
@@ -38,7 +43,7 @@ export function MyProductsPage() {
     mutationFn: (productId: string) => api.products.hide(productId),
     onSuccess: () => {
       toast.success("Đã ẩn tin đăng.");
-      refetch();
+      refreshProducts(); setDialog(null);
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể ẩn tin."),
   });
@@ -47,35 +52,40 @@ export function MyProductsPage() {
     mutationFn: (productId: string) => api.products.remove(productId),
     onSuccess: () => {
       toast.success("Đã xóa tin đăng.");
-      refetch();
+      refreshProducts(); setDialog(null);
+      if (data?.items.length === 1 && page > 1) setPage(page - 1);
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể xóa tin."),
   });
 
+  const submitMutation = useMutation({
+    mutationFn: (productId: string) => api.products.submit(productId),
+    onSuccess: () => { toast.success("Đã gửi duyệt lại."); refreshProducts(); },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể gửi duyệt."),
+  });
+
   const handleAction = (action: ProductAction, productId: string) => {
+    if (!online || hideMutation.isPending || deleteMutation.isPending || submitMutation.isPending) return;
     if (action === "hide") {
       setDialog({ open: true, productId, action: "hide" });
     } else if (action === "delete") {
       setDialog({ open: true, productId, action: "delete" });
-    } else if (action === "submit") {
-      api.products.submit(productId).then(() => {
-        toast.success("Đã gửi duyệt lại.");
-        refetch();
-      }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể gửi duyệt."));
+    } else if (action === "submit" || action === "resubmit") {
+      if (!submitMutation.isPending) submitMutation.mutate(productId);
     }
   };
 
   const confirmDialogAction = () => {
-    if (!dialog) return;
+    if (!dialog || !online || hideMutation.isPending || deleteMutation.isPending) return;
     if (dialog.action === "hide") hideMutation.mutate(dialog.productId);
     else if (dialog.action === "delete") deleteMutation.mutate(dialog.productId);
-    setDialog(null);
   };
 
   if (!viewer) return null;
 
   return (
     <div className="space-y-6">
+      <OfflineNotice online={online} />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Tin đăng của tôi</h1>
         <Button onClick={() => navigate("/account/products/new")} className="min-w-[140px]">
@@ -94,11 +104,6 @@ export function MyProductsPage() {
           >
             {s === "ALL" ? "Tất cả" : s === "PENDING" ? "Chờ duyệt" : s === "ACTIVE" ? "Đang bán" :
              s === "REJECTED" ? "Bị từ chối" : s === "INACTIVE" ? "Đã ẩn" : s === "RESERVED" ? "Đang giữ" : "Đã bán"}
-            {data && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-neutral-100 text-neutral-600">
-                {data.items.filter((p) => s === "ALL" || p.status === s).length}
-              </span>
-            )}
           </Button>
         ))}
       </div>
@@ -115,7 +120,6 @@ export function MyProductsPage() {
         </div>
       ) : !data || data.items.length === 0 ? (
         <EmptyState
-          icon="📦"
           title="Chưa có tin đăng nào"
           description={status === "ALL" ? "Hãy đăng tin đầu tiên của bạn ngay hôm nay." : `Không có tin ở trạng thái "${status}".`}
           action={{
@@ -130,6 +134,7 @@ export function MyProductsPage() {
               <ProductCard
                 key={product.id}
                 product={product}
+                busy={!online || hideMutation.isPending || deleteMutation.isPending || submitMutation.isPending}
                 onAction={(action) => handleAction(action, product.id)}
                 onEdit={() => navigate(`/account/products/${product.id}/edit`)}
                 onView={() => navigate(`/products/${product.id}`)}
@@ -173,7 +178,7 @@ export function MyProductsPage() {
           title={dialog.action === "hide" ? "Ẩn tin đăng" : "Xóa tin đăng"}
           description={dialog.action === "hide"
             ? "Tin đăng sẽ không còn hiển thị cho người mua. Bạn có thể hiển thị lại sau."
-            : "Thao tác này không thể hoàn tác. Tin đăng sẽ bị xóa vĩnh viễn."}
+            : "Tin đăng sẽ ngừng hiển thị. Lịch sử giao dịch vẫn được giữ."}
           confirmLabel={dialog.action === "hide" ? "Ẩn" : "Xóa"}
           tone={dialog.action === "hide" ? "primary" : "danger"}
         />
@@ -184,13 +189,14 @@ export function MyProductsPage() {
 
 interface ProductCardProps {
   product: OwnProduct;
+  busy: boolean;
   onAction: (action: ProductAction, productId: string) => void;
   onEdit: () => void;
   onView: () => void;
 }
 
-function ProductCard({ product, onAction, onEdit, onView }: ProductCardProps) {
-  const showActions = product.allowed_actions.length > 1;
+function ProductCard({ product, busy, onAction, onEdit, onView }: ProductCardProps) {
+  const showActions = product.allowed_actions.some((action) => action !== "view" && action !== "edit");
 
   return (
     <div className="group bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-lg transition-shadow">
@@ -241,15 +247,15 @@ function ProductCard({ product, onAction, onEdit, onView }: ProductCardProps) {
           </p>
         )}
 
-        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
-          <Button variant="secondary" size="md" onClick={onEdit} className="flex-1">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100">
+          {product.allowed_actions.includes("edit") && <Button variant="secondary" size="md" onClick={onEdit} disabled={busy} className="flex-1">
             Chỉnh sửa
-          </Button>
-          <Button variant="ghost" size="md" onClick={onView} className="flex-1">
+          </Button>}
+          {product.allowed_actions.includes("view") && <Button variant="ghost" size="md" onClick={onView} className="flex-1">
             Xem
-          </Button>
+          </Button>}
           {showActions && (
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {product.allowed_actions.filter((a) => a !== "edit" && a !== "view").map((action) => (
                 <Button
                   key={action}
@@ -264,8 +270,9 @@ function ProductCard({ product, onAction, onEdit, onView }: ProductCardProps) {
                     action === "hide" ? "border-warning text-warning" : ""
                   }
                   onClick={() => onAction(action, product.id)}
+                  disabled={busy}
                 >
-                  {action === "submit" ? "Gửi duyệt" : action === "hide" ? "Ẩn" : action === "delete" ? "Xóa" : action}
+                  {action === "submit" || action === "resubmit" ? "Gửi duyệt" : action === "hide" ? "Ẩn" : action === "delete" ? "Xóa" : action}
                 </Button>
               ))}
             </div>

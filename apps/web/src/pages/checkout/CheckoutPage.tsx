@@ -1,11 +1,13 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addVnd, formatVnd, validatePrice, validatePhone } from "@remarket/shared";
+import { addVnd, formatVnd, validateShippingFee, validatePhone } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { useSession } from "../../app/SessionProvider";
 import { isApiError } from "../../lib/errors";
+import type { CheckoutPayload } from "@remarket/shared";
+import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
 import {
   Button,
   EmptyState,
@@ -40,7 +42,9 @@ export function CheckoutPage() {
   const [searchParams] = useSearchParams();
   const { viewer } = useSession();
 
-  const [idempotencyKey, setIdempotencyKey] = useState(generateIdempotencyKey());
+  const attempt = useRef<{ payload: string; key: string } | null>(null);
+  const online = useConnectivity();
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, CheckoutDeliveryInput>>({});
   const [priceChangedAlert, setPriceChangedAlert] = useState<{
     items: Array<{ product_id: string; current_price: string; cart_price: string }>;
@@ -92,8 +96,22 @@ export function CheckoutPage() {
     () => Array.from(new Set(availableItems.map((i) => i.seller_id))),
     [availableItems],
   );
+  const productDetails = useQuery({
+    queryKey: ["checkout", "products", availableItems.map((item) => item.product_id)],
+    queryFn: () => Promise.all(availableItems.map((item) => api.products.detail(item.product_id))),
+    enabled: availableItems.length > 0,
+  });
+  function shippingFor(sellerId: string, method: "COD" | "MEETUP"): string {
+    if (method === "MEETUP") return "0";
+    return (productDetails.data ?? []).filter((item) => item.seller.id === sellerId).reduce((max, item) => BigInt(item.shipping_fee) > BigInt(max) ? item.shipping_fee : max, "0");
+  }
+  function methodsFor(sellerId: string): Array<"COD" | "MEETUP"> {
+    const products = (productDetails.data ?? []).filter((item) => item.seller.id === sellerId);
+    return products.length === 0 ? [] : (["COD", "MEETUP"] as const).filter((method) => products.every((item) => item.delivery_method === "BOTH" || item.delivery_method === method));
+  }
 
   useEffect(() => {
+    if (!productDetails.data) return;
     setDraft((previous) => {
       let next = previous;
       for (const sellerId of sellerIds) {
@@ -101,33 +119,33 @@ export function CheckoutPage() {
         if (next === previous) next = { ...previous };
         next[sellerId] = {
           seller_id: sellerId,
-          method: "COD",
+          method: productDetails.data.filter((item) => item.seller.id === sellerId).every((item) => item.delivery_method !== "MEETUP") ? "COD" : "MEETUP",
           recipient_name: viewer?.full_name ?? "",
           recipient_phone: viewer?.phone ?? "",
           delivery_address: viewer?.default_address ?? "",
           province_code: viewer?.province_code ?? "",
-          expected_shipping_fee: "0",
+          expected_shipping_fee: productDetails.data.filter((item) => item.seller.id === sellerId).reduce((max, item) => BigInt(item.shipping_fee) > BigInt(max) ? item.shipping_fee : max, "0"),
         };
       }
       return next;
     });
-  }, [sellerIds, viewer]);
+  }, [sellerIds, viewer, productDetails.data]);
 
   function updateDelivery(sellerId: string, patch: CheckoutDeliveryPatch) {
     setDraft((prev) => ({
       ...prev,
-      [sellerId]: { ...prev[sellerId], ...patch } as CheckoutDeliveryInput,
+      [sellerId]: { ...prev[sellerId], ...patch, ...(patch.method ? { expected_shipping_fee: shippingFor(sellerId, patch.method) } : {}) } as CheckoutDeliveryInput,
     }));
   }
 
   const subtotal = useMemo(() => addVnd(...availableItems.map((i) => i.expected_price)), [availableItems]);
 
   const checkout = useMutation({
-    mutationFn: (payload: { items: Array<{ product_id: string; expected_price: string }>; deliveries: CheckoutDeliveryInput[]; idempotency_key: string }) =>
-      api.checkout.create(payload, payload.idempotency_key),
+    mutationFn: ({ payload, key }: { payload: CheckoutPayload; key: string }) => api.checkout.create(payload, key),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate(`/orders/${result.orders[0]?.id ?? ""}`);
     },
     onError: (caught) => {
@@ -141,7 +159,8 @@ export function CheckoutPage() {
   });
 
   async function handleSubmit() {
-    if (checkout.isPending) return;
+    if (checkout.isPending || !online || !productDetails.data) return;
+    setSubmissionError(null);
 
     const deliveries: CheckoutDeliveryInput[] = [];
     for (const sellerId of sellerIds) {
@@ -153,42 +172,44 @@ export function CheckoutPage() {
       const phoneErr = validatePhone(d.recipient_phone);
       if (phoneErr) deliveryErrors.recipient_phone = phoneErr;
       if (!d.delivery_address.trim()) deliveryErrors.delivery_address = "Địa chỉ không được để trống.";
-      if (!d.province_code) deliveryErrors.province_code = "Vui lòng chọn khu vực.";
+      if (!methodsFor(sellerId).includes(d.method)) deliveryErrors.method = "Các món của người bán không có hình thức giao nhận chung. Hãy đặt riêng từng món.";
 
       if (d.method === "COD") {
-        const feeErr = validatePrice(d.expected_shipping_fee);
+        const feeErr = validateShippingFee(shippingFor(sellerId, d.method), true);
         if (feeErr) deliveryErrors.expected_shipping_fee = "Phí giao hàng không hợp lệ.";
       }
 
       if (Object.keys(deliveryErrors).length > 0) {
-        console.error("Validation errors for seller", sellerId, deliveryErrors);
+        setSubmissionError(Object.values(deliveryErrors).join(" "));
         return;
       }
 
-      deliveries.push(d);
+      deliveries.push({ ...d, expected_shipping_fee: shippingFor(sellerId, d.method) });
     }
 
     if (deliveries.length === 0) return;
 
-    setIdempotencyKey(generateIdempotencyKey());
-
-    await checkout.mutateAsync({
-      items: availableItems,
-      deliveries,
-      idempotency_key: idempotencyKey,
-    });
+    const payload: CheckoutPayload = {
+      items: availableItems.map(({ product_id, expected_price }) => ({ product_id, expected_price })),
+      deliveries: deliveries.map(({ province_code: _province, ...delivery }) => delivery),
+    };
+    const signature = JSON.stringify(payload);
+    if (!attempt.current || attempt.current.payload !== signature) attempt.current = { payload: signature, key: generateIdempotencyKey() };
+    try { await checkout.mutateAsync({ payload, key: attempt.current.key }); }
+    catch { /* The mutation's error panel owns feedback; never leak a rejected event promise. */ }
   }
 
   function handlePriceChangedRefresh() {
     setPriceChangedAlert(null);
     queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+    queryClient.invalidateQueries({ queryKey: ["checkout", "products"] });
   }
 
-  if (cart.isPending || provinces.isPending) {
+  if (cart.isPending || provinces.isPending || (availableItems.length > 0 && productDetails.isPending)) {
     return (
       <div className="rm-container py-6 lg:py-8">
         <h1 className="t-h1 text-ink mb-6">Đặt hàng</h1>
-        <div className="space-y-4">
+        <div className="space-y-4" aria-busy="true">
           {Array.from({ length: 3 }, (_, i) => (
             <div key={i} className="rounded-card border border-line bg-surface p-4 space-y-3">
               <div className="h-8 w-1/4 bg-surface-subtle rounded-control" />
@@ -233,6 +254,11 @@ export function CheckoutPage() {
 
   return (
     <div className="rm-container py-6 lg:py-8">
+      <OfflineNotice online={online} />
+      {submissionError && <InlineAlert tone="danger" title="Kiểm tra thông tin giao nhận">{submissionError}</InlineAlert>}
+      {checkout.isError && <QueryFailure error={checkout.error} />}
+      {provinces.isError && <QueryFailure error={provinces.error} retry={() => void provinces.refetch()} />}
+      {productDetails.isError && <QueryFailure error={productDetails.error} retry={() => void productDetails.refetch()} />}
       {priceChangedAlert && (
         <InlineAlert
           tone="warning"
@@ -260,6 +286,7 @@ export function CheckoutPage() {
 
             return (
               <section key={sellerId} className="space-y-4 border-t border-line pt-4 first:border-t-0 first:pt-0">
+                {methodsFor(sellerId).length === 0 && <InlineAlert tone="warning" title={productDetails.isPending ? "Đang tải hình thức giao nhận…" : "Các món này không có phương thức giao nhận chung"}>Hãy đặt riêng từng món nếu các phương thức không tương thích.</InlineAlert>}
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="t-label text-ink">{sellerGroup.seller.name}</p>
@@ -272,12 +299,14 @@ export function CheckoutPage() {
                     <div className="flex gap-4">
                       <Radio
                         name={`delivery-${sellerId}`}
+                        disabled={!methodsFor(sellerId).includes("COD") || checkout.isPending}
                         checked={delivery.method === "COD"}
                         onChange={() => updateDelivery(sellerId, { method: "COD" })}
                         label="Giao hàng (COD)"
                       />
                       <Radio
                         name={`delivery-${sellerId}`}
+                        disabled={!methodsFor(sellerId).includes("MEETUP") || checkout.isPending}
                         checked={delivery.method === "MEETUP"}
                         onChange={() => updateDelivery(sellerId, { method: "MEETUP" })}
                         label="Gặp trực tiếp"
@@ -285,7 +314,7 @@ export function CheckoutPage() {
                     </div>
                   </FormField>
 
-                  <FormField label="Khu vực" htmlFor={`province-${sellerId}`} required error={!delivery.province_code ? "Vui lòng chọn khu vực" : undefined}>
+                  <FormField label="Khu vực" htmlFor={`province-${sellerId}`}>
                     <select
                       id={`province-${sellerId}`}
                       value={delivery.province_code}
@@ -331,12 +360,12 @@ export function CheckoutPage() {
                 </FormField>
 
                 {delivery.method === "COD" && (
-                  <FormField label="Phí giao hàng" htmlFor={`shipping-${sellerId}`} required error={validatePrice(delivery.expected_shipping_fee) ?? undefined}>
+                  <FormField label="Phí giao hàng" htmlFor={`shipping-${sellerId}`} helper="Phí cao nhất trong nhóm món của người bán, do hệ thống tính.">
                     <Input
                       id={`shipping-${sellerId}`}
                       inputMode="numeric"
-                      value={delivery.expected_shipping_fee}
-                      onChange={(e) => updateDelivery(sellerId, { expected_shipping_fee: e.target.value.replace(/\D/g, "") })}
+                      value={shippingFor(sellerId, delivery.method)}
+                      readOnly
                       placeholder="0"
                     />
                   </FormField>
@@ -373,7 +402,7 @@ export function CheckoutPage() {
           </div>
         </div>
 
-        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} onClick={handleSubmit}>
+        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} disabled={!online || !productDetails.data || sellerIds.some((sellerId) => methodsFor(sellerId).length === 0)} onClick={handleSubmit}>
           {checkout.isPending ? "Đang xử lý..." : "Đặt hàng"}
         </Button>
       </div>

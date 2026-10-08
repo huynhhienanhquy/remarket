@@ -144,6 +144,9 @@ router.post(
   asyncHandler(async (req: AuthRequest, res) => {
     const user = currentUser(req);
     const input = createTicketSchema.parse(req.body);
+    if (user.emailVerifiedAt === null && input.type !== "ACCOUNT") {
+      throw forbidden("Xác minh email để gửi yêu cầu về giao dịch.");
+    }
 
     const subject = input.subject.trim();
     const message = input.message.trim();

@@ -4,6 +4,7 @@ import {
   toProductDetail,
   toSavedProductListItem,
   toSupportTicketDetail,
+  toOrderItemSnapshot,
 } from "../../src/shared/dto-mappers.js";
 import type { ProductRow, ViewerContext } from "../../src/shared/dto-mappers.js";
 
@@ -60,6 +61,10 @@ function context(viewerId: string | null): ViewerContext {
 }
 
 describe("product DTO privacy", () => {
+  it("signs private order snapshot images for an authorized browser without bearer headers", () => {
+    const item = { id: "item", productId: "product", titleSnapshot: "Máy ảnh", conditionSnapshot: "GOOD", imagePathSnapshot: "users/seller/product/snapshot.jpg", imageUrl: "/api/v1/uploads/snapshot.jpg", price: new Prisma.Decimal(100000) } as Parameters<typeof toOrderItemSnapshot>[0];
+    expect(toOrderItemSnapshot(item).image_url).toMatch(/^\/api\/v1\/uploads\/snapshot\.jpg\?expires=\d+&signature=/);
+  });
   it("does not expose private storage keys or moderation notes publicly", () => {
     const detail = toProductDetail(product, context("buyer-1"), ["Điện tử"], true);
     expect(detail.images[0]).not.toHaveProperty("storage_path");

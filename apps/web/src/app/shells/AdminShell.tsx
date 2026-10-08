@@ -4,10 +4,14 @@ import { useSession } from "../SessionProvider";
 import { Logo } from "./Logo";
 import { MenuIcon, XIcon, useToast } from "../../components/ui";
 import { errorTitle } from "../../lib/errors";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/queryClient";
 
 const NAV = [
   { to: "/admin", label: "Tổng quan", end: true },
   { to: "/admin/users", label: "Người dùng" },
+  { to: "/admin/email-verifications", label: "Xác minh email" },
   { to: "/admin/products", label: "Sản phẩm" },
   { to: "/admin/categories", label: "Danh mục" },
   { to: "/admin/reports", label: "Báo cáo" },
@@ -21,6 +25,7 @@ function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [loggingOut, setLoggingOut] = useState(false);
+  const requests = useQuery({ queryKey: queryKeys.adminEmailVerifications({ status: "PENDING", page: 1 }), queryFn: () => api.admin.emailVerifications({ status: "PENDING", page: 1 }), refetchInterval: 15000 });
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -60,6 +65,7 @@ function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
             }
           >
             {item.label}
+            {item.to === "/admin/email-verifications" && !requests.isError && !!requests.data?.meta.total && <span className="ml-2 rounded-full bg-warning-bg px-2 t-meta text-accent" aria-label={`${requests.data.meta.total} yêu cầu chờ duyệt`}>{requests.data.meta.total > 99 ? "99+" : requests.data.meta.total}</span>}
           </NavLink>
         ))}
       </nav>

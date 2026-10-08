@@ -64,6 +64,7 @@ function limited(windowMs: number, limit: number, keyMode: KeyMode) {
 
 export const loginRateLimit = limited(15 * 60 * 1000, 10, "ip-email");
 export const emailTokenRateLimit = limited(60 * 60 * 1000, 3, "ip-email");
+export const emailVerificationRateLimit = limited(60 * 60 * 1000, 3, "user");
 export const chatRateLimit = limited(60 * 1000, 30, "user");
 export const reportRateLimit = limited(60 * 60 * 1000, 5, "user");
 export const checkoutRateLimit = limited(10 * 60 * 1000, 10, "user");

@@ -29,6 +29,7 @@ import {
   useToast,
 } from "../../components/ui";
 import { ReportDialog } from "../../components/features/ReportDialog";
+import { OfflineNotice, useConnectivity } from "../../components/features/PageFeedback";
 
 export function ProductDetailPage() {
   const { id = "" } = useParams();
@@ -36,7 +37,8 @@ export function ProductDetailPage() {
   const location = useLocation();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { viewer } = useSession();
+  const { viewer, status: sessionStatus } = useSession();
+  const online = useConnectivity();
 
   const [activeImage, setActiveImage] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -52,7 +54,10 @@ export function ProductDetailPage() {
 
   const toggleFavorite = useMutation({
     mutationFn: (on: boolean) => api.favorites.set(id, on),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.product(id) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["products"] });
+      void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
     onError: (error) => toast.error("Không lưu được món đồ", { description: error.message }),
   });
 
@@ -73,29 +78,29 @@ export function ProductDetailPage() {
   const loginThen = loginPathFor(location.pathname, location.search);
 
   function requireLogin() {
+    if (sessionStatus !== "ready" || !online) return false;
     if (viewer) return true;
     navigate(loginThen);
     return false;
   }
 
-  function openChat() {
-    if (!requireLogin() || !product) return;
-    api.chat
-      .open(product.id)
-      .then((conversation) => navigate(`/messages/${conversation.id}`))
-      .catch((error) => toast.error("Không mở được tin nhắn", { description: error.message }));
-  }
-
-  function buyNow() {
-    if (!requireLogin() || !product) return;
-    api.cart
-      .add(product.id)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-        navigate("/checkout");
-      })
-      .catch((error) => toast.error("Không khởi tạo được đơn hàng", { description: error.message }));
-  }
+  const chat = useMutation({
+    mutationFn: () => api.chat.open(id),
+    onSuccess: (conversation) => navigate(`/messages/${conversation.id}`),
+    onError: (error) => toast.error("Không mở được tin nhắn", { description: error.message }),
+  });
+  const purchase = useMutation({
+    mutationFn: () => api.cart.add(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      navigate(`/checkout?items=${encodeURIComponent(id)}`);
+    },
+    onError: (error) => toast.error("Không khởi tạo được đơn hàng", { description: error.message }),
+  });
+  const actionBusy = !online || sessionStatus !== "ready" || chat.isPending || purchase.isPending || addToCart.isPending || toggleFavorite.isPending;
+  function openChat() { if (!actionBusy && requireLogin()) chat.mutate(); }
+  function buyNow() { if (!actionBusy && requireLogin()) purchase.mutate(); }
+  function addItem() { if (!actionBusy && requireLogin()) addToCart.mutate(); }
 
   const images = product?.images ?? [];
   const mainImage = images[activeImage] ?? images[0];
@@ -185,6 +190,7 @@ export function ProductDetailPage() {
 
   return (
     <div className="rm-container py-6 lg:py-8">
+      <OfflineNotice online={online} />
       <nav aria-label="Đường dẫn" className="t-meta text-muted">
         <Link to="/" className="hover:text-ink">
           Trang chủ
@@ -310,7 +316,8 @@ export function ProductDetailPage() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                disabled={!canBuy}
+                disabled={!canBuy || actionBusy}
+                loading={purchase.isPending}
                 onClick={buyNow}
               >
                 Mua ngay
@@ -318,16 +325,17 @@ export function ProductDetailPage() {
               <Button
                 variant="secondary"
                 fullWidth
-                disabled={!canCart}
+                disabled={!canCart || actionBusy}
                 loading={addToCart.isPending}
-                onClick={() => addToCart.mutate()}
+                onClick={addItem}
               >
                 Thêm vào giỏ
               </Button>
               <Button
                 variant="secondary"
                 fullWidth
-                disabled={!canChat}
+                disabled={!canChat || actionBusy}
+                loading={chat.isPending}
                 onClick={openChat}
               >
                 <ChatIcon />
@@ -340,7 +348,7 @@ export function ProductDetailPage() {
             <div className="mt-4 flex items-center justify-between">
               <button
                 type="button"
-                disabled={!product.capabilities.can_favorite}
+                disabled={!product.capabilities.can_favorite || actionBusy}
                 onClick={() => requireLogin() && toggleFavorite.mutate(!product.is_favorited)}
                 className="flex items-center gap-2 t-label text-ink hover:text-danger disabled:opacity-50"
               >
@@ -351,7 +359,7 @@ export function ProductDetailPage() {
               </button>
               <button
                 type="button"
-                disabled={!product.capabilities.can_report || isOwner}
+                disabled={!product.capabilities.can_report || isOwner || actionBusy}
                 onClick={() => requireLogin() && setReportOpen(true)}
                 className="t-label text-muted hover:text-ink disabled:opacity-50"
               >
@@ -399,7 +407,8 @@ export function ProductDetailPage() {
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
-            disabled={!canChat}
+            disabled={!canChat || actionBusy}
+            loading={chat.isPending}
             onClick={openChat}
             aria-label="Chat với người bán"
             className="min-h-[44px] flex-1"
@@ -409,8 +418,8 @@ export function ProductDetailPage() {
           </Button>
           <button
             type="button"
-            disabled={!canCart}
-            onClick={() => addToCart.mutate()}
+            disabled={!canCart || actionBusy}
+            onClick={addItem}
             aria-label="Thêm vào giỏ hàng"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-brand text-brand disabled:opacity-50"
           >
@@ -418,7 +427,8 @@ export function ProductDetailPage() {
           </button>
           <Button
             variant="primary"
-            disabled={!canBuy}
+            disabled={!canBuy || actionBusy}
+            loading={purchase.isPending}
             onClick={buyNow}
             className="min-h-[44px] flex-1"
           >

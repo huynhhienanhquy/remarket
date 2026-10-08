@@ -88,6 +88,8 @@ export const NOTIFICATION_TYPES = [
   "REVIEW_CREATED",
   "TICKET_REPLY",
   "REPORT_RESULT",
+  "EMAIL_VERIFICATION_REQUESTED",
+  "EMAIL_VERIFIED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

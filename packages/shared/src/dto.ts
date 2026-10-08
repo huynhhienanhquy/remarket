@@ -83,6 +83,14 @@ export interface PageMeta {
  * Identity (ui-spec 25: SessionUser, SellerSummary)
  * ------------------------------------------------------------------ */
 
+export interface EmailVerificationRequest {
+  id: string;
+  user: { id: string; full_name: string; email: string; status: UserStatus };
+  status: "PENDING" | "APPROVED";
+  requested_at: IsoDateTime;
+  approved_at: IsoDateTime | null;
+}
+
 export interface SessionUser {
   id: string;
   full_name: string;
@@ -357,6 +365,9 @@ export interface CheckoutResult {
 
 export interface ConversationListItem {
   id: string;
+  /** Authoritative composer capability; historical messages remain readable. */
+  can_send?: boolean;
+  unavailable_reason?: string | null;
   counterparty: {
     id: string;
     name: string;
@@ -630,4 +641,3 @@ export interface ProductQuery {
   page?: number;
   page_size?: number;
 }
-

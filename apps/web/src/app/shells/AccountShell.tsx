@@ -118,13 +118,13 @@ export function AccountShell() {
             {isIndex ? (
               <>
                 <div className="mb-6">
-                  <h1 className="t-h1 text-ink">Tài khoản</h1>
                   <p className="mt-1 t-body text-muted">
                     Chào {viewer?.full_name ?? ""}, quản lý hồ sơ và giao dịch của bạn.
                   </p>
                 </div>
-                {/* Mobile replaces the desktop sidebar with grouped links. */}
-                <nav aria-label="Tài khoản" className="space-y-6 lg:hidden">
+                <Outlet />
+                {/* Profile stays visible before the mobile navigation menu. */}
+                <nav aria-label="Tài khoản" className="mt-8 space-y-6 lg:hidden">
                   {GROUPS.map((group) => (
                     <div key={group.title}>
                       <h2 className="t-meta text-muted">{group.title}</h2>
@@ -148,7 +148,7 @@ export function AccountShell() {
                 </nav>
               </>
             ) : null}
-            <Outlet />
+            {!isIndex && <Outlet />}
           </div>
         </div>
       </main>

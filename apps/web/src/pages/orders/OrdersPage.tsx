@@ -138,7 +138,7 @@ export function OrdersPage({ role }: OrdersPageProps) {
                       {order.items.slice(0, 3).map((snap) => (
                         <img
                           key={snap.id}
-                          src={snap.image_path_snapshot ?? ""}
+                          src={snap.image_url ?? undefined}
                           alt=""
                           className="h-10 w-10 rounded-control object-cover border border-line"
                         />

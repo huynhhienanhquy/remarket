@@ -23,6 +23,7 @@ import {
   forbidden,
   isCategoryValid,
   mustFindProduct,
+  mustFindUser,
   notFound,
   paginate,
   parsePaging,
@@ -33,6 +34,7 @@ import {
 import { projectTicketDetail, projectTicketListItem, supportApi } from "./adapter-support";
 import { db } from "./store";
 import { uid } from "./time";
+import { approveMockEmailVerification, projectEmailVerification } from "./email-verification";
 import type { Database, MockProduct, MockReport, MockReview, MockTicket, MockUser } from "./types";
 
 /** Same normalization as the marketplace list so admin filters feel identical. */
@@ -299,6 +301,18 @@ function assertAdminTicketTransition(ticket: MockTicket, next: TicketStatus): vo
 }
 
 export const adminApi: AdminApi = {
+  async emailVerifications(query) {
+    requireAdmin(currentViewer());
+    const items = db().users.flatMap((user) => { const item = projectEmailVerification(user); return item ? [item] : []; })
+      .filter((item) => query.status === "ALL" || item.status === (query.status ?? "PENDING"))
+      .sort((a, b) => newestFirst(a.requested_at, b.requested_at) || newestFirst(a.id, b.id));
+    const result = paginate(items, parsePaging(query));
+    return { items: result.slice, meta: result.meta };
+  },
+  async approveEmailVerification(id) {
+    const admin = requireAdmin(currentViewer());
+    return approveMockEmailVerification(mustFindUser(db(), id), admin);
+  },
   async dashboard(from, to) {
     const admin = requireAdmin(currentViewer());
     void admin;

@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import type { ConversationListItem, MessagePage } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
-import { requireVerified } from "../middleware/auth.js";
+import { requireActive, requireVerified } from "../middleware/auth.js";
 import type { AuthRequest, AuthUser } from "../middleware/auth.js";
 import { ok, okList } from "../shared/api-response.js";
 import { DEFAULT_PAGE_SIZE, offsetOf, pageMeta } from "../shared/pagination.js";
@@ -25,10 +25,11 @@ import { chatRateLimit } from "../middleware/rate-limit.js";
  *
  * Membership is the only authorization: every read and write is scoped to the
  * two participants inside the same query. Sending additionally needs an
- * ACTIVE + verified account; a LOCKED user keeps read access.
+ * ACTIVE + verified account; a LOCKED user cannot access the inbox.
  */
 
 const router = Router();
+router.use(requireActive);
 
 const DEFAULT_MESSAGE_PAGE_SIZE = 30;
 const MAX_MESSAGE_PAGE_SIZE = 100;
@@ -80,7 +81,7 @@ const conversationInclude = {
   product: { include: { images: { orderBy: { sortOrder: "asc" } } } },
   messages: {
     take: 1,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: { content: true, createdAt: true, senderId: true },
   },
 } satisfies Prisma.ConversationInclude;
@@ -128,7 +129,7 @@ function mapConversation(row: ConversationRow, viewerId: string): ConversationLi
       product.status === "RESERVED" ||
       product.status === "SOLD");
 
-  return toConversationListItem(
+  const item = toConversationListItem(
     {
       id: row.id,
       updatedAt: row.updatedAt,
@@ -142,6 +143,8 @@ function mapConversation(row: ConversationRow, viewerId: string): ConversationLi
     viewerId,
     row._count.messages,
   );
+  const canSend = product === null || (!product.isBlocked && product.deletedAt === null);
+  return { ...item, can_send: canSend, unavailable_reason: canSend ? null : "Tin đăng không còn khả dụng nên không thể nhắn tin mới." };
 }
 
 async function conversationItem(
@@ -371,6 +374,13 @@ router.post(
 /* ------------------------------------------------------------------ *
  * GET /api/v1/conversations/:conversationId/messages
  * ------------------------------------------------------------------ */
+
+router.get("/:conversationId", asyncHandler(async (req: AuthRequest, res) => {
+  const viewer = viewerOf(req);
+  const id = parseId(req.params.conversationId);
+  await mustParticipate(id, viewer.id);
+  ok(res, await conversationItem(id, viewer.id));
+}));
 
 router.get(
   "/:conversationId/messages",

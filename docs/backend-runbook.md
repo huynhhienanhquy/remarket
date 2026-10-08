@@ -1,5 +1,30 @@
 # ReMarket backend runbook
 
+## Admin email verification
+
+User submits their own email from `/verify-email` and returns home; only an
+ACTIVE admin can approve the existing request at `/admin/email-verifications`.
+This is manual admin attestation, not automatic proof of mailbox ownership.
+Legacy email links submit the same request and cannot bypass admin approval.
+Existing verified accounts remain verified; no pending requests are backfilled.
+
+Migration `20261008000000_admin_email_verification` adds a nullable request
+timestamp, an index and two notification enum values without deleting data.
+Run `pnpm --filter @remarket/api prisma:deploy` followed by `prisma:generate`
+using the canonical schema in `apps/api/prisma`, then restart the API/worker.
+Do not use database reset or seed on the application's database.
+
+Requests and approvals use user-row locks, durable notifications, audit and
+outbox in one transaction. Retries do not create duplicate approvals. Approval
+changes only email verification, never role, password or account lock state.
+The web refreshes capabilities via Socket.IO, with a 15-second visible/online
+REST fallback for unverified users. Queue badges/list also poll every 15 seconds.
+
+Safe regression command from repo root:
+`node apps/api/scripts/verify-isolated.mjs --browser --email-only`.
+It migrates and tests a uniquely owned temporary schema, runs Chrome/live API
+against private test ports, then removes only its test schema/profile/uploads.
+
 ## Runtime baseline
 
 - Node.js 22, pnpm 11.9, PostgreSQL 16.
@@ -19,9 +44,11 @@ Admin APIs independently enforce role and account state.
 
 Initial cookie discovery uses `POST /auth/bootstrap`: a guest/expired session
 returns 200 with null user/token, whereas database failures remain errors.
-Bootstrap and protected-request recovery share one in-flight restore; Web Locks
-serialize rotation across supported browser tabs. Explicit `/auth/refresh`
-retains strict 401 and replay-revocation semantics.
+Bootstrap and protected-request recovery share one in-flight restore. Bootstrap
+validates the existing cookie without consuming it, setting a replacement or
+extending its lifetime; interrupted navigations cannot lose the session between
+database rotation and receipt of Set-Cookie. Explicit `/auth/refresh` still
+rotates atomically and retains strict 401 and replay-revocation semantics.
 
 Restored identities and `/auth/me` update the React session immediately. A user,
 role, status or email-verification change clears private query caches; old
@@ -48,7 +75,8 @@ this feature requires no database migration. Identity is still re-read from the
 database for every protected request: there is no role, status or revocation
 cache. Bootstrap returns rows from its existing User → Session → AuthToken
 locks instead of fetching them again, preserving the global lock order and
-atomic rotation/replay detection. Logout immediately displays its pending state
+replay detection without rotating during discovery. Explicit refresh retains
+atomic rotation. Logout immediately displays its pending state
 and rejects duplicate clicks while the server commits revocation.
 
 Dashboard counters use one parameterized aggregate statement with the same
@@ -156,7 +184,10 @@ lists, dashboard and audit caches.
 
 ## Development
 
-Run the API with `pnpm --filter @remarket/api dev` and the web app with `pnpm --filter @remarket/web dev`.
+Run both services with `pnpm dev`, or use `pnpm dev:api` and `pnpm dev:web` separately.
+The API loads `apps/api/.env`; Vite loads `apps/web/.env`. Only public `VITE_*`
+values belong in the web environment. The canonical Prisma 5.22 schema and
+migrations are under `apps/api/prisma`, not the legacy root Prisma files.
 
 `RUN_JOBS=auto` starts background jobs in the API outside tests. To run a dedicated worker, set `RUN_JOBS=false` on the API process and run `pnpm --filter @remarket/api worker` separately. Do not run both modes unintentionally; DB leases make outbox delivery safe, but duplicate schedulers waste capacity.
 
@@ -181,6 +212,20 @@ pnpm --filter @remarket/api start:worker
 ```
 
 The PostgreSQL integration suite runs only when `TEST_DATABASE_URL` is present. It must point to a disposable test database.
+
+Alternatively, `node apps/api/scripts/verify-isolated.mjs` creates a new random
+`remarket_verify_*` schema on the configured direct connection, verifies the
+selected namespace, deploys migrations, runs integration tests, then removes
+only that test schema. The database role must have schema creation privileges.
+It never resets or seeds existing application tables.
+
+Add `--browser` for integration plus live Chrome/adapter smoke, or use
+`--browser-only` to run just migrations, isolated seed and browser checks.
+The smoke uses private ports 5320/5321 and separate Chrome contexts for buyer,
+seller and admin. It refuses to reuse existing servers. It verifies responsive
+pages and the live upload-to-review lifecycle; screenshots/results are written
+under `.artifacts/member-smoke`. The harness stops its services and cleans its
+test schema/uploads on exit. `CHROME_BIN` can select the Chrome executable.
 
 `docs/openapi.yaml` is the source for `docs/remarket.postman_collection.json`. Regenerate the collection after contract changes; the API contract test verifies every request name and every local OpenAPI reference.
 

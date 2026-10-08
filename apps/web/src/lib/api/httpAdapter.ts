@@ -74,6 +74,8 @@ const auth: AuthApi = {
     return requireSession(await auth.me());
   },
   resendVerification: (email) => http.post("/auth/resend-verification", { email }),
+  emailVerificationRequest: () => http.get("/auth/email-verification-request"),
+  requestEmailVerification: () => http.post("/auth/email-verification-request", {}),
   forgotPassword: (email) => http.post("/auth/forgot-password", { email }),
   resetPassword: (token, password) =>
     http.post("/auth/reset-password", { token, password }),
@@ -134,6 +136,7 @@ const orders: OrdersApi = {
 
 const chat: ChatApi = {
   conversations: (page) => http.get("/conversations", { page }),
+  detail: (id) => http.get(`/conversations/${id}`),
   open: (productId) => http.post("/conversations", { product_id: productId }),
   messages: (conversationId, cursor) =>
     http.get(`/conversations/${conversationId}/messages`, { cursor: cursor ?? undefined }),
@@ -178,6 +181,8 @@ const profiles: ProfilesApi = {
 };
 
 const admin: ApiAdapter["admin"] = {
+  emailVerifications: (query) => http.get("/admin/email-verifications", { ...query }),
+  approveEmailVerification: (id) => http.post(`/admin/email-verifications/${id}/approve`, {}),
   dashboard: (from, to) => http.get("/admin/dashboard", { from, to }),
   users: (query) => http.get("/admin/users", { ...query }),
   user: (id) => http.get(`/admin/users/${id}`),

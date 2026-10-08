@@ -35,6 +35,7 @@ export function signAccessToken(userId: string, sessionId: string): string {
 export interface VerifiedAccess {
   userId: string;
   sessionId: string;
+  expiresAt: number;
 }
 
 export function verifyAccessToken(token: string): VerifiedAccess | null {
@@ -44,8 +45,8 @@ export function verifyAccessToken(token: string): VerifiedAccess | null {
       audience: env.jwtAudience,
       algorithms: [env.jwtAlgorithm],
     }) as jwt.JwtPayload & { session_id?: unknown };
-    if (typeof decoded.sub !== "string" || typeof decoded.session_id !== "string") return null;
-    return { userId: decoded.sub, sessionId: decoded.session_id };
+    if (typeof decoded.sub !== "string" || typeof decoded.session_id !== "string" || typeof decoded.exp !== "number") return null;
+    return { userId: decoded.sub, sessionId: decoded.session_id, expiresAt: decoded.exp * 1000 };
   } catch {
     return null;
   }

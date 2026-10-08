@@ -16,6 +16,8 @@ import type {
   ConversationListItem,
   CreateSupportTicketInput,
   FavoriteListResponse,
+  EmailVerificationRequest,
+  PageMeta,
   MessagePage,
   Notification,
   OrderDetail,
@@ -90,6 +92,8 @@ export interface AuthApi {
   logout(): Promise<void>;
   logoutAll(): Promise<void>;
   verifyEmail(token: string): Promise<SessionUser>;
+  emailVerificationRequest(): Promise<EmailVerificationRequest | null>;
+  requestEmailVerification(): Promise<EmailVerificationRequest | null>;
   resendVerification(email: string): Promise<{ retry_after?: string }>;
   forgotPassword(email: string): Promise<{ accepted: true }>;
   resetPassword(token: string, password: string): Promise<{ accepted: true }>;
@@ -193,6 +197,7 @@ export interface OrdersApi {
 
 export interface ChatApi {
   conversations(page?: number): Promise<{ items: ConversationListItem[]; meta: { total: number } }>;
+  detail(conversationId: string): Promise<ConversationListItem>;
   /** Opens the single conversation for (product, buyer, seller). */
   open(productId: string): Promise<{ id: string }>;
   messages(
@@ -246,6 +251,8 @@ export interface ProfilesApi {
 }
 
 export interface AdminApi {
+  emailVerifications(query: { status?: "PENDING" | "APPROVED" | "ALL"; page?: number }): Promise<{ items: EmailVerificationRequest[]; meta: PageMeta }>;
+  approveEmailVerification(id: string): Promise<EmailVerificationRequest>;
   dashboard(from: string, to: string): Promise<AdminDashboard>;
   users(query: {
     q?: string;

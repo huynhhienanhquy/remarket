@@ -12,13 +12,15 @@ import {
   Input,
   Select,
   Textarea,
-  ImageUpload,
   FormRow,
   Skeleton,
   Spinner,
+  InlineAlert,
+  useToast,
 } from "../../components/ui";
 import { CONDITIONS, DELIVERY_METHODS, conditionLabel, deliveryLabel } from "@remarket/shared";
-import { toast } from "react-toastify";
+import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
+import { ProductImageUpload } from "../../components/features/ProductImageUpload";
 
 type Mode = "create" | "edit";
 
@@ -37,6 +39,8 @@ export function ProductFormPage() {
   const mode: Mode = id ? "edit" : "create";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const online = useConnectivity();
 
   const [form, setForm] = useState<ProductFormData>({
     title: "",
@@ -52,13 +56,17 @@ export function ProductFormPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ProductInput, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [existingProduct, setExistingProduct] = useState<ProductDetail | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   // Load categories for select
-  const { data: categories } = useQuery({
+  const categoryQuery = useQuery({
     queryKey: queryKeys.categories,
     queryFn: () => api.categories.tree(),
   });
+  const categories = categoryQuery.data;
+  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: () => api.categories.provinces() });
 
   // Flatten categories for select (leaf only)
   const flatCategories = categories?.flatMap((root) =>
@@ -69,10 +77,13 @@ export function ProductFormPage() {
 
   // Load existing product when editing
   useEffect(() => {
+    let active = true;
     if (mode === "edit" && id) {
-      api.products.detail(id).then(setExistingProduct).catch(() => navigate("/account/products"));
+      setExistingProduct(null); setLoadError(null);
+      api.products.detail(id).then((product) => { if (active) setExistingProduct(product); }).catch((error: unknown) => { if (active) setLoadError(error); });
     }
-  }, [mode, id, navigate]);
+    return () => { active = false; };
+  }, [mode, id]);
 
   // Initialize form with existing data
   useEffect(() => {
@@ -149,7 +160,7 @@ export function ProductFormPage() {
         : api.products.create(request.input),
     onSuccess: () => {
       toast.success(mode === "create" ? "Tạo tin đăng thành công. Đang chờ duyệt." : "Cập nhật tin đăng thành công.");
-      queryClient.invalidateQueries({ queryKey: queryKeys.ownProducts({ status: "ALL", page: 1 }) });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate("/account/products");
     },
     onError: (error: unknown) => {
@@ -163,7 +174,7 @@ export function ProductFormPage() {
     mutationFn: (productId: string) => api.products.submit(productId),
     onSuccess: () => {
       toast.success("Đã gửi duyệt lại.");
-      queryClient.invalidateQueries({ queryKey: queryKeys.ownProducts({ status: "ALL", page: 1 }) });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate("/account/products");
     },
   });
@@ -172,7 +183,7 @@ export function ProductFormPage() {
     mutationFn: (productId: string) => api.products.hide(productId),
     onSuccess: () => {
       toast.success("Đã ẩn tin đăng.");
-      queryClient.invalidateQueries({ queryKey: queryKeys.ownProducts({ status: "ALL", page: 1 }) });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate("/account/products");
     },
   });
@@ -181,13 +192,14 @@ export function ProductFormPage() {
     mutationFn: (productId: string) => api.products.remove(productId),
     onSuccess: () => {
       toast.success("Đã xóa tin đăng.");
-      queryClient.invalidateQueries({ queryKey: queryKeys.ownProducts({ status: "ALL", page: 1 }) });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate("/account/products");
     },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || uploading || !online) return;
     if (!validate()) return;
 
     setSubmitting(true);
@@ -210,25 +222,33 @@ export function ProductFormPage() {
   };
 
   const handleAction = async (action: ProductAction) => {
-    if (!id) return;
+    if (!id || !online || submitting || uploading) return;
+    try {
     if (action === "submit") await submitAction.mutateAsync(id);
     else if (action === "hide") await hideAction.mutateAsync(id);
     else if (action === "delete") {
-      if (window.confirm("Xóa vĩnh viễn tin đăng này?")) await deleteAction.mutateAsync(id);
+      if (window.confirm("Xóa tin đăng này? Lịch sử giao dịch vẫn được giữ.")) await deleteAction.mutateAsync(id);
     } else if (action === "edit") {
       // Already in edit mode
     }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý tin đăng."); }
   };
 
   if (mode === "edit" && !existingProduct) {
+    if (loadError) return <QueryFailure error={loadError} retry={() => window.location.reload()} />;
     return <Skeleton className="space-y-4 h-[500px]" />;
   }
+  if (existingProduct && !existingProduct.capabilities.can_edit) return <InlineAlert tone="warning" title="Không thể chỉnh sửa tin này">Tin đang được giữ, đã bán hoặc bị hạn chế. <Button onClick={() => navigate("/account/products")}>Quay lại tin đăng</Button></InlineAlert>;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{mode === "create" ? "Đăng tin mới" : "Chỉnh sửa tin đăng"}</h1>
       </div>
+      <OfflineNotice online={online} />
+      {categoryQuery.isError && <QueryFailure error={categoryQuery.error} retry={() => void categoryQuery.refetch()} />}
+      {provinces.isError && <QueryFailure error={provinces.error} retry={() => void provinces.refetch()} />}
+      {saveMutation.isError && <QueryFailure error={saveMutation.error} />}
 
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="bg-white rounded-xl border border-neutral-200 p-5 space-y-5">
@@ -313,35 +333,7 @@ export function ProductFormPage() {
                 onChange={(e) => setForm({ ...form, province_code: e.target.value })}
               >
                 <option value="" disabled>Chọn tỉnh/thành</option>
-                {[
-                  { code: "VN-01", name: "Hà Nội" },
-                  { code: "VN-29", name: "Đà Nẵng" },
-                  { code: "VN-65", name: "TP. Hồ Chí Minh" },
-                  { code: "VN-14", name: "Hải Phòng" },
-                  { code: "VN-37", name: "Kon Tum" },
-                  { code: "VN-38", name: "Gia Lai" },
-                  { code: "VN-39", name: "Đắk Lắk" },
-                  { code: "VN-40", name: "Đắk Nông" },
-                  { code: "VN-41", name: "Lâm Đồng" },
-                  { code: "VN-43", name: "Bình Phước" },
-                  { code: "VN-44", name: "Tây Ninh" },
-                  { code: "VN-45", name: "Bình Dương" },
-                  { code: "VN-46", name: "Đồng Nai" },
-                  { code: "VN-47", name: "Long An" },
-                  { code: "VN-49", name: "Đồng Tháp" },
-                  { code: "VN-50", name: "An Giang" },
-                  { code: "VN-51", name: "Bà Rịa - Vũng Tàu" },
-                  { code: "VN-52", name: "Hồ Chí Minh" },
-                  { code: "VN-53", name: "Tiền Giang" },
-                  { code: "VN-54", name: "Bến Tre" },
-                  { code: "VN-55", name: "Trà Vinh" },
-                  { code: "VN-56", name: "Vĩnh Long" },
-                  { code: "VN-57", name: "Cần Thơ" },
-                  { code: "VN-58", name: "Hậu Giang" },
-                  { code: "VN-59", name: "Sóc Trăng" },
-                  { code: "VN-60", name: "Bạc Liêu" },
-                  { code: "VN-61", name: "Cà Mau" },
-                ].map((p) => (
+                {provinces.data?.map((p) => (
                   <option key={p.code} value={p.code}>{p.name}</option>
                 ))}
               </Select>
@@ -397,16 +389,12 @@ export function ProductFormPage() {
               </div>
             ))}
             {form.images.length < 8 && (
-              <ImageUpload
+              <ProductImageUpload
+                disabled={submitting || !online}
+                onBusyChange={setUploading}
                 onUpload={(upload) => {
-                  const newImages = [
-                    ...form.images,
-                    { ...upload, sort_order: form.images.length },
-                  ];
-                  setForm({ ...form, images: newImages });
+                  setForm((current) => ({ ...current, images: [...current.images, { ...upload, sort_order: current.images.length }].slice(0, 8) }));
                 }}
-                accept="image/jpeg,image/png,image/webp"
-                maxSize={5 * 1024 * 1024}
               />
             )}
           </div>
@@ -417,7 +405,7 @@ export function ProductFormPage() {
           <Button variant="secondary" onClick={() => navigate("/account/products")}>
             Hủy
           </Button>
-          <Button type="submit" disabled={submitting} className="min-w-[140px]">
+          <Button type="submit" disabled={submitting || uploading || !online || provinces.isPending || provinces.isError} className="min-w-[140px]">
             {submitting ? <Spinner size={16} /> : mode === "create" ? "Đăng tin" : "Lưu thay đổi"}
           </Button>
         </div>

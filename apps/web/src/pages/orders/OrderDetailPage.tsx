@@ -13,6 +13,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { useSession } from "../../app/SessionProvider";
 import { isApiError } from "../../lib/errors";
+import { OfflineNotice, useConnectivity } from "../../components/features/PageFeedback";
 import {
   Button,
   ConfirmDialog,
@@ -34,6 +35,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
   const { id = "" } = useParams();
   const queryClient = useQueryClient();
   const { viewer: _viewer } = useSession();
+  const online = useConnectivity();
 
   const [confirmOpen, setConfirmOpen] = useState<{ action: string; reason: string } | null>(null);
   const [shipFields, setShipFields] = useState<{ carrier: string; tracking: string } | null>(null);
@@ -49,7 +51,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
 
   const order = detail.data;
 
-  const isBuyer = role === "buyer";
+  const isBuyer = (order?.role ?? role) === "buyer";
   const counterparty = order?.counterparty ?? null;
   const myAllowedActions = order?.allowed_actions ?? [];
 
@@ -82,6 +84,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
     action: "confirm" | "cancel" | "ship" | "deliver" | "complete",
     body: Record<string, unknown>,
   ) {
+    if (!order || pendingAction || !online) return;
     setActionError(null);
     setPendingAction(action);
     try {
@@ -89,8 +92,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
         expected_version: order!.version,
         ...body,
       } as Parameters<typeof api.orders.act>[2]);
-      queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders(role, "ALL", 1) });
+      for (const key of ["orders", "products", "profiles", "cart", "notifications"]) void queryClient.invalidateQueries({ queryKey: [key] });
     } catch (caught) {
       if (isApiError(caught)) {
         if (caught.code === "VERSION_CONFLICT") {
@@ -179,11 +181,12 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
         <span className="text-ink">#{order.code.slice(0, 8).toUpperCase()}</span>
       </nav>
 
+      <OfflineNotice online={online} />
       {actionError && <InlineAlert tone="danger" title={actionError} />}
 
       <section className="rounded-card border border-line bg-surface p-5 mb-6">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="t-h2 text-ink">Đơn hàng #{order.code.slice(0, 8).toUpperCase()}</p>
             <StatusBadge label={statusMeta?.label ?? order.status} tone={statusMeta?.tone ?? "neutral"} />
           </div>
@@ -230,9 +233,9 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
             <div className="divide-y divide-line">
               {order.items.map((snap) => (
                 <div key={snap.id} className="py-4 flex gap-4">
-                  {snap.image_path_snapshot ? (
+                  {snap.image_url ? (
                     <img
-                      src={snap.image_path_snapshot}
+                      src={snap.image_url}
                       alt=""
                       className="h-16 w-16 shrink-0 rounded-control object-cover"
                     />

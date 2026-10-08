@@ -11,6 +11,7 @@ import {
   fail,
 } from "./adapter-helpers";
 import { API_ERROR_CODES } from "@remarket/shared";
+import { projectEmailVerification, requestMockEmailVerification } from "./email-verification";
 
 /**
  * Mock auth keeps a user id in localStorage (never a password or token) and
@@ -158,7 +159,7 @@ export const authApi: AuthApi = {
       fail(400, API_ERROR_CODES.VALIDATION_ERROR, "Liên kết xác minh không hợp lệ hoặc đã hết hạn.");
     }
     const user = mustFindUser(db(), userId);
-    user.email_verified_at = new Date().toISOString();
+    requestMockEmailVerification(user);
     setCurrentUserId(user.id);
     const { password: _password, ...rest } = user;
     return rest;
@@ -176,6 +177,13 @@ export const authApi: AuthApi = {
       issueToken(user.id);
     }
     return {};
+  },
+
+  async emailVerificationRequest() {
+    return projectEmailVerification(requireAuth(viewer()));
+  },
+  async requestEmailVerification() {
+    return requestMockEmailVerification(requireActive(viewer()));
   },
 
   async forgotPassword(email) {
@@ -226,7 +234,8 @@ export const authApi: AuthApi = {
 
   async uploadAvatar(storagePath) {
     const user = requireAuth(viewer());
-    user.avatar_url = storagePath;
+    const filename = decodeURIComponent(storagePath.split("/").at(-1) ?? "Avatar");
+    user.avatar_url = avatarPlaceholder(filename);
     const { password: _password, ...rest } = user;
     return rest;
   },

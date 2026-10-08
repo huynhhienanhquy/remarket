@@ -113,6 +113,8 @@ enum NotificationType {
   REVIEW_CREATED
   TICKET_REPLY
   REPORT_RESULT
+  EMAIL_VERIFICATION_REQUESTED
+  EMAIL_VERIFIED
 }
 
 // ============================================================================
@@ -128,6 +130,7 @@ model User {
   role                   UserRole  @default(USER)
   status                 UserStatus @default(ACTIVE)
   emailVerifiedAt        DateTime?
+  emailVerificationRequestedAt DateTime?
   phone                  String?
   provinceCode           String?
   defaultAddress         String?
@@ -165,6 +168,7 @@ model User {
 
   @@index([email])
   @@index([status])
+  @@index([emailVerifiedAt, emailVerificationRequestedAt])
 }
 
 /// One row per login session. Stores only hashes: the access JWT lives 15 min

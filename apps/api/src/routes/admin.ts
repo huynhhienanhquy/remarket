@@ -17,6 +17,7 @@ import { adminReviewsRouter } from "./adminReviews.js";
 import { adminSupportRouter } from "./adminSupport.js";
 import { adminAuditRouter } from "./adminAudit.js";
 import { adminOrdersRouter } from "./adminOrders.js";
+import { adminEmailVerificationsRouter } from "./adminEmailVerifications.js";
 
 /**
  * Admin module (detail-project 15). `app.ts` mounts this router behind
@@ -83,6 +84,7 @@ router.get(
 );
 
 router.use("/users", adminUsersRouter);
+router.use("/email-verifications", adminEmailVerificationsRouter);
 router.use("/products", adminProductsRouter);
 router.use("/categories", adminCategoriesRouter);
 router.use("/reports", adminReportsRouter);

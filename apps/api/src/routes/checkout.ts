@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { isTransactionConflict } from "../shared/database-errors.js";
 import { API_ERROR_CODES } from "@remarket/shared";
 import type { CheckoutResult, OrderListItem } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
@@ -234,7 +235,7 @@ async function uniqueOrderCode(tx: Prisma.TransactionClient): Promise<string> {
 
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return error.code === "P2002" || error.code === "P2028" || error.code === "P2034";
+    return error.code === "P2002" || error.code === "P2028" || isTransactionConflict(error);
   }
   if (error instanceof Error) {
     return /could not serialize access|write conflict|deadlock/i.test(error.message);
@@ -582,8 +583,6 @@ async function runCheckout(
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      maxWait: 5000,
-      timeout: 15000,
     },
   );
 

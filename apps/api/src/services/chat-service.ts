@@ -3,7 +3,7 @@ import type { Message } from "@prisma/client";
 import { CHAT_LIMITS, validateChatMessage } from "@remarket/shared";
 import type { AuthUser } from "../middleware/auth.js";
 import { enqueueOutbox } from "../outbox/outbox.js";
-import { accountLocked, emailNotVerified, notFound, validationError } from "../shared/errors.js";
+import { accountLocked, emailNotVerified, notFound, productNotAvailable, validationError } from "../shared/errors.js";
 import { toMessage } from "../shared/dto-mappers.js";
 import { prisma } from "../utils/prisma.js";
 
@@ -75,6 +75,13 @@ export async function sendChatMessage(input: {
       });
       if (!liveViewer || liveViewer.status !== "ACTIVE") throw accountLocked();
       if (liveViewer.emailVerifiedAt === null) throw emailNotVerified();
+      const thread = await tx.conversation.findUnique({ where: { id: conversationId }, select: { productId: true } });
+      if (!thread) throw notFound("Không tìm thấy cuộc hội thoại này.");
+      if (thread.productId) {
+        await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" = ${thread.productId} FOR SHARE`;
+        const product = await tx.product.findUnique({ where: { id: thread.productId }, select: { isBlocked: true, deletedAt: true } });
+        if (!product || product.isBlocked || product.deletedAt !== null) throw productNotAvailable("Tin đăng không còn khả dụng nên không thể nhắn tin mới.");
+      }
       const created = await tx.message.create({
         data: { conversationId, senderId: viewer.id, clientMessageId, content },
       });
@@ -119,7 +126,7 @@ export async function markConversationRead(input: {
   conversationId: string;
   viewerId: string;
   lastMessageId: string;
-}): Promise<{ unread: 0; updated: number; read_at: string }> {
+}): Promise<{ unread: number; updated: number; read_at: string }> {
   await assertConversationParticipant(input.conversationId, input.viewerId);
   const target = await prisma.message.findFirst({
     where: { id: input.lastMessageId, conversationId: input.conversationId },
@@ -134,10 +141,16 @@ export async function markConversationRead(input: {
         conversationId: input.conversationId,
         senderId: { not: input.viewerId },
         readAt: null,
-        createdAt: { lte: target.createdAt },
+        OR: [
+          { createdAt: { lt: target.createdAt } },
+          { createdAt: target.createdAt, id: { lte: input.lastMessageId } },
+        ],
       },
       data: { readAt: now },
     });
+    const unread = await tx.message.count({ where: {
+      conversationId: input.conversationId, senderId: { not: input.viewerId }, readAt: null,
+    } });
     await enqueueOutbox(
       tx,
       "conversation.read",
@@ -148,11 +161,11 @@ export async function markConversationRead(input: {
         reader_id: input.viewerId,
         last_message_id: input.lastMessageId,
         read_at: now.toISOString(),
-        unread: 0,
+        unread,
         updated: updated.count,
       },
     );
-    return updated;
+    return { updated: updated.count, unread };
   });
-  return { unread: 0, updated: result.count, read_at: now.toISOString() };
+  return { ...result, read_at: now.toISOString() };
 }

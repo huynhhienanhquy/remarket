@@ -20,7 +20,6 @@ import {
   notFound,
   paginate,
   parsePaging,
-  requireActive,
   requireAuth,
   validationError,
 } from "./adapter-helpers";
@@ -147,7 +146,8 @@ export const supportApi: SupportApi = {
   },
 
   async create(input: CreateSupportTicketInput) {
-    const viewer = requireActive(currentViewer());
+    const viewer = requireAuth(currentViewer());
+    if (!viewer.email_verified_at && input.type !== "ACCOUNT") forbidden("Xác minh email để gửi yêu cầu về giao dịch.");
     const database = db();
 
     const errors: Record<string, string> = {};
@@ -242,6 +242,7 @@ export const supportApi: SupportApi = {
     if (isOwner && !isAdmin && ticket.status === "RESOLVED") {
       ticket.status = "OPEN";
       ticket.resolved_at = null;
+      ticket.resolution_note = null;
     }
     ticket.updated_at = now;
     return projectTicketDetail(database, ticket, viewer);

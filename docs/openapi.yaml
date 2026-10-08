@@ -20,6 +20,7 @@ x-error-profiles:
   public-validation: &PublicValidationErrors [VALIDATION_ERROR, RATE_LIMITED, INTERNAL]
   public-lookup: &PublicLookupErrors [VALIDATION_ERROR, NOT_FOUND, RATE_LIMITED, INTERNAL]
   session-read: &SessionReadErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, RATE_LIMITED, INTERNAL]
+  active-read: &ActiveReadErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, ACCOUNT_LOCKED, NOT_FOUND, RATE_LIMITED, INTERNAL]
   restricted-mutation: &RestrictedMutationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, INVALID_ORDER_TRANSITION, RETRY_LATER, RATE_LIMITED, INTERNAL]
   active-mutation: &ActiveMutationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
   admin-operation: &AdminOperationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
@@ -31,7 +32,11 @@ x-operation-error-codes:
   getSession: *SessionReadErrors
   logout: *SessionReadErrors
   logoutAll: *SessionReadErrors
-  verifyEmail: *PublicValidationErrors
+  verifyEmail: [VALIDATION_ERROR, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, RATE_LIMITED, INTERNAL]
+  getEmailVerificationRequest: *SessionReadErrors
+  requestEmailVerification: *ActiveMutationErrors
+  adminEmailVerifications: *AdminOperationErrors
+  adminApproveEmailVerification: *AdminOperationErrors
   resendVerification: *PublicValidationErrors
   forgotPassword: *PublicValidationErrors
   resetPassword: *PublicValidationErrors
@@ -60,11 +65,12 @@ x-operation-error-codes:
   getOrder: *SessionReadErrors
   actOnOrder: *ActiveMutationErrors
   createReview: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, REVIEW_NOT_ALLOWED, RETRY_LATER, RATE_LIMITED, INTERNAL]
-  listConversations: *SessionReadErrors
+  listConversations: *ActiveReadErrors
+  getConversation: *ActiveReadErrors
   openConversation: *ActiveMutationErrors
-  listMessages: *SessionReadErrors
+  listMessages: *ActiveReadErrors
   sendMessage: *ActiveMutationErrors
-  markConversationRead: *RestrictedMutationErrors
+  markConversationRead: *ActiveReadErrors
   getPublicProfile: *PublicLookupErrors
   getPublicProducts: *PublicLookupErrors
   listPublicReviews: *PublicLookupErrors
@@ -120,7 +126,54 @@ paths:
   /auth/logout-all:
     post: { tags: [Auth], operationId: logoutAll, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' } } }
   /auth/verify-email:
-    post: { tags: [Auth], operationId: verifyEmail, requestBody: { $ref: '#/components/requestBodies/TokenBody' }, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
+    post: { tags: [Auth], operationId: verifyEmail, description: Consumes a legacy one-time mailbox token and submits an admin approval request. Opens a session but does NOT mark email verified., requestBody: { $ref: '#/components/requestBodies/TokenBody' }, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '422': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } } }
+  /auth/email-verification-request:
+    get:
+      tags: [Auth]
+      operationId: getEmailVerificationRequest
+      security: [{ bearerAuth: [] }]
+      description: Own request only; null when no request exists. Never accepts a target email or user ID.
+      responses:
+        '200': { $ref: '#/components/responses/EmailVerificationSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Auth]
+      operationId: requestEmailVerification
+      security: [{ bearerAuth: [] }]
+      description: ACTIVE account submits its immutable email for admin approval. Idempotent retries, no self-verification. Limit 3 per account per hour; trusted Origin required in production. Frontend returns home on success.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, example: {} } } } }
+      responses:
+        '200': { $ref: '#/components/responses/EmailVerificationSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /admin/email-verifications:
+    get:
+      tags: [Admin]
+      operationId: adminEmailVerifications
+      security: [{ bearerAuth: [] }]
+      description: ACTIVE ADMIN only. Pending requests by default, including users who became locked after submitting.
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [PENDING, APPROVED, ALL], default: PENDING } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }]
+      responses:
+        '200': { $ref: '#/components/responses/EmailVerificationListSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /admin/email-verifications/{id}/approve:
+    post:
+      tags: [Admin]
+      operationId: adminApproveEmailVerification
+      security: [{ bearerAuth: [] }]
+      description: ACTIVE ADMIN approves an existing request. Idempotent under concurrency. Updates only emailVerifiedAt; does not unlock accounts or grant roles. Approval, audit, notification and realtime outbox commit atomically.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, example: {} } } } }
+      responses:
+        '200': { $ref: '#/components/responses/EmailVerificationSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /auth/resend-verification:
     post: { tags: [Auth], operationId: resendVerification, requestBody: { $ref: '#/components/requestBodies/ResendVerificationBody' }, responses: { '200': { $ref: '#/components/responses/VerificationResendSuccess' } } }
   /auth/forgot-password:
@@ -235,6 +288,8 @@ paths:
   /conversations:
     get: { tags: [Chat], operationId: listConversations, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ConversationListSuccess' } } }
     post: { tags: [Chat], operationId: openConversation, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/OpenConversationBody' }, responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '201': { $ref: '#/components/responses/ConversationSuccess' } } }
+  /conversations/{conversationId}:
+    get: { tags: [Chat], operationId: getConversation, security: [{ bearerAuth: [] }], parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
   /conversations/{conversationId}/messages:
     parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
     get: { tags: [Chat], operationId: listMessages, security: [{ bearerAuth: [] }], parameters: [{ name: cursor, in: query, schema: { type: string, maxLength: 1024 } }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/MessagePageSuccess' } } }
@@ -425,6 +480,22 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/AdminProductBlockInput' }
   responses:
+    EmailVerificationSuccess:
+      description: Own request or approved request; nullable only for accounts without a request.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/SuccessEnvelope' }
+              - { type: object, properties: { data: { allOf: [{ $ref: '#/components/schemas/EmailVerificationRequest' }], nullable: true } } }
+    EmailVerificationListSuccess:
+      description: Paginated requests available only to ACTIVE admins.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - { $ref: '#/components/schemas/SuccessEnvelope' }
+              - { type: object, properties: { data: { type: object, required: [items, meta], properties: { items: { type: array, items: { $ref: '#/components/schemas/EmailVerificationRequest' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } }
     Success:
       description: Successful response
       content:
@@ -601,6 +672,22 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
   schemas:
+    EmailVerificationRequest:
+      type: object
+      required: [id, user, status, requested_at, approved_at]
+      properties:
+        id: { type: string, format: uuid }
+        user:
+          type: object
+          required: [id, full_name, email, status]
+          properties:
+            id: { type: string, format: uuid }
+            full_name: { type: string }
+            email: { type: string, format: email }
+            status: { type: string, enum: [ACTIVE, LOCKED] }
+        status: { type: string, enum: [PENDING, APPROVED] }
+        requested_at: { type: string, format: date-time }
+        approved_at: { type: string, format: date-time, nullable: true }
     RegisterInput:
       type: object
       required: [full_name, email, password, confirm_password, phone]
@@ -1143,6 +1230,8 @@ components:
       additionalProperties: false
       properties:
         id: { type: string, format: uuid }
+        can_send: { type: boolean, description: Whether this listing permits new messages. }
+        unavailable_reason: { type: string, nullable: true }
         counterparty: { $ref: '#/components/schemas/ConversationCounterparty' }
         product: { allOf: [{ $ref: '#/components/schemas/ConversationProduct' }], nullable: true }
         last_message: { allOf: [{ $ref: '#/components/schemas/ConversationLastMessage' }], nullable: true }
@@ -1199,7 +1288,7 @@ components:
         resolution_note: { type: string, nullable: true }
         created_at: { $ref: '#/components/schemas/IsoDateTime' }
         updated_at: { $ref: '#/components/schemas/IsoDateTime' }
-    NotificationType: { type: string, enum: [ORDER_CREATED, ORDER_CONFIRMED, ORDER_CANCELLED, ORDER_SHIPPED, ORDER_DELIVERED, ORDER_COMPLETED, ORDER_REMINDER, REVIEW_CREATED, TICKET_REPLY, REPORT_RESULT] }
+    NotificationType: { type: string, enum: [PRODUCT_APPROVED, PRODUCT_REJECTED, PRODUCT_BLOCKED, NEW_MESSAGE, ORDER_CREATED, ORDER_CONFIRMED, ORDER_CANCELLED, ORDER_SHIPPED, ORDER_DELIVERED, ORDER_COMPLETED, ORDER_REMINDER, REVIEW_CREATED, TICKET_REPLY, REPORT_RESULT, EMAIL_VERIFICATION_REQUESTED, EMAIL_VERIFIED] }
     Notification:
       type: object
       required: [id, user_id, type, title, content, reference_type, reference_id, read_at, created_at]

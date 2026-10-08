@@ -100,6 +100,15 @@ describe.skipIf(!enabled)("PostgreSQL integration", () => {
     expect(login.headers["set-cookie"]?.[0]).toContain("Path=/api/v1/auth");
     expect(login.headers["set-cookie"]?.[0]).toContain("HttpOnly");
 
+    // Repeated/cancelled page discovery must not consume the cookie. Actual
+    // refresh below must still rotate it and reject replay of the old token.
+    const discoveries = await Promise.all([0, 1].map(() => request(app)
+      .post("/api/v1/auth/bootstrap").set("Origin", "http://localhost:5173")
+      .set("Cookie", oldCookie!).expect(200)));
+    expect(discoveries.every((response) => response.body.data.user.id === userId)).toBe(true);
+    expect(discoveries.every((response) => response.headers["set-cookie"] === undefined)).toBe(true);
+    expect(await prisma.authToken.count({ where: { userId, purpose: "REFRESH", consumedAt: { not: null } } })).toBe(0);
+
     await request(app)
       .post("/api/v1/auth/refresh")
       .set("Origin", "http://localhost:5173")
@@ -171,6 +180,25 @@ describe.skipIf(!enabled)("PostgreSQL integration", () => {
     const held = await prisma.product.findUniqueOrThrow({ where: { id: product } });
     expect(held.status).toBe("RESERVED");
     expect(held.reservedOrderId).toBeTruthy();
+  });
+
+  it("creates a listing before attaching uploaded assets and rolls back unauthorized reuse", async () => {
+    const seller = randomUUID(), outsider = randomUUID(), category = randomUUID(), assetId = randomUUID();
+    ids.push(seller, outsider, category, assetId);
+    const passwordHash = await bcrypt.hash("unused-test-password", 4);
+    await prisma.user.createMany({ data: [seller, outsider].map((id) => ({ id, fullName: "Upload Test", email: `${id}@example.test`, passwordHash, emailVerifiedAt: new Date() })) });
+    await prisma.category.create({ data: { id: category, name: "Upload leaf", slug: `upload-${category}` } });
+    const storagePath = `users/${seller}/product/${assetId}.png`;
+    await prisma.uploadAsset.create({ data: { id: assetId, userId: seller, purpose: "product", storagePath, mimeType: "image/png", byteSize: 100 } });
+    const payload = { title: "Tin đăng với ảnh upload thật", description: "Mô tả đủ dài để kiểm tra việc gắn ảnh trong giao dịch tạo tin.", price: "100000", condition: "GOOD", usage_months: null, category_id: category, province_code: "VN-52", delivery_method: "COD", shipping_fee: "30000", images: [{ storage_path: storagePath, url: `/api/v1/uploads/${assetId}.png`, sort_order: 0 }] };
+    const sellerToken = await accessToken(seller);
+    const created = await request(app).post("/api/v1/products").set("Authorization", `Bearer ${sellerToken}`).send(payload).expect(201);
+    ids.push(created.body.data.id);
+    expect(created.body.data.status).toBe("PENDING");
+    expect(await prisma.uploadAsset.findUniqueOrThrow({ where: { id: assetId } })).toMatchObject({ productId: created.body.data.id, attachedAt: expect.any(Date) });
+    const outsiderToken = await accessToken(outsider);
+    await request(app).post("/api/v1/products").set("Authorization", `Bearer ${outsiderToken}`).send(payload).expect(422);
+    expect(await prisma.product.count({ where: { sellerId: outsider } })).toBe(0);
   });
 
   it("replays the same checkout key and rejects the key with a different payload", async () => {

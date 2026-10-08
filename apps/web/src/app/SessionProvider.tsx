@@ -96,6 +96,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return user;
   }, [applyUser]);
 
+  // REST fallback for admin approval when realtime is unavailable. No overlapping
+  // checks, no polling hidden/offline tabs, no change to refresh-cookie rotation.
+  const pendingVerification = !!viewer && viewer.status === "ACTIVE" && !viewer.email_verified_at;
+  const verificationViewerId = viewer?.id;
+  useEffect(() => {
+    if (!pendingVerification) return;
+    let disposed = false;
+    let checking = false;
+    const check = async () => {
+      if (checking || !navigator.onLine || document.visibilityState === "hidden") return;
+      checking = true;
+      try {
+        const user = await api.auth.me();
+        if (!disposed) applyUser(user);
+      } catch { /* Network errors are surfaced by the active page; retry later. */ }
+      finally { checking = false; }
+    };
+    const interval = window.setInterval(() => void check(), 15000);
+    const resume = () => void check();
+    window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      disposed = true; window.clearInterval(interval);
+      window.removeEventListener("online", resume); window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [verificationViewerId, pendingVerification, applyUser]);
+
   const register = useCallback(
     async (input: RegisterInput) => api.auth.register(input),
     [],

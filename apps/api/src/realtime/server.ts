@@ -14,6 +14,7 @@ import { onRealtimeEvent } from "./events.js";
 interface SocketIdentity {
   user: AuthUser;
   sessionId: string;
+  expiresAt: number;
 }
 
 const joinSchema = z.object({ conversation_id: z.string().uuid() }).strict();
@@ -79,6 +80,7 @@ async function identityFromToken(token: string): Promise<SocketIdentity | null> 
   ) return null;
   return {
     sessionId: session.id,
+    expiresAt: Math.min(claims.expiresAt, session.expiresAt.getTime()),
     user: {
       id: session.user.id,
       email: session.user.email,
@@ -98,6 +100,7 @@ async function refreshIdentity(identity: SocketIdentity): Promise<SocketIdentity
   if (!session || session.revokedAt !== null || session.expiresAt <= new Date()) return null;
   return {
     sessionId: session.id,
+    expiresAt: Math.min(identity.expiresAt, session.expiresAt.getTime()),
     user: {
       id: session.user.id,
       email: session.user.email,
@@ -142,6 +145,7 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
       const token = handshakeToken(socket);
       const identity = token ? await identityFromToken(token) : null;
       if (!identity) return next(new Error("UNAUTHORIZED"));
+      if (identity.user.status !== "ACTIVE") return next(new Error("ACCOUNT_LOCKED"));
       socket.data.identity = identity;
       next();
     } catch {
@@ -151,14 +155,26 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
 
   io.on("connection", (socket) => {
     const initial = socket.data.identity as SocketIdentity;
+    const expiration = setTimeout(() => socket.disconnect(true), Math.max(0, initial.expiresAt - Date.now()));
+    expiration.unref();
+    socket.once("disconnect", () => clearTimeout(expiration));
     void socket.join(`user:${initial.user.id}`);
     void socket.join(`session:${initial.sessionId}`);
 
     async function liveIdentity(): Promise<SocketIdentity> {
+      const token = handshakeToken(socket);
+      if (!token || !verifyAccessToken(token)) {
+        socket.disconnect(true);
+        throw new AppError(API_ERROR_CODES.UNAUTHORIZED, "Phiên đăng nhập đã hết hạn.", 401);
+      }
       const current = await refreshIdentity(socket.data.identity as SocketIdentity);
       if (!current) {
         socket.disconnect(true);
         throw new AppError(API_ERROR_CODES.SESSION_EXPIRED, "Phiên đăng nhập đã hết hạn.", 401);
+      }
+      if (current.user.status !== "ACTIVE") {
+        socket.disconnect(true);
+        throw new AppError(API_ERROR_CODES.ACCOUNT_LOCKED, "Tài khoản đang bị hạn chế.", 403);
       }
       socket.data.identity = current;
       return current;
@@ -195,6 +211,11 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
       } catch (error) {
         ack(socketError(error));
       }
+    });
+
+    socket.on("conversation:leave", async (raw) => {
+      const parsed = joinSchema.safeParse(raw);
+      if (parsed.success) await socket.leave(`conversation:${parsed.data.conversation_id}`);
     });
 
     socket.on("conversation:read", async (raw, ack = () => undefined) => {

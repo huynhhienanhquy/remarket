@@ -22,13 +22,14 @@ import { toSessionUser } from "../shared/dto-mappers.js";
 import type { SessionProfile } from "../shared/dto-mappers.js";
 import { accountLocked, forbidden, unauthorized, validationError } from "../shared/errors.js";
 import { newEmailToken, newRefreshToken, sha256, signAccessToken } from "../shared/tokens.js";
-import { emailTokenRateLimit, loginRateLimit } from "../middleware/rate-limit.js";
+import { emailTokenRateLimit, emailVerificationRateLimit, loginRateLimit } from "../middleware/rate-limit.js";
 import { publishRealtimeEvent } from "../realtime/events.js";
 import { sealEmailToken } from "../services/email.js";
 import { enqueueOutbox } from "../outbox/outbox.js";
 import { isKnownProvinceCode } from "../shared/geography.js";
 import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
 import type { IssuedSession } from "../services/session-issuance.js";
+import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
 
 /**
  * Authentication endpoints (detail-project 5).
@@ -390,7 +391,9 @@ function unavailableSession(res: Response, bootstrap: boolean) {
   throw sessionExpired();
 }
 
-// Both endpoints use exactly the same atomic rotation and replay detection.
+// Discovery validates the cookie without consuming it. A cancelled navigation
+// must not lose the session because its Set-Cookie response was never received.
+// Explicit refresh retains atomic rotation and strict replay detection.
 async function refreshSession(req: Request, res: Response, bootstrap = false) {
     const presented = readRefreshCookie(req);
     if (!presented) return unavailableSession(res, bootstrap);
@@ -461,6 +464,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
         return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
       }
 
+      if (bootstrap) return { kind: "discovered" as const, userId: current.userId, sessionId: session.id, user };
       const expiresAt = new Date(now.getTime() + REFRESH_MS);
       // Lock order/checks remain above. Combine only the dependent writes so
       // a token conflict or session-update failure rolls back every change.
@@ -483,13 +487,11 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
       });
       return unavailableSession(res, bootstrap);
     }
-    if (result.kind !== "rotated") return unavailableSession(res, bootstrap);
+    if (result.kind !== "rotated" && result.kind !== "discovered") return unavailableSession(res, bootstrap);
 
     if (bootstrap) {
-      // Read the user before committing rotation, so a later DB failure cannot
-      // consume the old cookie without delivering its replacement.
+      // Discovery does not extend the session lifetime or issue a new cookie.
       if (!result.user) return unavailableSession(res, true);
-      setRefreshCookie(res, nextToken);
       return ok(res, { user: toSessionUser(result.user), access_token: signAccessToken(result.userId, result.sessionId) });
     }
 
@@ -591,8 +593,22 @@ router.post(
   }),
 );
 
-// POST /api/v1/auth/verify-email — consumes a one-time token and opens a
-// brand new session so the frontend can reload /auth/me right away.
+// A valid legacy email link proves account ownership, not admin approval.
+router.get("/email-verification-request", authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
+  z.object({}).strict().parse(req.query);
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user) throw unauthorized();
+  ok(res, toEmailVerificationRequest(user));
+}));
+router.post("/email-verification-request", requireTrustedOrigin, authMiddleware, requireActive, emailVerificationRateLimit,
+  asyncHandler(async (req: AuthRequest, res) => {
+    z.object({}).strict().parse(req.body);
+    const result = await prisma.$transaction((tx) => requestEmailVerification(tx, req.user!.id));
+    ok(res, result);
+  }),
+);
+
+// POST /api/v1/auth/verify-email — submits the request and creates a session.
 router.post(
   "/verify-email",
   requireTrustedOrigin,
@@ -605,7 +621,7 @@ router.post(
           token: "Liên kết không hợp lệ hoặc đã hết hạn.",
         });
       }
-      await tx.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+      await requestEmailVerification(tx, userId);
       return createSession(tx, userId);
     });
     setRefreshCookie(res, issued.refreshToken);

@@ -102,6 +102,8 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   REVIEW_CREATED: "Đánh giá mới",
   TICKET_REPLY: "Phản hồi hỗ trợ",
   REPORT_RESULT: "Kết quả báo cáo",
+  EMAIL_VERIFICATION_REQUESTED: "Yêu cầu xác minh email",
+  EMAIL_VERIFIED: "Email đã được xác minh",
 };
 
 export function productStatusLabel(status: ProductStatus): string {

@@ -14,7 +14,8 @@ describe("security primitives", () => {
 
   it("round-trips the minimal access-token identity", () => {
     const token = signAccessToken("user-id", "session-id");
-    expect(verifyAccessToken(token)).toEqual({ userId: "user-id", sessionId: "session-id" });
+    expect(verifyAccessToken(token)).toMatchObject({ userId: "user-id", sessionId: "session-id" });
+    expect(verifyAccessToken(token)?.expiresAt).toBeGreaterThan(Date.now());
   });
 
   it("does not persist a raw email token in an outbox payload", () => {

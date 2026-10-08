@@ -16,6 +16,7 @@ import type {
 /** Internal shapes held by the in-memory mock database. */
 
 export interface MockUser extends SessionUser {
+  email_verification_requested_at?: string | null;
   /** Demo-only credential for the mock login form; never used by a real API. */
   password: string;
   lock_reason: string | null;
