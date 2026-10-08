@@ -80,6 +80,7 @@ function bearer(req: Request): string | null {
 
 /** Requires a live session; returns 401 otherwise. */
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+  res.setHeader("Cache-Control", "no-store");
   try {
     const token = bearer(req);
     if (!token) {
@@ -113,6 +114,7 @@ export async function optionalAuth(req: AuthRequest, _res: Response, next: NextF
       req.user = undefined;
       return next();
     }
+    _res.setHeader("Cache-Control", "no-store");
     const access = verifyAccessToken(token);
     if (!access) {
       req.user = undefined;

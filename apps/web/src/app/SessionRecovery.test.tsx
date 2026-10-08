@@ -57,7 +57,7 @@ describe("admin session recovery through the real HTTP adapter", () => {
   it("removes stale admin UI/cache when a 401 restores a different USER account", async () => {
     let bootstraps = 0;
     fetchMock.mockImplementation(async (url) => {
-      if (String(url).includes("/auth/bootstrap")) return ok({ user: ++bootstraps === 1 ? admin : member, access_token: `token-${bootstraps}` });
+      if (String(url).includes("/auth/bootstrap") || String(url).includes("/auth/refresh")) return ok({ user: ++bootstraps === 1 ? admin : member, access_token: `token-${bootstraps}` });
       if (String(url).includes("/auth/me")) return ok(member);
       return denied(401, "SESSION_EXPIRED");
     });
@@ -84,7 +84,7 @@ describe("admin session recovery through the real HTTP adapter", () => {
   it("never resubmits a moderation mutation after recovery switches accounts", async () => {
     let bootstraps = 0;
     fetchMock.mockImplementation(async (url) => {
-      if (String(url).includes("/auth/bootstrap")) return ok({ user: ++bootstraps === 1 ? admin : { ...admin, id: "another-admin" }, access_token: `token-${bootstraps}` });
+      if (String(url).includes("/auth/bootstrap") || String(url).includes("/auth/refresh")) return ok({ user: ++bootstraps === 1 ? admin : { ...admin, id: "another-admin" }, access_token: `token-${bootstraps}` });
       return denied(401, "SESSION_EXPIRED");
     });
     await mountAdmin();
@@ -122,5 +122,33 @@ describe("admin session recovery through the real HTTP adapter", () => {
     expect(await screen.findByText("Admin API bị từ chối")).toBeVisible();
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/admin/dashboard"))).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/auth/me"))).toHaveLength(1);
+  });
+  it("does not let an old identity-validation response hide a newly authenticated admin", async () => {
+    let finish!: (response: Response) => void;
+    const another = { ...admin, id: "another-admin" };
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes("/auth/bootstrap")) return ok({ user: admin, access_token: "admin-token" });
+      if (String(url).includes("/auth/me")) return new Promise<Response>((resolve) => { finish = resolve; });
+      if (String(url).includes("/auth/login")) return ok({ user: another, access_token: "another-token" });
+      return denied(403, "FORBIDDEN");
+    });
+    await mountAdmin();
+    await userEvent.click(screen.getByRole("button", { name: "Tải dữ liệu admin" }));
+    await act(async () => { await api.auth.login(another.email, "password"); finish(ok(admin)); });
+    expect(await screen.findByText("Admin screen: another-admin")).toBeVisible();
+    expect(screen.queryByText("Chưa thể kiểm tra phiên đăng nhập")).not.toBeInTheDocument();
+  });
+  it("preserves local identity if manual validation gets 401 then a retryable refresh failure", async () => {
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes("/auth/bootstrap")) return ok({ user: admin, access_token: "admin-token" });
+      if (String(url).includes("/auth/me")) return denied(401, "SESSION_EXPIRED");
+      if (String(url).includes("/auth/refresh")) return denied(503, "RETRY_LATER");
+      return denied(403, "FORBIDDEN");
+    });
+    await mountAdmin();
+    await userEvent.click(screen.getByRole("button", { name: "Tải dữ liệu admin" }));
+    expect(await screen.findByText("Chưa thể kiểm tra phiên đăng nhập")).toBeInTheDocument();
+    expect(http.getAccessToken()).toBe("admin-token");
+    expect(screen.queryByText("Cần đăng nhập")).not.toBeInTheDocument();
   });
 });

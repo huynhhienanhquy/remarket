@@ -81,7 +81,7 @@ export interface RegisterInput {
 }
 
 export interface AuthApi {
-  /** Initial session bootstrap: tries /auth/me, silently refreshes on 401, returns viewer or null. */
+  /** Initial non-consuming cookie discovery; 200/null for an anonymous session. */
   bootstrap(): Promise<SessionUser | null>;
   /** Returns the viewer if a valid access token exists; null if not authenticated. */
   me(): Promise<SessionUser | null>;

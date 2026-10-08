@@ -2,6 +2,10 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
+// Node's native channel cannot dispatch jsdom MessageEvents and crosses test
+// workers. Tests of cross-tab behavior install an isolated browser-like stub.
+Object.defineProperty(window, "BroadcastChannel", { configurable: true, writable: true, value: undefined });
+
 afterEach(() => {
   cleanup();
 });

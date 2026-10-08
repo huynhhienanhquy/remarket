@@ -44,7 +44,7 @@ function connect(url) {
       pending.delete(message.id); clearTimeout(entry.timer);
       if (message.error) entry.reject(new Error(message.error.message));
       else entry.resolve(message.result);
-    } else if (message.method === "Network.responseReceived" && message.params.response.url.startsWith("http://localhost:3000/api/v1")) {
+    } else if (message.method === "Network.responseReceived" && message.params.response.url.includes("/api/v1/")) {
       const response = message.params.response;
       requests.push({ path: new URL(response.url).pathname, status: response.status });
     } else if (message.method === "Runtime.exceptionThrown") exceptions.push(message.params.exceptionDetails.text);
@@ -162,24 +162,28 @@ try {
     await waitFor(tabB, "location.pathname === '/' || location.pathname === '/login'", "logout");
   });
   console.log("PASS: second tab logout completed");
+  await waitFor(tabA, "!document.querySelector('nav[aria-label=\"Khu vực quản trị\"]')", "broadcast removes private admin UI");
+  const start = requests.length;
   await measure("browser_member_login_to_home", async () => {
     await login(tabB, userEmail, userPassword);
     await waitFor(tabB, "location.pathname === '/' && document.body.innerText.includes('Món đồ cũ. Giá trị mới.')", "member login");
   });
-  const start = requests.length;
-  // Trigger an uncached filter even when fast navigation kept list data fresh.
-  await evaluate(tabA, "document.querySelector('a[href=\"/admin/users\"]').click()");
-  await waitFor(tabA, "location.pathname === '/403' || Boolean(document.querySelector('#user-role'))", "old tab user filter");
-  if (await evaluate(tabA, "location.pathname !== '/403'")) {
-    await evaluate(tabA, "(() => { const role = document.getElementById('user-role'); role.value = 'ADMIN'; role.dispatchEvent(new Event('change', { bubbles: true })); })()");
-  }
-  await waitFor(tabA, "location.pathname === '/403'", "stale admin tab leaves admin");
+  await tabA.send("Page.bringToFront");
+  await waitFor(tabA, `(async () => { const { getSessionUser } = await import('/src/lib/api/session.ts'); return getSessionUser()?.email === ${JSON.stringify(userEmail)}; })()`, "foreign tab restores current USER without waiting for 401");
   assert(!await evaluate(tabA, "Boolean(document.querySelector('nav[aria-label=\"Khu vực quản trị\"]'))"));
   const recovered = requests.slice(start);
-  assert(recovered.some((request) => request.path.startsWith("/api/v1/admin/") && request.status === 401), "Expired old session is detected");
   assert(recovered.some((request) => request.path === "/api/v1/auth/bootstrap" && request.status === 200), "Cookie restores the USER session");
   assert(!recovered.some((request) => request.path.startsWith("/api/v1/admin/") && request.status === 403), "No admin request is replayed under USER");
   await screenshot(tabA, "stale-admin-recovered");
+  // Expired/invalid access in both tabs must serialize actual cookie rotation.
+  const recoveryStart = requests.length;
+  await Promise.all([tabA, tabB].map((tab) => evaluate(tab, "(async () => { const { http } = await import('/src/lib/api/index.ts'); http.setAccessToken('expired-diagnostic-token'); })()")));
+  const restored = await Promise.all([tabA, tabB].map((tab) => evaluate(tab, "(async () => { const { api } = await import('/src/lib/api/index.ts'); return (await api.auth.me())?.role; })()")));
+  assert.deepEqual(restored, ["USER", "USER"]);
+  const rotations = requests.slice(recoveryStart).filter((request) => request.path === "/api/v1/auth/refresh");
+  assert.equal(rotations.length, 2, "Each tab performs one serialized refresh");
+  assert(rotations.every((request) => request.status === 200), "No concurrent cookie replay revokes the session");
+  console.log("PASS: simultaneous cross-tab access recovery rotates cookies without replay or logout");
   assert.equal(exceptions.length, 0, "No uncaught browser exceptions");
   console.log("PASS: second-tab USER login removes stale admin UI; no forbidden admin replay");
   console.log(`Screenshots: ${artifactDir}`);

@@ -19,7 +19,6 @@ import type {
 } from "./contract";
 import { ApiError } from "../errors";
 import { http } from "./http";
-import { updateSessionUser } from "./session";
 
 /** Post-login bootstrap expects a session; a 401 there means login failed. */
 function requireSession(user: SessionUser | null): SessionUser {
@@ -41,43 +40,47 @@ function requireSession(user: SessionUser | null): SessionUser {
 const auth: AuthApi = {
   /** One shared cookie restore, with 200/null for an anonymous visitor. */
   bootstrap: () => http.restoreSession(),
-  me: async () => {
-    const user = await http.getOrNull<SessionUser>("/auth/me");
-    updateSessionUser(user);
-    return user;
-  },
+  me: () => http.readSession(),
   register: (input) => http.post("/auth/register", input),
-  login: async (email, password) => {
-    const data = await http.post<{ access_token: string; user?: SessionUser }>("/auth/login", {
+  login: (email, password) => http.changeSession(async (assertCurrent) => {
+    const data = await http.post<{ access_token: string; user: SessionUser }>("/auth/login", {
       email,
       password,
     });
-    http.setAccessToken(data.access_token);
-    if (data.user) {
-      updateSessionUser(data.user);
-      return data.user;
-    }
-    return requireSession(await auth.me());
-  },
-  logout: async () => {
+    assertCurrent();
+    http.applyCredentials(data, true);
+    return data.user;
+  }),
+  logout: () => http.changeSession(async (assertCurrent) => {
     await http.post("/auth/logout");
+    assertCurrent();
     http.setAccessToken(null);
-  },
+  }),
   logoutAll: async () => {
-    await http.post("/auth/logout-all");
-    http.setAccessToken(null);
+    // Non-consuming discovery supplies a fresh access token even after expiry.
+    requireSession(await http.restoreSession());
+    await http.changeSession(async (assertCurrent) => {
+      await http.post("/auth/logout-all");
+      assertCurrent();
+      http.setAccessToken(null);
+    });
   },
-  verifyEmail: async (token) => {
-    const data = await http.post<{ access_token: string }>("/auth/verify-email", { token });
-    if (data.access_token) http.setAccessToken(data.access_token);
-    return requireSession(await auth.me());
-  },
+  verifyEmail: (token) => http.changeSession(async (assertCurrent) => {
+    const data = await http.post<{ access_token: string; user: SessionUser }>("/auth/verify-email", { token });
+    assertCurrent();
+    http.applyCredentials(data, true);
+    return requireSession(data.user);
+  }),
   resendVerification: (email) => http.post("/auth/resend-verification", { email }),
   emailVerificationRequest: () => http.get("/auth/email-verification-request"),
   requestEmailVerification: () => http.post("/auth/email-verification-request", {}),
   forgotPassword: (email) => http.post("/auth/forgot-password", { email }),
-  resetPassword: (token, password) =>
-    http.post("/auth/reset-password", { token, password }),
+  resetPassword: (token, password) => http.changeSession(async (assertCurrent) => {
+    const result = await http.post<{ accepted: true }>("/auth/reset-password", { token, password });
+    assertCurrent();
+    http.setAccessToken(null);
+    return result;
+  }),
   updateProfile: (input) => http.patch("/auth/profile", input),
   uploadAvatar: (storagePath) => http.patch("/auth/avatar", { storage_path: storagePath }),
 };

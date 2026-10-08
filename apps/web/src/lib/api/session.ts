@@ -20,6 +20,7 @@ export function updateSessionUser(user: SessionUser | null): void {
 }
 
 export function getSessionRevision(): number { return revision; }
+export function getSessionUser(): SessionUser | null { return currentUser; }
 
 export function subscribeSessionUser(listener: SessionListener): () => void {
   listeners.add(listener);

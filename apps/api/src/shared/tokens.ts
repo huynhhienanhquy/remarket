@@ -45,7 +45,9 @@ export function verifyAccessToken(token: string): VerifiedAccess | null {
       audience: env.jwtAudience,
       algorithms: [env.jwtAlgorithm],
     }) as jwt.JwtPayload & { session_id?: unknown };
-    if (typeof decoded.sub !== "string" || typeof decoded.session_id !== "string" || typeof decoded.exp !== "number") return null;
+    if (typeof decoded.sub !== "string" || !decoded.sub.trim() || typeof decoded.session_id !== "string" || !decoded.session_id.trim()
+      || typeof decoded.exp !== "number" || typeof decoded.iat !== "number" || decoded.iat > Math.floor(Date.now() / 1000)
+      || decoded.exp <= decoded.iat) return null;
     return { userId: decoded.sub, sessionId: decoded.session_id, expiresAt: decoded.exp * 1000 };
   } catch {
     return null;

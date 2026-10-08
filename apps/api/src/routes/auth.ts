@@ -2,7 +2,6 @@ import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import type { AuthToken, Session } from "@prisma/client";
 import { z } from "zod";
 import {
   API_ERROR_CODES,
@@ -18,10 +17,9 @@ import { asyncHandler, AppError } from "../middleware/errorHandler.js";
 import { authMiddleware, requireActive } from "../middleware/auth.js";
 import type { AuthRequest } from "../middleware/auth.js";
 import { ok } from "../shared/api-response.js";
-import { toSessionUser } from "../shared/dto-mappers.js";
-import type { SessionProfile } from "../shared/dto-mappers.js";
+import { sessionProfileSelect, toSessionUser } from "../shared/dto-mappers.js";
 import { accountLocked, forbidden, unauthorized, validationError } from "../shared/errors.js";
-import { newEmailToken, newRefreshToken, sha256, signAccessToken } from "../shared/tokens.js";
+import { newEmailToken, newRefreshToken, sha256, signAccessToken, verifyAccessToken } from "../shared/tokens.js";
 import { emailTokenRateLimit, emailVerificationRateLimit, loginRateLimit } from "../middleware/rate-limit.js";
 import { publishRealtimeEvent } from "../realtime/events.js";
 import { sealEmailToken } from "../services/email.js";
@@ -29,7 +27,6 @@ import { enqueueOutbox } from "../outbox/outbox.js";
 import { isKnownProvinceCode } from "../shared/geography.js";
 import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
 import { lockRefreshState } from "../services/refresh-locks.js";
-import type { IssuedSession } from "../services/session-issuance.js";
 import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
 
 /**
@@ -98,10 +95,6 @@ function readRefreshCookie(req: { headers: { cookie?: string | undefined } }): s
  * Session + email token primitives
  * ------------------------------------------------------------------ */
 
-async function issueSession(userId: string): Promise<IssuedSession> {
-  return createSession(prisma, userId);
-}
-
 /** Browser endpoints that create, rotate or clear a cookie require a trusted Origin. */
 function requireTrustedOrigin(req: Request, _res: Response, next: NextFunction): void {
   const value = req.headers.origin;
@@ -116,7 +109,7 @@ function requireTrustedOrigin(req: Request, _res: Response, next: NextFunction):
   } catch {
     throw forbidden("Nguồn yêu cầu không được phép.");
   }
-  if (!env.corsOrigins.includes(origin)) throw forbidden("Nguồn yêu cầu không được phép.");
+  if (value !== origin || !env.corsOrigins.includes(origin)) throw forbidden("Nguồn yêu cầu không được phép.");
   next();
 }
 
@@ -294,6 +287,12 @@ const avatarSchema = z.object({ storage_path: z.string().min(1).max(300) }).stri
  * ------------------------------------------------------------------ */
 
 const router = Router();
+// Identity and credentials must never be reused from a browser/proxy cache.
+router.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
 
 // POST /api/v1/auth/register
 router.post(
@@ -366,6 +365,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const data = loginSchema.parse(req.body);
     const email = data.email.trim().toLowerCase();
+    // bcrypt compares only the first 72 bytes; never silently accept a suffix.
+    if (Buffer.byteLength(data.password, "utf8") > 72) throw unauthorized("Email hoặc mật khẩu không đúng.");
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -378,10 +379,17 @@ router.post(
       throw unauthorized("Email hoặc mật khẩu không đúng.");
     }
 
-    const issued = await issueSession(user.id);
+    const { issued, identity } = await prisma.$transaction(async (tx) => {
+      // Password reset/account revocation also locks User first. Never issue a
+      // new session from the password snapshot read before bcrypt completed.
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
+      const live = await tx.user.findUnique({ where: { id: user.id } });
+      if (!live || live.passwordHash !== user.passwordHash) throw unauthorized("Email hoặc mật khẩu không đúng.");
+      return { issued: await createSession(tx, live.id), identity: live };
+    });
     setRefreshCookie(res, issued.refreshToken);
     // Login already loaded the identity; avoid a second HTTP + DB round trip.
-    ok(res, { access_token: issued.accessToken, user: toSessionUser(user) });
+    ok(res, { access_token: issued.accessToken, user: toSessionUser(identity) });
   }),
 );
 
@@ -425,6 +433,8 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
       if (bootstrap && !user) return { kind: "invalid" as const };
 
       const now = new Date();
+      // Only a still-valid, already-used credential is evidence of replay.
+      if (current.expiresAt.getTime() <= now.getTime()) return { kind: "invalid" as const };
       if (current.consumedAt !== null) {
         await tx.session.updateMany({
           where: { id: session.id, revokedAt: null },
@@ -435,7 +445,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
           "session.revoked",
           session.id,
           `session-revoked:refresh-reuse:${session.id}`,
-          { session_ids: [session.id], user_id: session.userId },
+          { session_ids: [session.id] },
         );
         return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
       }
@@ -453,7 +463,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
           "session.revoked",
           session.id,
           `session-revoked:refresh-mismatch:${session.id}`,
-          { session_ids: [session.id], user_id: session.userId },
+          { session_ids: [session.id] },
         );
         return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
       }
@@ -477,7 +487,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
       publishRealtimeEvent({
         eventType: "session.revoked",
         aggregateId: result.sessionId,
-        payload: { session_ids: [result.sessionId], user_id: result.userId },
+        payload: { session_ids: [result.sessionId] },
       });
       return unavailableSession(res, bootstrap);
     }
@@ -490,7 +500,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
     }
 
     setRefreshCookie(res, nextToken);
-    ok(res, { access_token: signAccessToken(result.userId, result.sessionId) });
+    ok(res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
 }
 
 // Anonymous/expired discovery is a successful empty session; DB errors still fail.
@@ -517,14 +527,25 @@ router.get(
 router.post(
   "/logout",
   requireTrustedOrigin,
-  authMiddleware,
-  asyncHandler(async (req: AuthRequest, res) => {
-    if (req.sessionId) {
-      const sessionId = req.sessionId;
+  asyncHandler(async (req, res) => {
+    // Logout is idempotent, including after access expiry/revocation. The
+    // trusted-Origin httpOnly cookie can revoke its own session without JWT.
+    const raw = readRefreshCookie(req);
+    const candidate = raw ? await prisma.authToken.findUnique({ where: { tokenHash: sha256(raw) } }) : null;
+    const cookieSession = candidate?.purpose === "REFRESH" && candidate.sessionId ? candidate : null;
+    const header = req.headers.authorization;
+    const access = header?.startsWith("Bearer ") ? verifyAccessToken(header.slice(7).trim()) : null;
+    if (access && cookieSession && access.sessionId !== cookieSession.sessionId) {
+      throw new AppError(API_ERROR_CODES.SESSION_CHANGED, "Phiên đăng nhập đã thay đổi. Vui lòng kiểm tra lại.", 409);
+    }
+    const sessionId = cookieSession?.sessionId ?? access?.sessionId;
+    const userId = cookieSession?.userId ?? access?.userId;
+    if (sessionId && userId) {
       const now = new Date();
       await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
         await tx.session.updateMany({
-          where: { id: sessionId, revokedAt: null },
+          where: { id: sessionId, userId, revokedAt: null },
           data: { revokedAt: now },
         });
         await tx.authToken.updateMany({
@@ -558,8 +579,14 @@ router.post(
   asyncHandler(async (req: AuthRequest, res) => {
     const authUser = req.user;
     if (authUser) {
+      const raw = readRefreshCookie(req);
+      const cookieToken = raw ? await prisma.authToken.findUnique({ where: { tokenHash: sha256(raw) } }) : null;
+      if (cookieToken?.purpose === "REFRESH" && cookieToken.sessionId && cookieToken.sessionId !== req.sessionId) {
+        throw new AppError(API_ERROR_CODES.SESSION_CHANGED, "Phiên đăng nhập đã thay đổi. Vui lòng kiểm tra lại.", 409);
+      }
       const now = new Date();
       await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${authUser.id} FOR UPDATE`;
         await tx.session.updateMany({
           where: { userId: authUser.id, revokedAt: null },
           data: { revokedAt: now },
@@ -608,7 +635,7 @@ router.post(
   requireTrustedOrigin,
   asyncHandler(async (req, res) => {
     const data = tokenSchema.parse(req.body);
-    const issued = await prisma.$transaction(async (tx) => {
+    const { issued, user } = await prisma.$transaction(async (tx) => {
       const userId = await consumeEmailToken(tx, data.token, "VERIFY_EMAIL");
       if (!userId) {
         throw validationError("Liên kết xác minh không hợp lệ hoặc đã hết hạn.", {
@@ -616,10 +643,11 @@ router.post(
         });
       }
       await requestEmailVerification(tx, userId);
-      return createSession(tx, userId);
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: sessionProfileSelect });
+      return { issued: await createSession(tx, userId), user };
     });
     setRefreshCookie(res, issued.refreshToken);
-    ok(res, { access_token: issued.accessToken });
+    ok(res, { access_token: issued.accessToken, user: toSessionUser(user) });
   }),
 );
 

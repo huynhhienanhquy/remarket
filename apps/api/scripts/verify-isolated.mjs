@@ -32,9 +32,13 @@ const childEnv = {
   JWT_SIGNING_KEY: randomUUID() + randomUUID(), JWT_SECRET: undefined,
   TEST_ACCOUNT_PASSWORD: randomUUID() + randomUUID(),
   SMOKE_WEB_URL: "http://127.0.0.1:5321",
+  SMOKE_ADMIN_EMAIL: "admin@example.test",
+  SMOKE_USER_EMAIL: "buyer@example.test",
   SMOKE_LIFECYCLE_ONLY: process.argv.includes("--lifecycle-only") ? "true" : "false",
   SMOKE_EMAIL_ONLY: process.argv.includes("--email-only") ? "true" : "false",
 };
+childEnv.SMOKE_ADMIN_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
+childEnv.SMOKE_USER_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
 async function run(moduleName, args, cwd = apiDir) {
   const child = spawn(process.execPath, [require.resolve(moduleName), ...args], {
     cwd, env: childEnv, stdio: "inherit", windowsHide: true,
@@ -65,8 +69,8 @@ try {
   assert.equal(current[0].name, schema, "Database did not select the isolated schema");
   console.log(`Isolated test schema: ${schema}`);
   await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"]);
-  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
-  if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only")) {
+  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only") || process.argv.includes("--auth-browser")) {
     await run("tsx/cli", ["tests/fixtures/browser-seed.ts"]);
   }
   if (process.argv.includes("--benchmark")) {
@@ -75,7 +79,7 @@ try {
     await run("tsx/cli", ["scripts/benchmark-performance.ts", "supabase-code-final"]);
     await run("tsx/cli", ["scripts/benchmark-performance.ts", "security"]);
   }
-  if (process.argv.includes("--browser") || process.argv.includes("--browser-only")) {
+  if (process.argv.includes("--browser") || process.argv.includes("--browser-only") || process.argv.includes("--auth-browser")) {
     for (const url of ["http://127.0.0.1:5320/health/live", "http://127.0.0.1:5321"]) {
       let alreadyRunning = false;
       try { alreadyRunning = (await fetch(url)).ok; } catch { /* port is free */ }
@@ -86,7 +90,7 @@ try {
     await startService("--import", ["tsx", "src/index.ts"], apiDir, { PORT: "5320", RUN_JOBS: "true", WEB_ORIGINS: childEnv.SMOKE_WEB_URL, PUBLIC_WEB_URL: childEnv.SMOKE_WEB_URL });
     await startService(path.join(path.dirname(webRequire.resolve("vite/package.json")), "bin/vite.js"), ["--host", "127.0.0.1", "--port", "5321", "--strictPort"], webDir, { VITE_API_BASE_URL: "/api/v1", VITE_SOCKET_URL: "", VITE_DEV_API_TARGET: "http://127.0.0.1:5320" });
     await Promise.all([waitForServer("http://127.0.0.1:5320/health/live"), waitForServer(childEnv.SMOKE_WEB_URL)]);
-    await run("../../scripts/smoke-member-flows.mjs", [], path.resolve(apiDir, "../.."));
+    await run(process.argv.includes("--auth-browser") ? "../../scripts/smoke-session-recovery.mjs" : "../../scripts/smoke-member-flows.mjs", [], path.resolve(apiDir, "../.."));
   }
 } finally {
   await Promise.all(services.map(async (child) => {

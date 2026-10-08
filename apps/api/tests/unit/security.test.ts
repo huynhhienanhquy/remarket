@@ -3,6 +3,8 @@ import { detectImageType } from "../../src/routes/uploads.js";
 import { newRefreshToken, sha256, signAccessToken, verifyAccessToken } from "../../src/shared/tokens.js";
 import { sealEmailToken } from "../../src/services/email.js";
 import { normalizeRateLimitIp } from "../../src/middleware/rate-limit.js";
+import jwt from "jsonwebtoken";
+import { env } from "../../src/config/env.js";
 
 describe("security primitives", () => {
   it("uses opaque 256-bit refresh tokens and hashes them", () => {
@@ -16,6 +18,18 @@ describe("security primitives", () => {
     const token = signAccessToken("user-id", "session-id");
     expect(verifyAccessToken(token)).toMatchObject({ userId: "user-id", sessionId: "session-id" });
     expect(verifyAccessToken(token)?.expiresAt).toBeGreaterThan(Date.now());
+  });
+  it.each([
+    { sub: "", session_id: "session" },
+    { sub: "user", session_id: "" },
+    { sub: "user", session_id: "session", iat: Math.floor(Date.now() / 1000) + 60 },
+  ])("rejects incomplete identity or future-issued JWT claims", (claims) => {
+    const token = jwt.sign(claims, env.jwtSecret, { issuer: env.jwtIssuer, audience: env.jwtAudience, expiresIn: "15m", algorithm: env.jwtAlgorithm });
+    expect(verifyAccessToken(token)).toBeNull();
+  });
+  it.each([{ issuer: "wrong" }, { audience: "wrong" }, { expiresIn: -1 }])("rejects wrong issuer/audience and expired JWT", (override) => {
+    const token = jwt.sign({ sub: "user", session_id: "session" }, env.jwtSecret, { issuer: env.jwtIssuer, audience: env.jwtAudience, expiresIn: "15m", ...override });
+    expect(verifyAccessToken(token)).toBeNull();
   });
 
   it("does not persist a raw email token in an outbox payload", () => {

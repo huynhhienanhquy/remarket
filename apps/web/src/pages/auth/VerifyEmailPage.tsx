@@ -14,7 +14,7 @@ export function VerifyEmailPage() {
   const [params, setParams] = useSearchParams();
   const [token] = useState(() => params.get("token"));
   const navigate = useNavigate();
-  const { viewer, status, refresh } = useSession();
+  const { viewer, status } = useSession();
   const online = useConnectivity();
   const toast = useToast();
   const [error, setError] = useState<unknown>(null);
@@ -34,7 +34,7 @@ export function VerifyEmailPage() {
     if (pending || !online) return;
     setPending(true); setError(null);
     try {
-      if (token) { await api.auth.verifyEmail(token); await refresh(); }
+      if (token) await api.auth.verifyEmail(token);
       else await api.auth.requestEmailVerification();
       void client.invalidateQueries({ queryKey: ["email-verification"] });
       void client.invalidateQueries({ queryKey: ["notifications"] });

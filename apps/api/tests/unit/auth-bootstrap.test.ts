@@ -100,4 +100,24 @@ describe("cookie session discovery", () => {
     expect(response.status).toBeGreaterThanOrEqual(400);
     expect(response.headers["set-cookie"]).toBeUndefined();
   });
+  it("refresh returns the server identity, consumes once, and issues a protected cookie", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/refresh").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user).toMatchObject({ id: user.id, role: "ADMIN" });
+    expect(response.body.data.access_token).toBeTypeOf("string");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");
+    expect(client.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+  it("does not revoke a current session for an expired consumed credential", async () => {
+    client.authToken.findUnique.mockResolvedValue({ ...token, consumedAt: new Date(), expiresAt: new Date(0) });
+    await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(client.session.updateMany).not.toHaveBeenCalled();
+    expect(client.outboxEvent.createMany).not.toHaveBeenCalled();
+  });
+  it("replay revokes only the affected session, not other devices of the same user", async () => {
+    client.authToken.findUnique.mockResolvedValue({ ...token, consumedAt: new Date() });
+    await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    const payload = client.outboxEvent.createMany.mock.calls[0]![0].data[0].payload;
+    expect(payload).toEqual({ session_ids: ["session"] });
+  });
 });

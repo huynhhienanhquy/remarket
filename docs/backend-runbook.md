@@ -38,17 +38,37 @@ The Prisma datasource uses `DATABASE_URL` for application traffic and `DIRECT_UR
 
 All accounts use `/login`. Login returns the authenticated `user` with the access
 token; the web app uses this server identity without an additional `/auth/me`
-request (with a fallback for older APIs). It routes `ADMIN/ACTIVE` to `/admin`, `USER/ACTIVE` to the marketplace (or a
+request. Refresh and legacy email verification return the same identity/token shape. Deploy API and web changes together. It routes `ADMIN/ACTIVE` to `/admin`, `USER/ACTIVE` to the marketplace (or a
 permitted internal return target), and locked accounts to restricted routes.
 Admin APIs independently enforce role and account state.
 
 Initial cookie discovery uses `POST /auth/bootstrap`: a guest/expired session
 returns 200 with null user/token, whereas database failures remain errors.
-Bootstrap and protected-request recovery share one in-flight restore. Bootstrap
+Parallel bootstrap calls share one in-flight discovery. Protected 401/socket
+recovery shares one actual `/auth/refresh` rotation per tab. Bootstrap
 validates the existing cookie without consuming it, setting a replacement or
 extending its lifetime; interrupted navigations cannot lose the session between
 database rotation and receipt of Set-Cookie. Explicit `/auth/refresh` still
 rotates atomically and retains strict 401 and replay-revocation semantics.
+
+Login, verification, reset, logout, bootstrap and refresh use the same browser
+Web Lock and local queue. Late responses are checked again after JSON parsing;
+credential actions invalidate earlier in-flight discoveries and private work.
+BroadcastChannel sends only an opaque sender id and a cookie-change hint (never
+tokens or identity), ignores its own tab, and causes other tabs to discard stale
+memory/cache and discover the current server identity. Focus/online/visibility
+revalidation is the fallback when messaging is unavailable. Web Locks require a
+secure context (HTTPS or localhost); browsers without that API serialize only
+within one tab, so target-browser multi-tab verification is required.
+
+Login rechecks the password hash and identity under a User lock after bcrypt.
+Logout-all uses User -> Session -> AuthToken, like refresh and password reset.
+Current-session logout is idempotent and can revoke its cookie session after
+access JWT expiry; a mismatched live bearer/cookie returns SESSION_CHANGED.
+Password reset clears frontend memory and private caches on success only. A
+reset-link token is removed from the address bar and retained only in memory.
+Auth/protected responses use Cache-Control: no-store. Refresh reuse revokes only
+the affected device/session; logout-all/reset intentionally revoke every device.
 
 Restored identities and `/auth/me` update the React session immediately. A user,
 role, status or email-verification change clears private query caches; old
@@ -65,6 +85,12 @@ browser profile, verifies the admin API pages, then switches to USER in a second
 tab and checks recovery of the stale admin tab. It changes no roles/listings;
 test-session login/logout is the only application write. Screenshots are written
 to `.artifacts/session-recovery`, and timings to `.artifacts/performance/browser.json`.
+
+For integration plus multi-tab Chrome checks without touching app records, run
+`node apps/api/scripts/verify-isolated.mjs --auth-browser` from the repo root.
+It owns a fresh remarket_verify_* schema, ephemeral accounts/server ports/browser
+profile, and removes that schema after completion. No application user password
+or role is changed.
 
 ## Performance checks
 

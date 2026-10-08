@@ -30,7 +30,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       reauthenticating = true;
       authRetried = true;
       try {
-        const user = await http.restoreSession();
+        const user = await http.restoreSession("refresh");
         if (!disposed && user?.id === viewerId && user.status === "ACTIVE") socket.connect();
       } catch { /* REST queries surface a retryable session/network error. */ }
       finally { reauthenticating = false; }

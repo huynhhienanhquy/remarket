@@ -8,6 +8,8 @@ import { Button, InlineAlert } from "../components/ui";
 import { errorTitle } from "../lib/errors";
 import { sameSessionContext, subscribeSessionUser, subscribeSessionValidation } from "../lib/api/session";
 import { PageSkeleton } from "./PageSkeleton";
+import { ApiError } from "../lib/errors";
+import { http, listenForSessionChanges, SESSION_COOKIE_CHANGED_EVENT } from "../lib/api/http";
 
 type SessionStatus = "loading" | "ready";
 
@@ -81,6 +83,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
+          if (error instanceof ApiError && error.code === "SESSION_CHANGED") return;
           // A database/network failure is not proof of an anonymous session.
           setBootstrapError(error);
         }
@@ -90,9 +93,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [bootstrapAttempt, applyUser]);
 
+  useEffect(() => {
+    let disposed = false;
+    let checking = false;
+    const sync = async () => {
+      if (checking || !navigator.onLine || document.visibilityState === "hidden") return;
+      checking = true;
+      setValidationPending(true);
+      try {
+        const user = await http.restoreSession();
+        if (!disposed) { applyUser(user); setStatus("ready"); setBootstrapError(null); }
+      } catch (error) {
+        if (!disposed && !(error instanceof ApiError && error.code === "SESSION_CHANGED")) {
+          queryClient.clear(); setBootstrapError(error);
+        }
+      } finally { checking = false; if (!disposed) setValidationPending(false); }
+    };
+    const resume = () => { if (document.visibilityState !== "hidden") void sync(); };
+    const unsubscribe = listenForSessionChanges();
+    window.addEventListener(SESSION_COOKIE_CHANGED_EVENT, resume);
+    window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      disposed = true; unsubscribe();
+      window.removeEventListener(SESSION_COOKIE_CHANGED_EVENT, resume);
+      window.removeEventListener("online", resume);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [applyUser, queryClient]);
+
   const login = useCallback(async (email: string, password: string) => {
     const user = await api.auth.login(email, password);
     applyUser(user);
+    setStatus("ready");
+    setBootstrapError(null);
     return user;
   }, [applyUser]);
 

@@ -1,9 +1,9 @@
 ﻿import { useRef, useState } from "react";
+import { useEffect } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { validatePassword, validatePasswordConfirm } from "@remarket/shared";
-import { useSession } from "../../app/SessionProvider";
 import { safeReturnTo } from "../../app/guards";
 import { errorTitle, isApiError } from "../../lib/errors";
 import { api } from "../../lib/api";
@@ -21,12 +21,14 @@ function fieldMessages(caught: unknown): Record<string, string> | null {
 }
 
 export function ResetPasswordPage() {
-  const _navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [params] = useSearchParams();
-  const { login: _login } = useSession();
-
-  const token = params.get("token");
+  const [params, setParams] = useSearchParams();
+  const [token] = useState(() => params.get("token"));
+  useEffect(() => {
+    if (!params.has("token")) return;
+    const next = new URLSearchParams(params); next.delete("token");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
   const returnTo = safeReturnTo(params.get("returnTo") ?? "/", "");
 
   const [password, setPassword] = useState("");
@@ -97,6 +99,7 @@ export function ResetPasswordPage() {
     try {
       await api.auth.resetPassword(token, password);
       queryClient.clear();
+      setPassword(""); setConfirm("");
       setFormSuccess("Mật khẩu đã được cập nhật. Bạn có thể đăng nhập ngay bây giờ.");
     } catch (caught) {
       if (isApiError(caught) && (caught.code === "TOKEN_EXPIRED" || caught.code === "INVALID_TOKEN")) {
@@ -145,14 +148,14 @@ export function ResetPasswordPage() {
       <div>
         <h1 className="t-h1 text-ink">Đặt lại mật khẩu</h1>
         <p className="mt-2 t-body text-muted">
-          Mật khẩu mới phải khác mật khẩu cũ. Tối thiểu 12 ký tự.
+          Mật khẩu mới tối thiểu 12 ký tự.
         </p>
       </div>
 
       {formError !== null && <InlineAlert tone="danger" title={formError} />}
       {formSuccess !== null && <InlineAlert tone="success" title={formSuccess} />}
 
-      <form noValidate onSubmit={submit} className="space-y-4">
+      {formSuccess === null && <form noValidate onSubmit={submit} className="space-y-4">
         <FormField
           label="Mật khẩu mới"
           htmlFor="reset-password"
@@ -221,7 +224,7 @@ export function ResetPasswordPage() {
         <Button type="submit" size="lg" fullWidth loading={pending} variant="primary">
           Cập nhật mật khẩu
         </Button>
-      </form>
+      </form>}
 
       <p className="t-body text-muted text-center">
         <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="t-label text-brand hover:underline">

@@ -76,13 +76,14 @@ describe("email verification through the HTTP adapter", () => {
     context.viewer = null;
     context.on("POST", "/auth/verify-email", () => {
       context.viewer = { ...member, email_verified_at: null };
-      return { access_token: "legacy-test-access" };
+      return { access_token: "legacy-test-access", user: context.viewer };
     });
     show(<VerifyEmailPage />, "/verify-email?token=valid-test-link&returnTo=%2Fcheckout");
     await userEvent.click(await screen.findByRole("button", { name: "Gửi yêu cầu xác minh email" }));
     expect(await screen.findByRole("heading", { name: "Trang chủ kiểm thử" })).toBeInTheDocument();
     expect(context.requests("POST", "/auth/verify-email")).toHaveLength(1);
     expect(context.requests("POST", "/auth/verify-email")[0]?.body).toEqual({ token: "valid-test-link" });
+    expect(context.requests("GET", "/auth/me")).toHaveLength(0);
     await act(async () => {
       expect(await api.auth.me()).toMatchObject({ email_verified_at: null });
     });

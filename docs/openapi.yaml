@@ -30,8 +30,8 @@ x-operation-error-codes:
   bootstrapSession: [FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
   refreshSession: [UNAUTHORIZED, FORBIDDEN, SESSION_EXPIRED, RETRY_LATER, RATE_LIMITED, INTERNAL]
   getSession: *SessionReadErrors
-  logout: *SessionReadErrors
-  logoutAll: *SessionReadErrors
+  logout: [FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  logoutAll: [UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
   verifyEmail: [VALIDATION_ERROR, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, RATE_LIMITED, INTERNAL]
   getEmailVerificationRequest: *SessionReadErrors
   requestEmailVerification: *ActiveMutationErrors
@@ -122,9 +122,9 @@ paths:
   /auth/me:
     get: { tags: [Auth], operationId: getSession, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' }, '401': { $ref: '#/components/responses/Error' } } }
   /auth/logout:
-    post: { tags: [Auth], operationId: logout, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' } } }
+    post: { tags: [Auth], operationId: logout, description: Trusted-Origin idempotent logout using the refresh cookie or bearer. A mismatched live bearer/cookie session returns 409 without clearing credentials., responses: { '200': { $ref: '#/components/responses/AckSuccess' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
   /auth/logout-all:
-    post: { tags: [Auth], operationId: logoutAll, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' } } }
+    post: { tags: [Auth], operationId: logoutAll, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
   /auth/verify-email:
     post: { tags: [Auth], operationId: verifyEmail, description: Consumes a legacy one-time mailbox token and submits an admin approval request. Opens a session but does NOT mark email verified., requestBody: { $ref: '#/components/requestBodies/TokenBody' }, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '422': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } } }
   /auth/email-verification-request:
@@ -505,13 +505,13 @@ components:
       description: Account created; email verification is pending
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [pending_verification, email], additionalProperties: false, properties: { pending_verification: { type: boolean, enum: [true] }, email: { type: string, format: email } } } } }] } } }
     AccessTokenSuccess:
-      description: Access token issued; refresh token is set in an HttpOnly cookie
-      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [access_token], additionalProperties: false, properties: { access_token: { type: string } } } } }] } } }
+      description: Access token and current identity issued; refresh token is set in an HttpOnly cookie
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [access_token, user], additionalProperties: false, properties: { access_token: { type: string }, user: { $ref: '#/components/schemas/SessionUser' } } } } }] } } }
     LoginSuccess:
       description: Access token and already-validated identity, avoiding another /auth/me request
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [access_token, user], additionalProperties: false, properties: { access_token: { type: string }, user: { $ref: '#/components/schemas/SessionUser' } } } } }] } } }
     BootstrapSuccess:
-      description: Trusted-origin cookie discovery and rotation; anonymous or expired sessions return null. Database failures remain errors.
+      description: Trusted-origin non-consuming cookie discovery; anonymous or expired sessions return null. Database failures remain errors.
       content:
         application/json:
           schema:
@@ -1607,6 +1607,7 @@ components:
         - RETRY_LATER
         - RATE_LIMITED
         - SESSION_EXPIRED
+        - SESSION_CHANGED
         - INTERNAL
       example: VERSION_CONFLICT
     ErrorEnvelope:
