@@ -1,0 +1,1535 @@
+openapi: 3.0.3
+info:
+  title: ReMarket API
+  version: 1.0.0
+  description: |
+    REST contract for the ReMarket marketplace. Monetary values are decimal
+    strings in VND and timestamps are ISO-8601 UTC strings. Mutating order and
+    product operations use optimistic versions. Checkout requires an
+    Idempotency-Key header and replays the original result for the same payload.
+servers:
+  - url: /api/v1
+tags:
+  - name: Auth
+  - name: Marketplace
+  - name: Orders
+  - name: Chat
+  - name: Trust
+  - name: Admin
+x-error-profiles:
+  public-validation: &PublicValidationErrors [VALIDATION_ERROR, RATE_LIMITED, INTERNAL]
+  public-lookup: &PublicLookupErrors [VALIDATION_ERROR, NOT_FOUND, RATE_LIMITED, INTERNAL]
+  session-read: &SessionReadErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, RATE_LIMITED, INTERNAL]
+  restricted-mutation: &RestrictedMutationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, INVALID_ORDER_TRANSITION, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  active-mutation: &ActiveMutationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  admin-operation: &AdminOperationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
+x-operation-error-codes:
+  register: *PublicValidationErrors
+  login: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  bootstrapSession: [FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  refreshSession: [UNAUTHORIZED, FORBIDDEN, SESSION_EXPIRED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  getSession: *SessionReadErrors
+  logout: *SessionReadErrors
+  logoutAll: *SessionReadErrors
+  verifyEmail: *PublicValidationErrors
+  resendVerification: *PublicValidationErrors
+  forgotPassword: *PublicValidationErrors
+  resetPassword: *PublicValidationErrors
+  updateProfile: *ActiveMutationErrors
+  updateAvatar: *ActiveMutationErrors
+  categoryTree: *PublicValidationErrors
+  listProvinces: *PublicValidationErrors
+  searchProducts: *PublicValidationErrors
+  createProduct: *ActiveMutationErrors
+  getProduct: *PublicLookupErrors
+  updateProduct: *ActiveMutationErrors
+  deleteProduct: *ActiveMutationErrors
+  submitProduct: *ActiveMutationErrors
+  hideProduct: *ActiveMutationErrors
+  listOwnProducts: *ActiveMutationErrors
+  uploadImage: *ActiveMutationErrors
+  getUpload: *PublicLookupErrors
+  listFavorites: *ActiveMutationErrors
+  addFavorite: *ActiveMutationErrors
+  removeFavorite: *ActiveMutationErrors
+  getCart: *ActiveMutationErrors
+  addCartItem: *ActiveMutationErrors
+  removeCartItem: *ActiveMutationErrors
+  checkout: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, PRODUCT_NOT_AVAILABLE, PRICE_CHANGED, IDEMPOTENCY_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  listOrders: *SessionReadErrors
+  getOrder: *SessionReadErrors
+  actOnOrder: *ActiveMutationErrors
+  createReview: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, REVIEW_NOT_ALLOWED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  listConversations: *SessionReadErrors
+  openConversation: *ActiveMutationErrors
+  listMessages: *SessionReadErrors
+  sendMessage: *ActiveMutationErrors
+  markConversationRead: *RestrictedMutationErrors
+  getPublicProfile: *PublicLookupErrors
+  getPublicProducts: *PublicLookupErrors
+  listPublicReviews: *PublicLookupErrors
+  createReport: *ActiveMutationErrors
+  listOwnReports: *SessionReadErrors
+  listNotifications: *SessionReadErrors
+  unreadNotificationCount: *SessionReadErrors
+  readNotification: *RestrictedMutationErrors
+  readAllNotifications: *RestrictedMutationErrors
+  listSupportTickets: *SessionReadErrors
+  createSupportTicket: *RestrictedMutationErrors
+  getSupportTicket: *SessionReadErrors
+  replySupportTicket: *RestrictedMutationErrors
+  closeSupportTicket: *RestrictedMutationErrors
+  adminDashboard: *AdminOperationErrors
+  adminUsers: *AdminOperationErrors
+  adminLockUser: *AdminOperationErrors
+  adminUnlockUser: *AdminOperationErrors
+  adminUserDetail: *AdminOperationErrors
+  adminProducts: *AdminOperationErrors
+  adminApproveProduct: *AdminOperationErrors
+  adminRejectProduct: *AdminOperationErrors
+  adminBlockProduct: *AdminOperationErrors
+  adminUnblockProduct: *AdminOperationErrors
+  adminCategories: *AdminOperationErrors
+  adminCategoryTree: *AdminOperationErrors
+  adminCreateCategory: *AdminOperationErrors
+  adminUpdateCategory: *AdminOperationErrors
+  adminReports: *AdminOperationErrors
+  adminResolveReport: *AdminOperationErrors
+  adminRejectReport: *AdminOperationErrors
+  adminReviews: *AdminOperationErrors
+  adminHideReview: *AdminOperationErrors
+  adminTickets: *AdminOperationErrors
+  adminTicketDetail: *AdminOperationErrors
+  adminUpdateTicket: *AdminOperationErrors
+  adminReplyTicket: *AdminOperationErrors
+  adminAudit: *AdminOperationErrors
+  adminCancelOrder: *AdminOperationErrors
+paths:
+  /auth/register:
+    post: { tags: [Auth], operationId: register, requestBody: { $ref: '#/components/requestBodies/RegisterBody' }, responses: { '201': { $ref: '#/components/responses/RegisterSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
+  /auth/login:
+    post: { tags: [Auth], operationId: login, requestBody: { $ref: '#/components/requestBodies/LoginBody' }, responses: { '200': { $ref: '#/components/responses/LoginSuccess' }, '401': { $ref: '#/components/responses/Error' } } }
+  /auth/refresh:
+    post: { tags: [Auth], operationId: refreshSession, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } } }
+  /auth/bootstrap:
+    post: { tags: [Auth], operationId: bootstrapSession, responses: { '200': { $ref: '#/components/responses/BootstrapSuccess' }, '403': { $ref: '#/components/responses/Error' } } }
+  /auth/me:
+    get: { tags: [Auth], operationId: getSession, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' }, '401': { $ref: '#/components/responses/Error' } } }
+  /auth/logout:
+    post: { tags: [Auth], operationId: logout, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' } } }
+  /auth/logout-all:
+    post: { tags: [Auth], operationId: logoutAll, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' } } }
+  /auth/verify-email:
+    post: { tags: [Auth], operationId: verifyEmail, requestBody: { $ref: '#/components/requestBodies/TokenBody' }, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
+  /auth/resend-verification:
+    post: { tags: [Auth], operationId: resendVerification, requestBody: { $ref: '#/components/requestBodies/ResendVerificationBody' }, responses: { '200': { $ref: '#/components/responses/VerificationResendSuccess' } } }
+  /auth/forgot-password:
+    post: { tags: [Auth], operationId: forgotPassword, requestBody: { $ref: '#/components/requestBodies/EmailBody' }, responses: { '200': { $ref: '#/components/responses/AcceptedSuccess' } } }
+  /auth/reset-password:
+    post: { tags: [Auth], operationId: resetPassword, requestBody: { $ref: '#/components/requestBodies/ResetPasswordBody' }, responses: { '200': { $ref: '#/components/responses/AcceptedSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
+  /auth/profile:
+    patch: { tags: [Auth], operationId: updateProfile, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/ProfileBody' }, responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' } } }
+  /auth/avatar:
+    patch: { tags: [Auth], operationId: updateAvatar, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/AvatarBody' }, responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' } } }
+
+  /categories:
+    get: { tags: [Marketplace], operationId: categoryTree, responses: { '200': { $ref: '#/components/responses/CategoryTreeSuccess' } } }
+  /provinces:
+    get: { tags: [Marketplace], operationId: listProvinces, responses: { '200': { $ref: '#/components/responses/ProvinceListSuccess' } } }
+  /products:
+    get:
+      tags: [Marketplace]
+      operationId: searchProducts
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: category_id, in: query, schema: { type: string } }
+        - { name: province_code, in: query, schema: { type: string } }
+        - { name: min_price, in: query, schema: { $ref: '#/components/schemas/MoneyString' } }
+        - { name: max_price, in: query, schema: { $ref: '#/components/schemas/MoneyString' } }
+        - { name: condition, in: query, schema: { type: string, enum: [LIKE_NEW, GOOD, FAIR, HEAVILY_USED] } }
+        - { name: delivery_method, in: query, schema: { type: string, enum: [COD, MEETUP, BOTH] } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, price_asc, price_desc] } }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses: { '200': { $ref: '#/components/responses/ProductListSuccess' } }
+    post: { tags: [Marketplace], operationId: createProduct, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/ProductCreateBody' }, responses: { '201': { $ref: '#/components/responses/ProductDetailSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
+  /products/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Marketplace], operationId: getProduct, responses: { '200': { $ref: '#/components/responses/ProductDetailSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch: { tags: [Marketplace], operationId: updateProduct, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/ProductUpdateBody' }, responses: { '200': { $ref: '#/components/responses/ProductDetailSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+    delete: { tags: [Marketplace], operationId: deleteProduct, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/IdSuccess' } } }
+  /products/{id}/submit:
+    post: { tags: [Marketplace], operationId: submitProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/ProductDetailSuccess' } } }
+  /products/{id}/hide:
+    post: { tags: [Marketplace], operationId: hideProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/ProductDetailSuccess' } } }
+  /account/products:
+    get: { tags: [Marketplace], operationId: listOwnProducts, security: [{ bearerAuth: [] }], parameters: [{ name: status, in: query, schema: { type: string, enum: [PENDING, ACTIVE, REJECTED, RESERVED, SOLD, INACTIVE] } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/OwnProductListSuccess' } } }
+  /uploads:
+    post:
+      tags: [Marketplace]
+      operationId: uploadImage
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, purpose]
+              properties:
+                file: { type: string, format: binary }
+                purpose: { type: string, enum: [product, avatar] }
+      responses: { '201': { $ref: '#/components/responses/UploadSuccess' }, '422': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/Error' } }
+  /uploads/{filename}:
+    get: { tags: [Marketplace], operationId: getUpload, parameters: [{ name: filename, in: path, required: true, schema: { type: string } }], responses: { '200': { description: Local private image bytes }, '302': { description: Redirect to a five-minute Supabase signed URL }, '404': { $ref: '#/components/responses/Error' } } }
+  /favorites:
+    get: { tags: [Marketplace], operationId: listFavorites, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ProductListSuccess' } } }
+  /favorites/{productId}:
+    parameters: [{ name: productId, in: path, required: true, schema: { type: string } }]
+    put: { tags: [Marketplace], operationId: addFavorite, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/FavoriteSuccess' } } }
+    delete: { tags: [Marketplace], operationId: removeFavorite, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/FavoriteSuccess' } } }
+  /cart:
+    get: { tags: [Marketplace], operationId: getCart, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/CartSuccess' } } }
+  /cart/items:
+    post: { tags: [Marketplace], operationId: addCartItem, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/CartItemBody' }, responses: { '200': { $ref: '#/components/responses/CartSuccess' } } }
+  /cart/items/{productId}:
+    delete: { tags: [Marketplace], operationId: removeCartItem, security: [{ bearerAuth: [] }], parameters: [{ name: productId, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/CartSuccess' } } }
+
+  /checkout:
+    post:
+      tags: [Orders]
+      operationId: checkout
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 200 }
+          description: Same key and canonical payload replay the original order group; another payload returns IDEMPOTENCY_CONFLICT.
+      requestBody: { $ref: '#/components/requestBodies/CheckoutBody' }
+      responses: { '201': { $ref: '#/components/responses/CheckoutSuccess' }, '409': { $ref: '#/components/responses/Error' } }
+  /orders:
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: role, in: query, schema: { type: string, enum: [buyer, seller] } }
+        - { name: status, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses: { '200': { $ref: '#/components/responses/OrderListSuccess' } }
+  /orders/{id}:
+    get: { tags: [Orders], operationId: getOrder, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/OrderDetailSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
+  /orders/{id}/actions:
+    post:
+      tags: [Orders]
+      operationId: actOnOrder
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { $ref: '#/components/requestBodies/OrderActionBody' }
+      responses: { '200': { $ref: '#/components/responses/OrderDetailSuccess' }, '409': { $ref: '#/components/responses/Error' } }
+  /orders/{orderId}/reviews:
+    post: { tags: [Trust], operationId: createReview, security: [{ bearerAuth: [] }], parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }], requestBody: { $ref: '#/components/requestBodies/ReviewBody' }, responses: { '201': { $ref: '#/components/responses/ReviewSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+
+  /conversations:
+    get: { tags: [Chat], operationId: listConversations, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ConversationListSuccess' } } }
+    post: { tags: [Chat], operationId: openConversation, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/OpenConversationBody' }, responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '201': { $ref: '#/components/responses/ConversationSuccess' } } }
+  /conversations/{conversationId}/messages:
+    parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get: { tags: [Chat], operationId: listMessages, security: [{ bearerAuth: [] }], parameters: [{ name: cursor, in: query, schema: { type: string, maxLength: 1024 } }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/MessagePageSuccess' } } }
+    post: { tags: [Chat], operationId: sendMessage, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/SendMessageBody' }, responses: { '200': { $ref: '#/components/responses/MessageSuccess' }, '201': { $ref: '#/components/responses/MessageSuccess' } } }
+  /conversations/{conversationId}/read:
+    post: { tags: [Chat], operationId: markConversationRead, security: [{ bearerAuth: [] }], parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }], requestBody: { $ref: '#/components/requestBodies/MarkReadBody' }, responses: { '200': { $ref: '#/components/responses/MarkReadSuccess' } } }
+
+  /users/{id}:
+    get: { tags: [Marketplace], operationId: getPublicProfile, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/PublicProfileSuccess' } } }
+  /users/{id}/products:
+    get: { tags: [Marketplace], operationId: getPublicProducts, parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ProductListSuccess' } } }
+  /users/{id}/reviews:
+    get: { tags: [Trust], operationId: listPublicReviews, parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ReviewListSuccess' } } }
+  /reports:
+    post: { tags: [Trust], operationId: createReport, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/ReportBody' }, responses: { '201': { $ref: '#/components/responses/ReportSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+  /reports/mine:
+    get: { tags: [Trust], operationId: listOwnReports, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ReportListSuccess' } } }
+  /notifications:
+    get: { tags: [Trust], operationId: listNotifications, security: [{ bearerAuth: [] }], parameters: [{ name: type, in: query, schema: { $ref: '#/components/schemas/NotificationType' } }, { name: unread, in: query, schema: { type: boolean } }, { name: unread_only, in: query, schema: { type: boolean } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/NotificationListSuccess' } } }
+  /notifications/unread-count:
+    get: { tags: [Trust], operationId: unreadNotificationCount, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/CountSuccess' } } }
+  /notifications/{id}/read:
+    post: { tags: [Trust], operationId: readNotification, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/MutationCountSuccess' } } }
+  /notifications/read-all:
+    post: { tags: [Trust], operationId: readAllNotifications, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/MutationCountSuccess' } } }
+  /support/tickets:
+    get: { tags: [Trust], operationId: listSupportTickets, security: [{ bearerAuth: [] }], parameters: [{ name: status, in: query, schema: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED] } }, { name: type, in: query, schema: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER] } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/SupportTicketListSuccess' } } }
+    post: { tags: [Trust], operationId: createSupportTicket, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/SupportTicketBody' }, responses: { '201': { $ref: '#/components/responses/SupportTicketSuccess' } } }
+  /support/tickets/{id}:
+    get: { tags: [Trust], operationId: getSupportTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/SupportTicketSuccess' } } }
+  /support/tickets/{id}/messages:
+    post: { tags: [Trust], operationId: replySupportTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/SupportReplyBody' }, responses: { '200': { $ref: '#/components/responses/SupportTicketSuccess' } } }
+  /support/tickets/{id}/close:
+    post: { tags: [Trust], operationId: closeSupportTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/SupportTicketSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+
+  /admin/dashboard:
+    get: { tags: [Admin], operationId: adminDashboard, security: [{ bearerAuth: [] }], parameters: [{ name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }], responses: { '200': { $ref: '#/components/responses/AdminDashboardSuccess' } } }
+  /admin/users:
+    get: { tags: [Admin], operationId: adminUsers, security: [{ bearerAuth: [] }], parameters: [{ name: handled_by, in: query, description: Admin who has audited an action on this entity., schema: { type: string, maxLength: 64 } }, { name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: status, in: query, schema: { type: string, enum: [ACTIVE, LOCKED, ALL] } }, { name: role, in: query, schema: { type: string, enum: [USER, ADMIN, ALL] } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminUserListSuccess' } } }
+  /admin/users/{id}/lock:
+    post: { tags: [Admin], operationId: adminLockUser, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReasonBody' }, responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
+  /admin/users/{id}/unlock:
+    post: { tags: [Admin], operationId: adminUnlockUser, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
+  /admin/users/{id}:
+    get: { tags: [Admin], operationId: adminUserDetail, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
+  /admin/products:
+    get: { tags: [Admin], operationId: adminProducts, security: [{ bearerAuth: [] }], parameters: [{ name: handled_by, in: query, description: Admin who has audited an action on this entity., schema: { type: string, maxLength: 64 } }, { name: status, in: query, schema: { type: string, enum: [PENDING, ACTIVE, REJECTED, RESERVED, SOLD, INACTIVE, BLOCKED, ALL] } }, { name: category_id, in: query, schema: { type: string } }, { name: seller_id, in: query, schema: { type: string } }, { name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminProductListSuccess' } } }
+  /admin/products/{id}/approve:
+    post: { tags: [Admin], operationId: adminApproveProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminProductVersionBody' }, responses: { '200': { $ref: '#/components/responses/AdminProductSuccess' } } }
+  /admin/products/{id}/reject:
+    post: { tags: [Admin], operationId: adminRejectProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminProductRejectBody' }, responses: { '200': { $ref: '#/components/responses/AdminProductSuccess' } } }
+  /admin/products/{id}/block:
+    post: { tags: [Admin], operationId: adminBlockProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminProductBlockBody' }, responses: { '200': { $ref: '#/components/responses/AdminProductSuccess' } } }
+  /admin/products/{id}/unblock:
+    post: { tags: [Admin], operationId: adminUnblockProduct, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminProductVersionBody' }, responses: { '200': { $ref: '#/components/responses/AdminProductSuccess' } } }
+  /admin/categories:
+    get: { tags: [Admin], operationId: adminCategories, security: [{ bearerAuth: [] }], description: 'Paginated root groups retaining all children. Dates filter admin audit events in Asia/Ho_Chi_Minh.', parameters: [{ name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: status, in: query, schema: { type: string, enum: [ACTIVE, INACTIVE] } }, { name: handled_by, in: query, schema: { type: string, maxLength: 64 } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminCategoryListSuccess' } } }
+    post: { tags: [Admin], operationId: adminCreateCategory, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/CategoryCreateBody' }, responses: { '201': { $ref: '#/components/responses/CategorySuccess' } } }
+  /admin/categories/tree:
+    get: { tags: [Admin], operationId: adminCategoryTree, security: [{ bearerAuth: [] }], description: Full tree including inactive categories for administration., responses: { '200': { $ref: '#/components/responses/CategoryTreeSuccess' } } }
+  /admin/categories/{id}:
+    patch: { tags: [Admin], operationId: adminUpdateCategory, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/CategoryId' }], requestBody: { $ref: '#/components/requestBodies/CategoryUpdateBody' }, responses: { '200': { $ref: '#/components/responses/CategorySuccess' } } }
+  /admin/reports:
+    get: { tags: [Admin], operationId: adminReports, security: [{ bearerAuth: [] }], parameters: [{ name: status, in: query, schema: { type: string, enum: [PENDING, RESOLVED, REJECTED, ALL] } }, { name: reason, in: query, schema: { type: string, enum: [COUNTERFEIT, PROHIBITED, FRAUD, SPAM, HARASSMENT, INAPPROPRIATE, OTHER, ALL] } }, { name: target_type, in: query, schema: { type: string, enum: [product, user, ALL] } }, { name: handled_by, in: query, schema: { type: string } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminReportListSuccess' } } }
+  /admin/reports/{id}/resolve:
+    post: { tags: [Admin], operationId: adminResolveReport, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReportResolutionBody' }, responses: { '200': { $ref: '#/components/responses/AdminReportSuccess' } } }
+  /admin/reports/{id}/reject:
+    post: { tags: [Admin], operationId: adminRejectReport, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReportRejectionBody' }, responses: { '200': { $ref: '#/components/responses/AdminReportSuccess' } } }
+  /admin/reviews:
+    get: { tags: [Admin], operationId: adminReviews, security: [{ bearerAuth: [] }], parameters: [{ name: handled_by, in: query, description: Admin who has audited an action on this entity., schema: { type: string, maxLength: 64 } }, { name: rating, in: query, schema: { type: integer, minimum: 1, maximum: 5 } }, { name: q, in: query, schema: { type: string, maxLength: 200 } }, { name: visibility, in: query, schema: { type: string, enum: [VISIBLE, HIDDEN, ALL] } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminReviewListSuccess' } } }
+  /admin/reviews/{id}/hide:
+    post: { tags: [Admin], operationId: adminHideReview, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReasonBody' }, responses: { '200': { $ref: '#/components/responses/AdminReviewSuccess' } } }
+  /admin/support-tickets:
+    get: { tags: [Admin], operationId: adminTickets, security: [{ bearerAuth: [] }], parameters: [{ name: status, in: query, schema: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, ALL] } }, { name: type, in: query, schema: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER, ALL] } }, { name: assigned_admin_id, in: query, schema: { type: string, description: Admin UUID or UNASSIGNED } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminSupportTicketListSuccess' } } }
+  /admin/support-tickets/{id}:
+    get: { tags: [Admin], operationId: adminTicketDetail, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
+    patch: { tags: [Admin], operationId: adminUpdateTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminTicketUpdateBody' }, responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
+  /admin/support-tickets/{id}/messages:
+    post: { tags: [Admin], operationId: adminReplyTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/SupportReplyBody' }, responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
+  /admin/audit-logs:
+    get: { tags: [Admin], operationId: adminAudit, security: [{ bearerAuth: [] }], parameters: [{ name: action, in: query, schema: { type: string, maxLength: 100 } }, { name: entity_type, in: query, schema: { type: string, maxLength: 50 } }, { name: entity_id, in: query, schema: { type: string } }, { name: actor_id, in: query, schema: { type: string } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AuditLogListSuccess' } } }
+  /admin/orders/{id}/cancel:
+    post: { tags: [Admin], operationId: adminCancelOrder, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminOrderCancelBody' }, responses: { '200': { $ref: '#/components/responses/AdminOrderCancelSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    CategoryId: { name: id, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 64 } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+  requestBodies:
+    RegisterBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/RegisterInput' } } }
+    LoginBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/LoginInput' } } }
+    TokenBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/TokenInput' } } }
+    EmailBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/EmailInput' } } }
+    ResendVerificationBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ResendVerificationInput' } } }
+    ResetPasswordBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ResetPasswordInput' } } }
+    ProfileBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ProfileInput' } } }
+    AvatarBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/AvatarInput' } } }
+    ProductCreateBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ProductCreateInput' } } }
+    ProductUpdateBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ProductUpdateInput' } } }
+    CartItemBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/CartItemInput' } } }
+    CheckoutBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/CheckoutInput' } } }
+    OrderActionBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/OrderActionInput' } } }
+    ReviewBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ReviewInput' } } }
+    OpenConversationBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/OpenConversationInput' } } }
+    SendMessageBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/SendMessageInput' } } }
+    MarkReadBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/MarkReadInput' } } }
+    ReportBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ReportInput' } } }
+    SupportTicketBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/SupportTicketInput' } } }
+    SupportReplyBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/SupportReplyInput' } } }
+    ReasonBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ReasonInput' } } }
+    CategoryCreateBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/CategoryCreateInput' } } }
+    CategoryUpdateBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/CategoryUpdateInput' } } }
+    ReportResolutionBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ReportResolutionInput' } } }
+    ReportRejectionBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/ReportRejectionInput' } } }
+    AdminTicketUpdateBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/AdminTicketUpdateInput' } } }
+    AdminOrderCancelBody:
+      required: true
+      content: { application/json: { schema: { $ref: '#/components/schemas/AdminOrderCancelInput' } } }
+    AdminProductVersionBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductVersionInput' }
+    AdminProductRejectBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductRejectInput' }
+    AdminProductBlockBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductBlockInput' }
+  responses:
+    Success:
+      description: Successful response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+    RegisterSuccess:
+      description: Account created; email verification is pending
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [pending_verification, email], additionalProperties: false, properties: { pending_verification: { type: boolean, enum: [true] }, email: { type: string, format: email } } } } }] } } }
+    AccessTokenSuccess:
+      description: Access token issued; refresh token is set in an HttpOnly cookie
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [access_token], additionalProperties: false, properties: { access_token: { type: string } } } } }] } } }
+    LoginSuccess:
+      description: Access token and already-validated identity, avoiding another /auth/me request
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [access_token, user], additionalProperties: false, properties: { access_token: { type: string }, user: { $ref: '#/components/schemas/SessionUser' } } } } }] } } }
+    BootstrapSuccess:
+      description: Trusted-origin cookie discovery and rotation; anonymous or expired sessions return null. Database failures remain errors.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [user, access_token]
+                    properties:
+                      user:
+                        nullable: true
+                        allOf: [{ $ref: '#/components/schemas/SessionUser' }]
+                      access_token: { type: string, nullable: true }
+    SessionUserSuccess:
+      description: Current user
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/SessionUser' } } }] } } }
+    AckSuccess:
+      description: Operation acknowledged
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [ok], additionalProperties: false, properties: { ok: { type: boolean, enum: [true] } } } } }] } } }
+    AcceptedSuccess:
+      description: Request accepted without revealing account existence
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [accepted], additionalProperties: false, properties: { accepted: { type: boolean, enum: [true] } } } } }] } } }
+    VerificationResendSuccess:
+      description: Verification request accepted, or throttled with retry information
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, properties: { retry_after: { type: integer, minimum: 1 } }, additionalProperties: false } } }] } } }
+    CategoryTreeSuccess:
+      description: Category tree
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/CategoryNode' } } } }] } } }
+    CategorySuccess:
+      description: Category
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/CategoryNode' } } }] } } }
+    AdminCategoryListSuccess:
+      description: Paginated root category groups, including inactive categories
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminCategoryListData' } } }] } } }
+    ProvinceListSuccess:
+      description: Provinces
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Province' } } } }] } } }
+    ProductListSuccess:
+      description: Paginated products
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ProductListData' } } }] } } }
+    OwnProductListSuccess:
+      description: Paginated owner products
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/OwnProductListData' } } }] } } }
+    ProductDetailSuccess:
+      description: Product detail
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ProductDetail' } } }] } } }
+    UploadSuccess:
+      description: Private upload accepted
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [storage_path, url], additionalProperties: false, properties: { storage_path: { type: string }, url: { type: string } } } } }] } } }
+    IdSuccess:
+      description: Resource identifier
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [id], additionalProperties: false, properties: { id: { type: string, format: uuid } } } } }] } } }
+    FavoriteSuccess:
+      description: Favorite state
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [is_favorited], additionalProperties: false, properties: { is_favorited: { type: boolean } } } } }] } } }
+    CartSuccess:
+      description: Current cart
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/CartView' } } }] } } }
+    CheckoutSuccess:
+      description: Checkout result
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [checkout_request_id, orders], additionalProperties: false, properties: { checkout_request_id: { type: string, format: uuid }, orders: { type: array, items: { $ref: '#/components/schemas/OrderListItem' } } } } } }] } } }
+    OrderListSuccess:
+      description: Paginated orders
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/OrderListData' } } }] } } }
+    OrderDetailSuccess:
+      description: Order detail
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/OrderDetail' } } }] } } }
+    ReviewSuccess:
+      description: Review
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/Review' } } }] } } }
+    ConversationListSuccess:
+      description: Paginated conversations
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ConversationListData' } } }] } } }
+    ConversationSuccess:
+      description: Conversation
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/Conversation' } } }] } } }
+    MessagePageSuccess:
+      description: Cursor-paginated messages
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/MessagePage' } } }] } } }
+    MessageSuccess:
+      description: Message accepted or idempotently replayed
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [message], additionalProperties: false, properties: { message: { $ref: '#/components/schemas/Message' } } } } }] } } }
+    MarkReadSuccess:
+      description: Conversation read state
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [unread, updated, read_at], additionalProperties: false, properties: { unread: { type: integer, minimum: 0 }, updated: { type: integer, minimum: 0 }, read_at: { $ref: '#/components/schemas/IsoDateTime' } } } } }] } } }
+    PublicProfileSuccess:
+      description: Public seller profile
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/PublicProfile' } } }] } } }
+    ReviewListSuccess:
+      description: Paginated reviews
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ReviewListData' } } }] } } }
+    ReportSuccess:
+      description: Report
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ReportRecord' } } }] } } }
+    ReportListSuccess:
+      description: Paginated reports
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/ReportListData' } } }] } } }
+    NotificationListSuccess:
+      description: Paginated notifications
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/NotificationListData' } } }] } } }
+    CountSuccess:
+      description: Count
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: integer, minimum: 0 } } }] } } }
+    MutationCountSuccess:
+      description: Updated and remaining counts
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [unread, updated], additionalProperties: false, properties: { unread: { type: integer, minimum: 0 }, updated: { type: integer, minimum: 0 } } } } }] } } }
+    SupportTicketListSuccess:
+      description: Paginated support tickets
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicketListData' } } }] } } }
+    SupportTicketSuccess:
+      description: Support ticket detail
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicketDetail' } } }] } } }
+    AdminDashboardSuccess:
+      description: Admin dashboard metrics
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminDashboard' } } }] } } }
+    AdminUserListSuccess:
+      description: Paginated users
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminUserListData' } } }] } } }
+    AdminUserSuccess:
+      description: Admin user view
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminUser' } } }] } } }
+    AdminProductListSuccess:
+      description: Paginated admin products
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminProductListData' } } }] } } }
+    AdminProductSuccess:
+      description: Admin product view
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } }] } } }
+    AdminReportListSuccess:
+      description: Paginated admin reports
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminReportListData' } } }] } } }
+    AdminReportSuccess:
+      description: Admin report view
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminReport' } } }] } } }
+    AdminReviewListSuccess:
+      description: Paginated admin reviews
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminReviewListData' } } }] } } }
+    AdminReviewSuccess:
+      description: Admin review view
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminReview' } } }] } } }
+    AdminSupportTicketListSuccess:
+      description: Paginated admin support tickets
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminSupportTicketListData' } } }] } } }
+    AdminSupportTicketSuccess:
+      description: Admin support ticket detail
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AdminSupportTicketDetail' } } }] } } }
+    AuditLogListSuccess:
+      description: Paginated audit log
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { $ref: '#/components/schemas/AuditLogListData' } } }] } } }
+    AdminOrderCancelSuccess:
+      description: Order cancelled by an administrator
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [id, status, version], additionalProperties: false, properties: { id: { type: string, format: uuid }, status: { type: string, enum: [CANCELLED] }, version: { type: integer, minimum: 2 } } } } }] } } }
+    Error:
+      description: Business or validation error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    RegisterInput:
+      type: object
+      required: [full_name, email, password, confirm_password, phone]
+      additionalProperties: false
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 100, example: Nguyễn Văn An }
+        email: { type: string, format: email, maxLength: 254, example: an@example.com }
+        password: { type: string, minLength: 12, maxLength: 72, format: password, writeOnly: true, example: MatKhauRatManh123! }
+        confirm_password: { type: string, minLength: 12, maxLength: 72, format: password, writeOnly: true, example: MatKhauRatManh123! }
+        phone: { type: string, pattern: '^\d{9,11}$', example: '0900000000' }
+    LoginInput:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email, maxLength: 254, example: an@example.com }
+        password: { type: string, maxLength: 72, format: password, writeOnly: true }
+    TokenInput:
+      type: object
+      required: [token]
+      additionalProperties: false
+      properties: { token: { type: string, minLength: 1, maxLength: 200, writeOnly: true } }
+    EmailInput:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties: { email: { type: string, format: email, maxLength: 254, example: an@example.com } }
+    ResendVerificationInput:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties: { email: { type: string, format: email, maxLength: 254, example: an@example.com } }
+    ResetPasswordInput:
+      type: object
+      required: [token, password]
+      additionalProperties: false
+      properties:
+        token: { type: string, minLength: 1, maxLength: 200, writeOnly: true }
+        password: { type: string, minLength: 12, maxLength: 72, format: password, writeOnly: true }
+    ProfileInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 100 }
+        phone: { type: string, nullable: true, pattern: '^\d{9,11}$' }
+        province_code: { type: string, nullable: true, maxLength: 20 }
+        default_address: { type: string, nullable: true, maxLength: 300 }
+    AvatarInput:
+      type: object
+      required: [storage_path]
+      additionalProperties: false
+      properties: { storage_path: { type: string, minLength: 1, maxLength: 300, example: users/00000000-0000-0000-0000-000000000001/avatar/avatar.webp } }
+    ProductImageInput:
+      type: object
+      required: [url, storage_path, sort_order]
+      additionalProperties: false
+      properties:
+        url: { type: string, minLength: 1, example: /api/v1/uploads/image.webp }
+        storage_path: { type: string, maxLength: 300, example: users/00000000-0000-0000-0000-000000000001/product/image.webp }
+        sort_order: { type: integer, minimum: 0, maximum: 7 }
+    ProductCreateInput:
+      type: object
+      required: [title, description, category_id, price, condition, province_code, delivery_method, shipping_fee, images]
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 5, maxLength: 150, example: Máy ảnh Fujifilm còn đẹp }
+        description: { type: string, minLength: 20, maxLength: 5000, example: Máy hoạt động tốt, đầy đủ pin và sạc chính hãng. }
+        category_id: { type: string, minLength: 1, maxLength: 64 }
+        price: { $ref: '#/components/schemas/PriceString' }
+        condition: { type: string, enum: [LIKE_NEW, GOOD, FAIR, HEAVILY_USED] }
+        usage_months: { type: integer, nullable: true, minimum: 0, maximum: 1200 }
+        province_code: { type: string, minLength: 1, maxLength: 20 }
+        delivery_method: { type: string, enum: [COD, MEETUP, BOTH] }
+        shipping_fee: { $ref: '#/components/schemas/ShippingFeeString' }
+        images: { type: array, minItems: 1, maxItems: 8, items: { $ref: '#/components/schemas/ProductImageInput' } }
+    ProductUpdateInput:
+      type: object
+      required: [title, description, category_id, price, condition, province_code, delivery_method, shipping_fee, expected_version]
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 5, maxLength: 150 }
+        description: { type: string, minLength: 20, maxLength: 5000 }
+        category_id: { type: string, minLength: 1, maxLength: 64 }
+        price: { $ref: '#/components/schemas/PriceString' }
+        condition: { type: string, enum: [LIKE_NEW, GOOD, FAIR, HEAVILY_USED] }
+        usage_months: { type: integer, nullable: true, minimum: 0, maximum: 1200 }
+        province_code: { type: string, minLength: 1, maxLength: 20 }
+        delivery_method: { type: string, enum: [COD, MEETUP, BOTH] }
+        shipping_fee: { $ref: '#/components/schemas/ShippingFeeString' }
+        images: { type: array, minItems: 1, maxItems: 8, items: { $ref: '#/components/schemas/ProductImageInput' } }
+        expected_version: { type: integer, minimum: 1 }
+    CartItemInput:
+      type: object
+      required: [product_id]
+      additionalProperties: false
+      properties: { product_id: { type: string, format: uuid } }
+    CheckoutItemInput:
+      type: object
+      required: [product_id, expected_price]
+      additionalProperties: false
+      properties:
+        product_id: { type: string, format: uuid }
+        expected_price: { $ref: '#/components/schemas/PriceString' }
+    CheckoutDeliveryInput:
+      type: object
+      required: [seller_id, method, recipient_name, recipient_phone, delivery_address, expected_shipping_fee]
+      additionalProperties: false
+      properties:
+        seller_id: { type: string, format: uuid }
+        method: { type: string, enum: [COD, MEETUP] }
+        recipient_name: { type: string, minLength: 1, maxLength: 100, example: Nguyễn Văn An }
+        recipient_phone: { type: string, pattern: '^\d{9,11}$', example: '0900000000' }
+        delivery_address: { type: string, minLength: 1, maxLength: 300, example: 12 Nguyễn Huệ, Quận 1 }
+        expected_shipping_fee: { $ref: '#/components/schemas/ShippingFeeString' }
+    CheckoutInput:
+      type: object
+      required: [items, deliveries]
+      additionalProperties: false
+      properties:
+        items: { type: array, minItems: 1, maxItems: 20, items: { $ref: '#/components/schemas/CheckoutItemInput' } }
+        deliveries: { type: array, minItems: 1, maxItems: 20, items: { $ref: '#/components/schemas/CheckoutDeliveryInput' } }
+    OrderActionInput:
+      type: object
+      required: [action, expected_version]
+      additionalProperties: false
+      properties:
+        action: { type: string, enum: [confirm, cancel, ship, deliver, complete, support, chat] }
+        expected_version: { type: integer, minimum: 1 }
+        reason: { type: string, maxLength: 500 }
+        carrier: { type: string, maxLength: 100 }
+        tracking_code: { type: string, maxLength: 100 }
+        buyer_confirmed_received: { type: boolean }
+        buyer_confirmed_paid: { type: boolean }
+    ReviewInput:
+      type: object
+      required: [rating]
+      additionalProperties: false
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, nullable: true, maxLength: 1000 }
+        expected_version: { type: integer, minimum: 1 }
+    OpenConversationInput:
+      type: object
+      required: [product_id]
+      additionalProperties: false
+      properties: { product_id: { type: string, format: uuid } }
+    SendMessageInput:
+      type: object
+      required: [content, client_message_id]
+      additionalProperties: false
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000, example: Sản phẩm này còn không bạn? }
+        client_message_id: { type: string, minLength: 1, maxLength: 100 }
+    MarkReadInput:
+      type: object
+      required: [last_message_id]
+      additionalProperties: false
+      properties: { last_message_id: { type: string, format: uuid } }
+    ReportInput:
+      type: object
+      required: [target_type, reason]
+      additionalProperties: false
+      properties:
+        target_type: { type: string, enum: [product, user] }
+        product_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        reason: { type: string, enum: [COUNTERFEIT, PROHIBITED, FRAUD, SPAM, HARASSMENT, INAPPROPRIATE, OTHER] }
+        description: { type: string, maxLength: 2000 }
+    SupportTicketInput:
+      type: object
+      required: [type, subject, message]
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER] }
+        subject: { type: string, minLength: 5, maxLength: 150, example: Cần hỗ trợ đơn hàng }
+        message: { type: string, minLength: 1, maxLength: 5000 }
+        order_id: { type: string, format: uuid }
+    SupportReplyInput:
+      type: object
+      required: [message]
+      additionalProperties: false
+      properties: { message: { type: string, minLength: 1, maxLength: 5000 } }
+    ReasonInput:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties: { reason: { type: string, minLength: 1, maxLength: 500 } }
+    CategoryCreateInput:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        slug: { type: string, minLength: 1, maxLength: 120 }
+        parent_id: { type: string, nullable: true, maxLength: 64 }
+    CategoryUpdateInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        slug: { type: string, minLength: 1, maxLength: 120 }
+        parent_id: { type: string, nullable: true, maxLength: 64 }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+    ReportResolutionInput:
+      type: object
+      required: [resolution_note]
+      additionalProperties: false
+      properties:
+        resolution_note: { type: string, minLength: 1, maxLength: 1000 }
+        action: { type: string, enum: [block_product, lock_user, none], default: none }
+    ReportRejectionInput:
+      type: object
+      required: [resolution_note]
+      additionalProperties: false
+      properties: { resolution_note: { type: string, minLength: 1, maxLength: 1000 } }
+    AdminTicketUpdateInput:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED] }
+        resolution_note: { type: string, maxLength: 2000 }
+        assigned_admin_id: { type: string, nullable: true, maxLength: 64 }
+        assign: { type: boolean }
+    AdminOrderCancelInput:
+      type: object
+      required: [expected_version, reason]
+      additionalProperties: false
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        ticket_id: { type: string, format: uuid }
+        delivery_outcome: { type: string, enum: [NOT_DELIVERED, RETURNED] }
+        payment_resolution: { type: string, minLength: 1, maxLength: 1000 }
+    AdminProductVersionInput:
+      type: object
+      required: [expected_version]
+      additionalProperties: false
+      properties: { expected_version: { type: integer, minimum: 1 } }
+    AdminProductRejectInput:
+      type: object
+      required: [expected_version, reason]
+      additionalProperties: false
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    AdminProductBlockInput:
+      type: object
+      required: [expected_version, reason]
+      additionalProperties: false
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    MoneyString:
+      type: string
+      pattern: '^\d+$'
+      example: '1100000'
+    PriceString:
+      allOf:
+        - { $ref: '#/components/schemas/MoneyString' }
+      description: Positive integer VND, maximum 1,000,000,000.
+    ShippingFeeString:
+      allOf:
+        - { $ref: '#/components/schemas/MoneyString' }
+      description: Non-negative integer VND, maximum 10,000,000.
+    IsoDateTime: { type: string, format: date-time }
+    UserRole: { type: string, enum: [USER, ADMIN] }
+    UserStatus: { type: string, enum: [ACTIVE, LOCKED] }
+    ProductStatus: { type: string, enum: [PENDING, ACTIVE, REJECTED, RESERVED, SOLD, INACTIVE] }
+    Condition: { type: string, enum: [LIKE_NEW, GOOD, FAIR, HEAVILY_USED] }
+    DeliveryMethod: { type: string, enum: [COD, MEETUP, BOTH] }
+    OrderDeliveryMethod: { type: string, enum: [COD, MEETUP] }
+    OrderStatus: { type: string, enum: [PENDING, CONFIRMED, SHIPPING, DELIVERED, COMPLETED, CANCELLED] }
+    ReportReason: { type: string, enum: [COUNTERFEIT, PROHIBITED, FRAUD, SPAM, HARASSMENT, INAPPROPRIATE, OTHER] }
+    ReportStatus: { type: string, enum: [PENDING, RESOLVED, REJECTED] }
+    TicketType: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER] }
+    TicketStatus: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED] }
+    PageMeta:
+      type: object
+      required: [page, page_size, total, total_pages]
+      additionalProperties: false
+      properties:
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        total_pages: { type: integer, minimum: 1 }
+    SessionUser:
+      type: object
+      required: [id, full_name, email, avatar_url, role, status, email_verified_at, phone, province_code, default_address, joined_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        email: { type: string, format: email }
+        avatar_url: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/UserRole' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        email_verified_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+        phone: { type: string, nullable: true }
+        province_code: { type: string, nullable: true }
+        default_address: { type: string, nullable: true }
+        joined_at: { $ref: '#/components/schemas/IsoDateTime' }
+    SellerSummary:
+      type: object
+      required: [id, name, avatar_url, province_code, province_label, joined_at, rating, review_count, completed_sales_count]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        avatar_url: { type: string, nullable: true }
+        province_code: { type: string, nullable: true }
+        province_label: { type: string, nullable: true }
+        joined_at: { $ref: '#/components/schemas/IsoDateTime' }
+        rating: { type: number, nullable: true, minimum: 1, maximum: 5 }
+        review_count: { type: integer, minimum: 0 }
+        completed_sales_count: { type: integer, minimum: 0 }
+    PublicProfile:
+      type: object
+      required: [seller]
+      additionalProperties: false
+      properties: { seller: { $ref: '#/components/schemas/SellerSummary' } }
+    Province:
+      type: object
+      required: [code, name]
+      additionalProperties: false
+      properties: { code: { type: string }, name: { type: string } }
+    CategoryNode:
+      type: object
+      required: [id, parent_id, name, slug, status]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1, maxLength: 64 }
+        parent_id: { type: string, maxLength: 64, nullable: true }
+        name: { type: string }
+        slug: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        children: { type: array, items: { $ref: '#/components/schemas/CategoryNode' } }
+    ProductImage:
+      type: object
+      required: [id, url, sort_order]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string }
+        storage_path: { type: string }
+        sort_order: { type: integer, minimum: 0 }
+    ProductCapabilities:
+      type: object
+      required: [can_buy, can_add_to_cart, can_chat, can_favorite, can_report, can_edit, can_manage, unavailable_reason]
+      additionalProperties: false
+      properties:
+        can_buy: { type: boolean }
+        can_add_to_cart: { type: boolean }
+        can_chat: { type: boolean }
+        can_favorite: { type: boolean }
+        can_report: { type: boolean }
+        can_edit: { type: boolean }
+        can_manage: { type: boolean }
+        unavailable_reason: { type: string, nullable: true }
+    ProductListItem:
+      type: object
+      required: [id, title, price, image_url, condition, province_code, province_label, published_at, created_at, status, is_favorited, seller]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        price: { $ref: '#/components/schemas/MoneyString' }
+        image_url: { type: string, nullable: true }
+        condition: { $ref: '#/components/schemas/Condition' }
+        province_code: { type: string }
+        province_label: { type: string, nullable: true }
+        published_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        is_favorited: { type: boolean }
+        seller: { $ref: '#/components/schemas/SellerSummary' }
+        is_blocked: { type: boolean }
+        is_hidden: { type: boolean }
+    ProductDetail:
+      allOf:
+        - { $ref: '#/components/schemas/ProductListItem' }
+        - type: object
+          required: [description, images, category_id, category_path, usage_months, delivery_method, shipping_fee, version, is_blocked, block_reason, rejection_reason, capabilities]
+          properties:
+            description: { type: string }
+            images: { type: array, items: { $ref: '#/components/schemas/ProductImage' } }
+            category_id: { type: string, minLength: 1, maxLength: 64 }
+            category_path: { type: array, items: { type: string } }
+            usage_months: { type: integer, nullable: true, minimum: 0 }
+            delivery_method: { $ref: '#/components/schemas/DeliveryMethod' }
+            shipping_fee: { $ref: '#/components/schemas/MoneyString' }
+            version: { type: integer, minimum: 1 }
+            is_blocked: { type: boolean }
+            block_reason: { type: string, nullable: true }
+            rejection_reason: { type: string, nullable: true }
+            capabilities: { $ref: '#/components/schemas/ProductCapabilities' }
+    OwnProduct:
+      allOf:
+        - { $ref: '#/components/schemas/ProductDetail' }
+        - type: object
+          required: [allowed_actions]
+          properties:
+            allowed_actions: { type: array, items: { type: string, enum: [edit, submit, resubmit, hide, delete, view] } }
+    CartItem:
+      type: object
+      required: [product_id, title, price, image_url, condition, status, province_label, available, unavailable_reason]
+      additionalProperties: false
+      properties:
+        product_id: { type: string, format: uuid }
+        title: { type: string }
+        price: { $ref: '#/components/schemas/MoneyString' }
+        image_url: { type: string, nullable: true }
+        condition: { $ref: '#/components/schemas/Condition' }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        province_label: { type: string, nullable: true }
+        available: { type: boolean }
+        unavailable_reason: { type: string, nullable: true }
+    CartGroup:
+      type: object
+      required: [seller, items]
+      additionalProperties: false
+      properties:
+        seller: { $ref: '#/components/schemas/SellerSummary' }
+        items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
+    CartView:
+      type: object
+      required: [groups, total_items]
+      additionalProperties: false
+      properties:
+        groups: { type: array, items: { $ref: '#/components/schemas/CartGroup' } }
+        total_items: { type: integer, minimum: 0 }
+    OrderItemSnapshot:
+      type: object
+      required: [id, product_id, title_snapshot, condition_snapshot, image_path_snapshot, image_url, price]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        title_snapshot: { type: string }
+        condition_snapshot: { $ref: '#/components/schemas/Condition' }
+        image_path_snapshot: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        price: { $ref: '#/components/schemas/MoneyString' }
+    OrderListItem:
+      type: object
+      required: [id, code, role, counterparty, status, delivery_method, items, total_amount, created_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        role: { type: string, enum: [buyer, seller] }
+        counterparty: { $ref: '#/components/schemas/SellerSummary' }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        delivery_method: { $ref: '#/components/schemas/OrderDeliveryMethod' }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItemSnapshot' } }
+        total_amount: { $ref: '#/components/schemas/MoneyString' }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        expires_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+    OrderHistory:
+      type: object
+      required: [from_status, to_status, actor_type, actor_name, reason, created_at]
+      additionalProperties: false
+      properties:
+        from_status: { allOf: [{ $ref: '#/components/schemas/OrderStatus' }], nullable: true }
+        to_status: { $ref: '#/components/schemas/OrderStatus' }
+        actor_type: { type: string, enum: [USER, ADMIN, SYSTEM] }
+        actor_name: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+    OrderDelivery:
+      type: object
+      required: [method, recipient_name, recipient_phone, delivery_address, carrier, tracking_code]
+      additionalProperties: false
+      properties:
+        method: { $ref: '#/components/schemas/OrderDeliveryMethod' }
+        recipient_name: { type: string }
+        recipient_phone: { type: string }
+        delivery_address: { type: string }
+        carrier: { type: string, nullable: true }
+        tracking_code: { type: string, nullable: true }
+    OrderReviewState:
+      type: object
+      required: [can_review, reason, existing]
+      additionalProperties: false
+      properties:
+        can_review: { type: boolean }
+        reason: { type: string, nullable: true }
+        existing: { allOf: [{ $ref: '#/components/schemas/Review' }], nullable: true }
+    OrderDetail:
+      allOf:
+        - { $ref: '#/components/schemas/OrderListItem' }
+        - type: object
+          required: [version, subtotal, shipping_fee, currency, delivery, status_history, allowed_actions, completion_block_reason, cancellation_reason, confirmed_at, shipped_at, delivered_at, completed_at, cancelled_at, review, conversation_id]
+          properties:
+            version: { type: integer, minimum: 1 }
+            subtotal: { $ref: '#/components/schemas/MoneyString' }
+            shipping_fee: { $ref: '#/components/schemas/MoneyString' }
+            currency: { type: string, enum: [VND] }
+            delivery: { $ref: '#/components/schemas/OrderDelivery' }
+            status_history: { type: array, items: { $ref: '#/components/schemas/OrderHistory' } }
+            allowed_actions: { type: array, items: { type: string, enum: [confirm, cancel, ship, deliver, complete, review, support, chat] } }
+            completion_block_reason: { type: string, nullable: true }
+            cancellation_reason: { type: string, nullable: true }
+            confirmed_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            shipped_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            delivered_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            completed_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            cancelled_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            review: { $ref: '#/components/schemas/OrderReviewState' }
+            conversation_id: { type: string, format: uuid, nullable: true }
+    ConversationCounterparty:
+      type: object
+      required: [id, name, avatar_url]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        avatar_url: { type: string, nullable: true }
+    ConversationProduct:
+      type: object
+      required: [id, title, image_url, status, price]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        image_url: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        price: { $ref: '#/components/schemas/MoneyString' }
+    ConversationLastMessage:
+      type: object
+      required: [content, created_at, sender_id]
+      additionalProperties: false
+      properties:
+        content: { type: string }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        sender_id: { type: string, format: uuid }
+    Conversation:
+      type: object
+      required: [id, counterparty, product, last_message, unread_count, updated_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        counterparty: { $ref: '#/components/schemas/ConversationCounterparty' }
+        product: { allOf: [{ $ref: '#/components/schemas/ConversationProduct' }], nullable: true }
+        last_message: { allOf: [{ $ref: '#/components/schemas/ConversationLastMessage' }], nullable: true }
+        unread_count: { type: integer, minimum: 0 }
+        updated_at: { $ref: '#/components/schemas/IsoDateTime' }
+    Message:
+      type: object
+      required: [id, client_message_id, sender_id, content, created_at, read_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        client_message_id: { type: string }
+        sender_id: { type: string, format: uuid }
+        content: { type: string }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        read_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+    MessagePage:
+      type: object
+      required: [items, next_cursor]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Message' } }
+        next_cursor: { type: string, nullable: true }
+    ReviewPerson:
+      type: object
+      required: [id, name, avatar_url]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        avatar_url: { type: string, nullable: true }
+    Review:
+      type: object
+      required: [id, order_id, rating, comment, created_at, reviewer, reviewed_user_id]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        reviewer: { $ref: '#/components/schemas/ReviewPerson' }
+        reviewed_user_id: { type: string, format: uuid }
+    ReportRecord:
+      type: object
+      required: [id, target_type, target_label, target_id, reason, description, status, resolution_note, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        target_type: { type: string, enum: [product, user] }
+        target_label: { type: string }
+        target_id: { type: string, format: uuid }
+        reason: { $ref: '#/components/schemas/ReportReason' }
+        description: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ReportStatus' }
+        resolution_note: { type: string, nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        updated_at: { $ref: '#/components/schemas/IsoDateTime' }
+    NotificationType: { type: string, enum: [ORDER_CREATED, ORDER_CONFIRMED, ORDER_CANCELLED, ORDER_SHIPPED, ORDER_DELIVERED, ORDER_COMPLETED, ORDER_REMINDER, REVIEW_CREATED, TICKET_REPLY, REPORT_RESULT] }
+    Notification:
+      type: object
+      required: [id, user_id, type, title, content, reference_type, reference_id, read_at, created_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        title: { type: string }
+        content: { type: string }
+        reference_type: { type: string }
+        reference_id: { type: string, nullable: true }
+        dedupe_key: { type: string }
+        read_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+    SupportTicketListItem:
+      type: object
+      required: [id, code, subject, type, status, order_id, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        subject: { type: string }
+        type: { $ref: '#/components/schemas/TicketType' }
+        status: { $ref: '#/components/schemas/TicketStatus' }
+        order_id: { type: string, format: uuid, nullable: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        updated_at: { $ref: '#/components/schemas/IsoDateTime' }
+    SupportMessageSender:
+      type: object
+      required: [id, name, role]
+      additionalProperties: false
+      properties:
+        id: { type: string, description: UUID for admins and users; the literal `support` when admin identity is hidden. }
+        name: { type: string }
+        role: { type: string, enum: [USER, ADMIN] }
+    SupportMessage:
+      type: object
+      required: [id, sender, message, created_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        sender: { $ref: '#/components/schemas/SupportMessageSender' }
+        message: { type: string }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+    SupportTicketDetail:
+      allOf:
+        - { $ref: '#/components/schemas/SupportTicketListItem' }
+        - type: object
+          required: [resolution_note, resolved_at, closed_at, assigned_admin_name, messages, allowed_actions]
+          properties:
+            resolution_note: { type: string, nullable: true }
+            resolved_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            closed_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            assigned_admin_name: { type: string, nullable: true }
+            messages: { type: array, items: { $ref: '#/components/schemas/SupportMessage' } }
+            allowed_actions: { type: array, items: { type: string, enum: [reply, close, reopen, resolve, progress] } }
+    AdminDashboard:
+      type: object
+      required: [total_users, new_users_in_period, pending_products, products_by_status, blocked_products, completed_orders_in_period, completed_order_value_in_period, pending_reports, unresolved_tickets, pending_products_queue, open_tickets_queue]
+      additionalProperties: false
+      properties:
+        total_users: { type: integer, minimum: 0 }
+        new_users_in_period: { type: integer, minimum: 0 }
+        pending_products: { type: integer, minimum: 0 }
+        products_by_status:
+          type: object
+          required: [PENDING, ACTIVE, REJECTED, RESERVED, SOLD, INACTIVE]
+          additionalProperties: false
+          properties:
+            PENDING: { type: integer, minimum: 0 }
+            ACTIVE: { type: integer, minimum: 0 }
+            REJECTED: { type: integer, minimum: 0 }
+            RESERVED: { type: integer, minimum: 0 }
+            SOLD: { type: integer, minimum: 0 }
+            INACTIVE: { type: integer, minimum: 0 }
+        blocked_products: { type: integer, minimum: 0 }
+        unresolved_tickets: { type: integer, minimum: 0, description: OPEN and IN_PROGRESS tickets }
+        completed_orders_in_period: { type: integer, minimum: 0 }
+        completed_order_value_in_period: { $ref: '#/components/schemas/MoneyString' }
+        pending_reports: { type: integer, minimum: 0 }
+        pending_products_queue: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/AdminProduct' } }
+        open_tickets_queue: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/AdminSupportTicketItem' } }
+    AdminUser:
+      type: object
+      required: [id, full_name, email, avatar_url, phone, province_code, province_label, default_address, email_verified_at, role, status, created_at, lock_reason, locked_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        email: { type: string, format: email }
+        avatar_url: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        province_code: { type: string, nullable: true }
+        province_label: { type: string, nullable: true }
+        default_address: { type: string, nullable: true }
+        email_verified_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+        role: { $ref: '#/components/schemas/UserRole' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        lock_reason: { type: string, nullable: true }
+        locked_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+    AdminProduct:
+      type: object
+      required: [id, title, price, image_url, status, is_blocked, block_reason, rejection_reason, version, updated_at, created_at, seller, category_name, description, images, condition, usage_months, province_code, delivery_method, shipping_fee]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        price: { $ref: '#/components/schemas/MoneyString' }
+        image_url: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ProductStatus' }
+        is_blocked: { type: boolean }
+        block_reason: { type: string, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        version: { type: integer, minimum: 1 }
+        updated_at: { $ref: '#/components/schemas/IsoDateTime' }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+        seller: { $ref: '#/components/schemas/SellerSummary' }
+        category_name: { type: string }
+        description: { type: string }
+        images: { type: array, items: { $ref: '#/components/schemas/ProductImage' } }
+        condition: { $ref: '#/components/schemas/Condition' }
+        usage_months: { type: integer, minimum: 0, nullable: true }
+        province_code: { type: string }
+        delivery_method: { $ref: '#/components/schemas/DeliveryMethod' }
+        shipping_fee: { $ref: '#/components/schemas/ShippingFeeString' }
+    AdminSupportTicketItem:
+      allOf:
+        - { $ref: '#/components/schemas/SupportTicketListItem' }
+        - type: object
+          required: [user, assigned_admin]
+          properties:
+            user: { type: object, required: [id, name], additionalProperties: false, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+            assigned_admin: { type: object, nullable: true, required: [id, name], additionalProperties: false, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+    AdminSupportTicketDetail:
+      allOf:
+        - { $ref: '#/components/schemas/SupportTicketDetail' }
+        - { $ref: '#/components/schemas/AdminSupportTicketItem' }
+    AdminReport:
+      allOf:
+        - { $ref: '#/components/schemas/ReportRecord' }
+        - type: object
+          required: [reporter_name, handled_by_name, handled_at]
+          properties:
+            reporter_name: { type: string }
+            handled_by_name: { type: string, nullable: true }
+            handled_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+    AdminReview:
+      allOf:
+        - { $ref: '#/components/schemas/Review' }
+        - type: object
+          required: [order_code, reviewed_user_name, hidden_at, hidden_reason]
+          properties:
+            order_code: { type: string }
+            reviewed_user_name: { type: string }
+            hidden_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+            hidden_reason: { type: string, nullable: true }
+    AuditLog:
+      type: object
+      required: [id, actor_id, actor_name, actor_type, action, entity_type, entity_id, reason, metadata, created_at]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid, nullable: true }
+        actor_name: { type: string, nullable: true }
+        actor_type: { type: string, enum: [USER, ADMIN, SYSTEM] }
+        action: { type: string }
+        entity_type: { type: string }
+        entity_id: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        metadata: { type: object, additionalProperties: true }
+        created_at: { $ref: '#/components/schemas/IsoDateTime' }
+    ProductListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProductListItem' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    OwnProductListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OwnProduct' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    OrderListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OrderListItem' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    ConversationListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Conversation' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    ReviewListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Review' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    ReportListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ReportRecord' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    NotificationListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+        meta:
+          allOf:
+            - { $ref: '#/components/schemas/PageMeta' }
+            - type: object
+              required: [unread]
+              properties: { unread: { type: integer, minimum: 0 } }
+    SupportTicketListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SupportTicketListItem' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminUserListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminUser' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminCategoryListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CategoryNode' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminProductListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminProduct' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminReportListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminReport' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminReviewListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminReview' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AdminSupportTicketListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminSupportTicketItem' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    AuditLogListData:
+      type: object
+      required: [items, meta]
+      additionalProperties: false
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
+        meta: { $ref: '#/components/schemas/PageMeta' }
+    Meta:
+      type: object
+      required: [request_id]
+      properties:
+        request_id: { type: string, format: uuid }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        total_pages: { type: integer, minimum: 1 }
+    SuccessEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: {}
+        meta: { $ref: '#/components/schemas/Meta' }
+    ApiErrorCode:
+      type: string
+      description: Stable machine-readable error code shared by the API and web client.
+      enum:
+        - VALIDATION_ERROR
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - EMAIL_NOT_VERIFIED
+        - ACCOUNT_LOCKED
+        - NOT_FOUND
+        - PRODUCT_NOT_AVAILABLE
+        - PRICE_CHANGED
+        - INVALID_ORDER_TRANSITION
+        - ORDER_EXPIRED
+        - VERSION_CONFLICT
+        - REVIEW_NOT_ALLOWED
+        - IDEMPOTENCY_CONFLICT
+        - RETRY_LATER
+        - RATE_LIMITED
+        - SESSION_EXPIRED
+        - INTERNAL
+      example: VERSION_CONFLICT
+    ErrorEnvelope:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { $ref: '#/components/schemas/ApiErrorCode' }
+            message: { type: string, example: Dữ liệu đã thay đổi, vui lòng tải lại. }
+            details: { type: object, additionalProperties: true }
+        meta: { $ref: '#/components/schemas/Meta' }

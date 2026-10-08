@@ -1,0 +1,109 @@
+/*
+ * Typographic scale (ui-spec 2.1). Mobile-first: default value is the mobile
+ * size, the 1024px breakpoint switches to the desktop size.
+ */
+:root {
+  --rm-space: 4px;
+}
+
+.t-hero {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.t-h1 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+}
+
+.t-h2 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.t-h3 {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.t-body {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.t-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.t-meta {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.t-price-card {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.t-price-detail {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+}
+
+@media (min-width: 1024px) {
+  .t-hero {
+    font-size: 40px;
+    line-height: 48px;
+  }
+
+  .t-h1 {
+    font-size: 30px;
+    line-height: 40px;
+  }
+
+  .t-h2 {
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  .t-price-card {
+    font-size: 18px;
+    line-height: 26px;
+  }
+
+  .t-price-detail {
+    font-size: 32px;
+    line-height: 40px;
+  }
+}
+
+/*
+ * Focus ring (ui-spec: color.focus). Applied through :focus-visible so keyboard
+ * users always see it while pointer interaction stays clean.
+ */
+:focus-visible {
+  outline: 2px solid #245ea8;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm 11 reads workspace settings from this file, not package.json.
+# esbuild needs its postinstall so vite/vitest can resolve the platform binary.
+allowBuilds:
+  '0': esbuild
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  sharp: true
+  workerd: set this to true or false

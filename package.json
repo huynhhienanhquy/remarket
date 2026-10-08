@@ -1,0 +1,17 @@
+{
+  "name": "remarket",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ReMarket - marketplace mua ban do cu truc tuyen (monorepo)",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev": "pnpm --filter @remarket/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}

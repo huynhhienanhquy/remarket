@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: remarket
+          POSTGRES_PASSWORD: remarket
+          POSTGRES_DB: remarket_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U remarket -d remarket_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
+      DIRECT_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
+      TEST_DATABASE_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
+      JWT_SECRET: ci-only-secret-with-at-least-thirty-two-characters
+      FRONTEND_URL: http://localhost:5173
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.9.0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @remarket/api prisma:generate
+      - run: pnpm --filter @remarket/api prisma:deploy
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint
+      - run: pnpm -r test
+      - run: pnpm -r build

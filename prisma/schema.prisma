@@ -1,0 +1,663 @@
+// This is your Prisma schema file
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "windows"]
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// Enums (matching shared package)
+// ============================================================================
+
+enum ProductStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  RESERVED
+  SOLD
+  INACTIVE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPING
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum Condition {
+  LIKE_NEW
+  GOOD
+  FAIR
+  HEAVILY_USED
+}
+
+enum DeliveryMethod {
+  COD
+  MEETUP
+  BOTH
+}
+
+enum OrderDeliveryMethod {
+  COD
+  MEETUP
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+enum ReportReason {
+  COUNTERFEIT
+  PROHIBITED
+  FRAUD
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+enum TicketType {
+  ACCOUNT
+  ORDER_PROBLEM
+  PRODUCT
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NotificationType {
+  PRODUCT_APPROVED
+  PRODUCT_REJECTED
+  PRODUCT_BLOCKED
+  NEW_MESSAGE
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  ORDER_CANCELLED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  ORDER_COMPLETED
+  ORDER_REMINDER
+  REVIEW_CREATED
+  TICKET_REPLY
+  REPORT_RESULT
+}
+
+// ============================================================================
+// Core Models
+// ============================================================================
+
+model User {
+  id                     String    @id @default(uuid())
+  fullName               String
+  email                  String    @unique
+  passwordHash           String
+  avatarUrl              String?
+  role                   UserRole  @default(USER)
+  status                 UserStatus @default(ACTIVE)
+  emailVerifiedAt        DateTime?
+  phone                  String?
+  provinceCode           String?
+  defaultAddress         String?
+  joinedAt               DateTime  @default(now())
+  lockReason             String?
+  lockedAt               DateTime?
+
+  // Relations
+  products               Product[]
+  favorites              Favorite[]
+  cartItems              CartItem[]
+  ordersAsBuyer          Order[]        @relation("OrderBuyer")
+  ordersAsSeller         Order[]        @relation("OrderSeller")
+  messages               Message[]      @relation("MessageSender")
+  conversationsAsBuyer   Conversation[] @relation("ConversationBuyer")
+  conversationsAsSeller  Conversation[] @relation("ConversationSeller")
+  reviewsAsReviewer      Review[]       @relation("ReviewReviewer")
+  reviewsAsReviewee      Review[]       @relation("ReviewReviewee")
+  reportsCreated         Report[]       @relation("ReportCreator")
+  reportsTargeted        Report[]       @relation("ReportTarget")
+  notifications          Notification[]
+  supportTickets         SupportTicket[] @relation("SupportTicketUser")
+  supportMessages        SupportMessage[]
+  auditLogs              AuditLog[]     @relation("AuditLog")
+  authTokens             AuthToken[]
+  sessions               Session[]
+  handledReports         Report[]       @relation("ReportHandler")
+  assignedTickets        SupportTicket[] @relation("SupportTicketAdmin")
+  checkoutRequests       CheckoutRequest[]
+  uploads                UploadAsset[]
+  reviewedProducts       Product[]       @relation("ProductReviewer")
+  orderStatusActions     OrderStatusHistory[] @relation("OrderStatusActor")
+  cancelledOrders        Order[]         @relation("OrderCancelledBy")
+  hiddenReviews          Review[]        @relation("ReviewHiddenBy")
+
+  @@index([email])
+  @@index([status])
+}
+
+/// One row per login session. Stores only hashes: the access JWT lives 15 min
+/// and carries `session_id`; the refresh token is an opaque random string held
+/// in an httpOnly cookie, and only its SHA-256 lands here (detail-project 5).
+model Session {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the current refresh token.
+  refreshHash     String?   @unique
+  /// SHA-256 of the token rotated out one step. Presenting it again is reuse
+  /// and revokes the whole session (detail-project 5.2).
+  refreshPrevHash String?   @unique
+  revokedAt       DateTime?
+  expiresAt       DateTime
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  tokens          AuthToken[]
+
+  @@index([userId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+/// One-time email token: VERIFY_EMAIL (24h) or RESET_PASSWORD (15min).
+/// Only the hash is stored and a token can be consumed exactly once.
+model AuthToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId  String?
+  session    Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  purpose    String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, purpose])
+  @@index([sessionId, purpose])
+  @@index([expiresAt])
+}
+
+model Category {
+  id        String        @id @default(uuid())
+  parentId  String?
+  parent    Category?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[]    @relation("CategoryHierarchy")
+  name      String
+  slug      String
+  status    CategoryStatus @default(ACTIVE)
+  products  Product[]
+
+  @@unique([slug])
+  @@index([parentId])
+  @@index([slug])
+  @@index([status])
+}
+
+model Province {
+  id   String @id @default(uuid())
+  code String @unique
+  name String
+}
+
+model Product {
+  id              String         @id @default(uuid())
+  title           String
+  description     String
+  price           Decimal        @db.Decimal(18, 0)
+  condition       Condition
+  usageMonths     Int?
+  categoryId      String
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  provinceCode    String
+  deliveryMethod  DeliveryMethod
+  shippingFee     Decimal        @db.Decimal(18, 0)
+  status          ProductStatus  @default(PENDING)
+  version         Int            @default(1)
+  isBlocked       Boolean        @default(false)
+  blockReason     String?
+  rejectionReason String?
+  /// Set while an order holds this listing; `status = RESERVED` iff this is set.
+  reservedOrderId String?
+  reservedOrder   Order?         @relation("ReservedProducts", fields: [reservedOrderId], references: [id], onDelete: Restrict)
+  /// Soft delete marker — rows are kept for order/report references.
+  deletedAt       DateTime?
+  reviewedBy      String?
+  reviewer        User?          @relation("ProductReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  sellerId        String
+  seller          User           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  publishedAt     DateTime?
+
+  // Relations
+  images          ProductImage[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  favorites       Favorite[]
+  reviews         Review[]
+  reports         Report[]
+  conversations   Conversation[]
+  uploads         UploadAsset[]
+
+  @@index([sellerId])
+  @@index([categoryId])
+  @@index([provinceCode])
+  @@index([status])
+  @@index([createdAt])
+  @@index([price])
+  @@index([status, createdAt, id])
+  @@index([categoryId, status, price])
+  @@index([provinceCode, status])
+  @@index([sellerId, status])
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  storagePath String?  @unique
+  sortOrder Int
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@unique([productId, sortOrder])
+}
+
+/// Metadata for a private object written by the upload endpoint. Product and
+/// avatar mutations accept this storage path, never an arbitrary client URL.
+model UploadAsset {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  purpose     String
+  storagePath String   @unique
+  mimeType    String
+  byteSize    Int
+  attachedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, purpose])
+  @@index([productId])
+  @@index([attachedAt, createdAt])
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  buyerId   String
+  buyer     User     @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    User     @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  Message[]
+
+  @@unique([buyerId, sellerId, productId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id                 String   @id @default(uuid())
+  conversationId     String
+  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId           String
+  sender             User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  clientMessageId    String
+  content            String
+  readAt             DateTime?
+  createdAt          DateTime @default(now())
+
+  @@unique([conversationId, senderId, clientMessageId])
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@index([conversationId, createdAt, id])
+}
+
+model Order {
+  id                    String        @id @default(uuid())
+  code                  String        @unique
+  buyerId               String
+  buyer                 User          @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId              String
+  seller                User          @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  status                OrderStatus   @default(PENDING)
+  deliveryMethod        OrderDeliveryMethod
+  subtotal              Decimal       @db.Decimal(18, 0)
+  shippingFee           Decimal       @db.Decimal(18, 0)
+  totalAmount           Decimal       @db.Decimal(18, 0)
+  version               Int           @default(1)
+  cancellationReason    String?
+  cancelledById         String?
+  cancelledBy           User?         @relation("OrderCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  buyerConfirmedReceived Boolean      @default(false)
+  buyerConfirmedPaid     Boolean      @default(false)
+  confirmedAt           DateTime?
+  shippedAt             DateTime?
+  deliveredAt           DateTime?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  expiresAt             DateTime?
+  checkoutRequestId     String?
+  checkoutRequest       CheckoutRequest? @relation(fields: [checkoutRequestId], references: [id], onDelete: SetNull)
+
+  // Relations
+  items                 OrderItem[]
+  statusHistory         OrderStatusHistory[]
+  deliveryInfo          OrderDeliveryInfo?
+  review                Review?
+  supportTickets        SupportTicket[]
+  reservedProducts      Product[]      @relation("ReservedProducts")
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([code])
+  @@index([createdAt])
+  @@index([buyerId, createdAt, id])
+  @@index([sellerId, status, createdAt])
+  @@index([status, expiresAt])
+  @@unique([checkoutRequestId, sellerId])
+}
+
+model OrderItem {
+  id              String      @id @default(uuid())
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  titleSnapshot   String
+  conditionSnapshot Condition
+  imagePathSnapshot String?
+  imageUrl        String?
+  price           Decimal     @db.Decimal(18, 0)
+  sortOrder       Int
+
+  @@index([orderId])
+  @@index([productId])
+  @@unique([orderId, productId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(uuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  actorType   String       // USER | ADMIN | SYSTEM
+  actorId     String?
+  actor       User?        @relation("OrderStatusActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName   String?
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+model OrderDeliveryInfo {
+  id                String              @id @default(uuid())
+  orderId           String              @unique
+  order             Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method            OrderDeliveryMethod
+  recipientName     String
+  recipientPhone    String
+  deliveryAddress   String
+  carrier           String?
+  trackingCode      String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reviewerId      String
+  reviewer        User     @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewedUserId  String
+  reviewedUser    User     @relation("ReviewReviewee", fields: [reviewedUserId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating          Int      // 1-5
+  comment         String?
+  hiddenAt        DateTime?
+  hiddenBy        String?
+  hiddenByUser    User?    @relation("ReviewHiddenBy", fields: [hiddenBy], references: [id], onDelete: SetNull)
+  hiddenReason    String?
+  createdAt       DateTime @default(now())
+
+  @@index([reviewerId])
+  @@index([reviewedUserId])
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model Report {
+  id              String       @id @default(uuid())
+  targetType      String       // "product" | "user"
+  targetId        String
+  targetLabel     String
+  reporterId      String
+  reporter        User         @relation("ReportCreator", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetProductId String?
+  targetProduct   Product?     @relation(fields: [targetProductId], references: [id], onDelete: SetNull)
+  targetUserId    String?
+  targetUser      User?        @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  reason          ReportReason
+  description     String?
+  status          ReportStatus @default(PENDING)
+  resolutionNote  String?
+  handledById     String?
+  handledBy       User?        @relation("ReportHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  handledAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([reporterId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model Notification {
+  id             String           @id @default(uuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           NotificationType
+  title          String
+  content        String
+  referenceType  String
+  referenceId    String?
+  dedupeKey      String?
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId])
+  @@index([type])
+  @@index([readAt])
+  @@index([createdAt])
+  @@index([userId, readAt, createdAt])
+}
+
+model SupportTicket {
+  id                String       @id @default(uuid())
+  code              String       @unique
+  userId            String
+  user              User         @relation("SupportTicketUser", fields: [userId], references: [id], onDelete: Cascade)
+  orderId           String?
+  order             Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedAdminId   String?
+  assignedAdmin     User?        @relation("SupportTicketAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  subject           String
+  type              TicketType
+  status            TicketStatus @default(OPEN)
+  resolutionNote    String?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  messages          SupportMessage[]
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([assignedAdminId])
+  @@index([createdAt])
+  @@index([userId, status])
+  @@index([orderId, status])
+}
+
+model SupportMessage {
+  id              String   @id @default(uuid())
+  ticketId        String
+  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId        String
+  sender          User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  role            String   // "USER" | "ADMIN"
+  message         String
+  createdAt       DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  actor        User?    @relation("AuditLog", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName    String?
+  actorType    String   // USER | ADMIN | SYSTEM
+  action       String
+  entityType   String
+  entityId     String?
+  reason       String?
+  metadata     Json
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entityType, entityId, createdAt])
+}
+
+model CheckoutRequest {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idempotencyKey String
+  /// SHA-256 of the canonical payload; a reused key with another hash is a conflict.
+  requestHash    String
+  /// PENDING -> SUCCEEDED once the transaction commits.
+  status         String    @default("PENDING")
+  createdAt      DateTime  @default(now())
+  orders         Order[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId])
+}
+
+model OutboxEvent {
+  id            String   @id @default(uuid())
+  eventType     String
+  aggregateId   String
+  dedupeKey     String   @unique
+  payload       Json
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  processedAt   DateTime?
+  lastError     String?
+  lockedAt      DateTime?
+  lockId        String?
+  createdAt     DateTime @default(now())
+
+  @@index([processedAt, nextAttemptAt])
+  @@index([lockedAt])
+}
+
+/// Shared heartbeat so an API process can observe a separately deployed
+/// background worker rather than relying on process-local memory.
+model WorkerHeartbeat {
+  id            String   @id
+  running       Boolean  @default(false)
+  lastRunAt     DateTime?
+  lastSuccessAt DateTime?
+  lastError     String?
+  updatedAt     DateTime @updatedAt
+}

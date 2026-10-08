@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@remarket/shared": ["../../packages/shared/src/index.ts"],
+      "@/*": ["./src/*"]
+    },
+    "noEmit": true
+  },
+  "include": ["src"]
+}

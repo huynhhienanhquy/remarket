@@ -1,0 +1,68 @@
+@import "./typography.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-page text-ink font-sans antialiased;
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  /* Inputs/buttons keep a 44px minimum target (ui-spec 2.2). */
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+@layer components {
+  /* Public container: max 1280px, padding 16/24/32 by breakpoint. */
+  .rm-container {
+    @apply mx-auto w-full max-w-[1280px] px-4 lg:px-8;
+  }
+
+  @media (min-width: 640px) {
+    .rm-container {
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .rm-container {
+      padding-left: 32px;
+      padding-right: 32px;
+    }
+  }
+
+  /* Vertical rhythm between sections: 32px mobile / 48px desktop. */
+  .rm-section {
+    @apply py-8 lg:py-12;
+  }
+
+  .rm-skeleton {
+    @apply animate-pulse rounded-control bg-surface-subtle;
+  }
+
+  /* Fixed bottom bars must clear the iOS home indicator. */
+  .rm-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Keep scrollbar of horizontal thumbnail rows out of the layout flow. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}

@@ -1,0 +1,102 @@
+import request from "supertest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
+
+const client = vi.hoisted(() => ({
+  authToken: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+  session: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  user: { findUnique: vi.fn() },
+  outboxEvent: { createMany: vi.fn() },
+  $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(),
+}));
+vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
+import { createApp } from "../../src/app.js";
+import { env } from "../../src/config/env.js";
+import { sha256 } from "../../src/shared/tokens.js";
+
+const expiresAt = new Date(Date.now() + 60_000);
+const user = { id: "user", fullName: "Admin Test", email: "admin@example.test", role: "ADMIN", status: "ACTIVE", emailVerifiedAt: new Date(), joinedAt: new Date(), avatarUrl: null, phone: null, provinceCode: null, defaultAddress: null };
+const cookie = `${env.refreshCookie}=opaque-test-token`;
+const token = { id: "token", userId: user.id, sessionId: "session", purpose: "REFRESH", consumedAt: null, expiresAt };
+beforeEach(() => {
+  vi.resetAllMocks();
+  client.authToken.findUnique.mockResolvedValue(token);
+  client.session.findUnique.mockResolvedValue({ id: "session", userId: user.id, expiresAt, revokedAt: null, refreshHash: sha256("opaque-test-token") });
+  client.user.findUnique.mockResolvedValue(user);
+  client.$executeRaw.mockResolvedValue(1);
+  client.$queryRaw.mockImplementation(async (query: TemplateStringsArray) => {
+    const sql = query.join("?");
+    if (sql.includes('FROM "User"')) return [await client.user.findUnique()];
+    if (sql.includes('FROM "Session"')) return [await client.session.findUnique()];
+    if (sql.includes('FROM "AuthToken"')) return [await client.authToken.findUnique()];
+    return [];
+  });
+  client.$transaction.mockImplementation((fn: (tx: typeof client) => Promise<unknown>) => fn(client));
+});
+
+describe("cookie session discovery", () => {
+  it("returns a successful guest session without hitting persistence", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Origin", "http://localhost:5173").expect(200);
+    expect(response.body.data).toEqual({ user: null, access_token: null });
+    expect(client.authToken.findUnique).not.toHaveBeenCalled();
+    await request(createApp()).post("/api/v1/auth/refresh").expect(401);
+  });
+  it("rejects an untrusted Origin before touching cookies or persistence", async () => {
+    await request(createApp()).post("/api/v1/auth/bootstrap").set("Origin", "https://untrusted.example").set("Cookie", cookie).expect(403);
+    expect(client.$transaction).not.toHaveBeenCalled();
+  });
+  it("rotates once and returns the server role plus the new access token", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user).toMatchObject({ id: user.id, role: "ADMIN", status: "ACTIVE" });
+    expect(response.body.data.access_token).toBeTypeOf("string");
+    expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");
+    expect(client.$executeRaw).toHaveBeenCalledTimes(1);
+    expect((client.$executeRaw.mock.calls[0]![0] as TemplateStringsArray).join("?"))
+      .toContain('AND "consumedAt" IS NULL');
+    expect(client.$queryRaw).toHaveBeenCalledTimes(3);
+    expect(client.$queryRaw.mock.calls.map(([query]) => (query as TemplateStringsArray).join("?")))
+      .toEqual([
+        expect.stringContaining('FROM "User"'),
+        expect.stringContaining('FROM "Session"'),
+        expect.stringContaining('FROM "AuthToken"'),
+      ]);
+  });
+  it("uses the profile and state returned by the locks without reading them again", async () => {
+    client.user.findUnique.mockRejectedValue(new Error("Unexpected duplicate user read"));
+    client.session.findUnique.mockRejectedValue(new Error("Unexpected duplicate session read"));
+    client.$queryRaw.mockReset()
+      .mockResolvedValueOnce([user])
+      .mockResolvedValueOnce([{ id: "session", userId: user.id, expiresAt, revokedAt: null, refreshHash: sha256("opaque-test-token") }])
+      .mockResolvedValueOnce([token]);
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user.role).toBe("ADMIN");
+    expect(client.user.findUnique).not.toHaveBeenCalled();
+    expect(client.session.findUnique).not.toHaveBeenCalled();
+    expect(client.authToken.findUnique).toHaveBeenCalledTimes(1);
+  });
+  it.each([null, { ...token, expiresAt: new Date(0) }])("returns guest for unknown or expired cookies", async (record) => {
+    client.authToken.findUnique.mockResolvedValue(record);
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user).toBeNull();
+    expect(client.$executeRaw).not.toHaveBeenCalled();
+  });
+  it("still revokes the session if a consumed cookie is replayed", async () => {
+    client.authToken.findUnique.mockResolvedValue({ ...token, consumedAt: new Date() });
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user).toBeNull();
+    expect(client.session.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { revokedAt: expect.any(Date) } }));
+    expect(client.$executeRaw).not.toHaveBeenCalled();
+  });
+  it("does not clear cookies or report a guest on a database timeout", async () => {
+    client.$transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Timed out", { code: "P2028", clientVersion: "5.22.0" }));
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(409);
+    expect(response.body.error.code).toBe("RETRY_LATER");
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+  it("does not deliver a replacement cookie when the atomic writes fail", async () => {
+    client.$executeRaw.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Conflict", { code: "P2002", clientVersion: "5.22.0" }));
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie);
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+});

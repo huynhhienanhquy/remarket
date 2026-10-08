@@ -1,0 +1,35 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+npm-debug.log*
+pnpm-debug.log*
+*.log
+
+.DS_Store
+Thumbs.db
+
+# test/editor artifacts
+/test-results/
+/playwright-report/
+.vscode/
+.idea/
+codex-agent-kit/
+
+# Local dependencies, generated clients, uploads, and verification output
+.pnpm-store/
+.prisma/
+/.artifacts/
+/apps/api/uploads/
+
+# Locally installed agent skills
+/.agents/
+/.claude/
+/.windsurf/
