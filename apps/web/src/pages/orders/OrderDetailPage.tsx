@@ -21,6 +21,7 @@ import {
   EmptyState,
   InlineAlert,
   OrderTimeline,
+  MarketplaceImage,
   StatusBadge,
   UserSummary,
 } from "../../components/ui";
@@ -234,7 +235,8 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
               {order.items.map((snap) => (
                 <div key={snap.id} className="py-4 flex gap-4">
                   {snap.image_url ? (
-                    <img
+                    <MarketplaceImage
+                      variant="card"
                       src={snap.image_url}
                       alt=""
                       className="h-16 w-16 shrink-0 rounded-control object-cover"

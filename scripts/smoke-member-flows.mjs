@@ -7,6 +7,8 @@ import path from "node:path";
 import assert from "node:assert/strict";
 
 assert.match(new URL(process.env.TEST_DATABASE_URL ?? "http://invalid").searchParams.get("schema") ?? "", /^remarket_verify_[a-f0-9]{32}$/);
+const testPassword = process.env.TEST_ACCOUNT_PASSWORD;
+assert.ok(testPassword, "Run browser checks through the isolated harness");
 const web = process.env.SMOKE_WEB_URL ?? "http://127.0.0.1:5321";
 const profile = await mkdtemp(path.join(tmpdir(), "remarket-member-smoke-"));
 const artifacts = path.resolve(".artifacts/member-smoke");
@@ -85,7 +87,7 @@ try {
     await tab.send("Page.enable"); await tab.send("Runtime.enable"); await tab.send("Network.enable");
     await tab.send("Page.navigate", { url: web + "/login" });
     await wait(tab, "Boolean(document.querySelector('#login-email'))", "login form");
-    await fill(tab, "#login-email", email); await fill(tab, "#login-password", "remarket-demo-2026");
+    await fill(tab, "#login-email", email); await fill(tab, "#login-password", testPassword);
     await evaluate(tab, "document.querySelector('form').requestSubmit()");
     await wait(tab, "location.pathname === '/' || location.pathname === '/admin' || location.pathname === '/orders'", "login redirect");
     const cookies = (await tab.send('Network.getAllCookies')).cookies;
@@ -94,8 +96,8 @@ try {
     return tab;
   }
   if (process.env.SMOKE_EMAIL_ONLY === "true") {
-    const user = await tabFor("vy.moi@remarket.vn");
-    const admin = await tabFor("admin@remarket.vn");
+    const user = await tabFor("unverified@example.test");
+    const admin = await tabFor("admin@example.test");
     await visit(user, "/verify-email?returnTo=%2Fcheckout", "Gửi yêu cầu xác minh email", "email-request-mobile", true);
     const before = await call(user, "return api.auth.me();");
     assert.equal(before.email_verified_at, null);
@@ -132,9 +134,9 @@ try {
     assert.equal(noticesAfter.items.filter(item => item.type === "EMAIL_VERIFIED").length, 1);
     checks.push("email-approval-idempotent");
   } else {
-  const buyer = await tabFor("ha.mua@remarket.vn");
-  const seller = await tabFor("lan.ban@remarket.vn");
-  const admin = await tabFor("admin@remarket.vn");
+  const buyer = await tabFor("buyer@example.test");
+  const seller = await tabFor("seller@example.test");
+  const admin = await tabFor("admin@example.test");
   if (process.env.SMOKE_LIFECYCLE_ONLY !== "true") {
   for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Lưu thay đổi", "profile"], ["/favorites", "Sản phẩm yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
     await visit(buyer, route, text, `${label}-desktop`);
@@ -204,7 +206,7 @@ try {
   await click(admin, "Xem");
   await wait(admin, "document.body.innerText.includes('Chi tiết đánh giá')", "admin review drawer");
   await screenshot(admin, "admin-review-drawer"); checks.push("admin-review-drawer");
-  const locked = await tabFor("long.bi.khoa@remarket.vn");
+  const locked = await tabFor("locked@example.test");
   await visit(locked, "/support/new", "Gửi yêu cầu", "locked-support-mobile", true);
   await locked.send("Page.navigate", { url: web + "/messages" });
   await wait(locked, "location.pathname === '/orders'", "locked inbox redirects to allowed orders");

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { DEMO_BANNER } from "../../lib/env";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { MarketplaceHeader } from "./MarketplaceHeader";
@@ -14,17 +13,6 @@ function isDiscovery(pathname: string): boolean {
     pathname === "/" ||
     pathname === "/products" ||
     pathname.startsWith("/users/")
-  );
-}
-
-function DemoBanner() {
-  if (!DEMO_BANNER) return null;
-  return (
-    <div className="bg-warning-bg">
-      <div className="rm-container py-1.5 text-center t-meta text-accent">
-        Môi trường demo — dữ liệu là dữ liệu mẫu, không giao dịch thật.
-      </div>
-    </div>
   );
 }
 
@@ -65,7 +53,6 @@ export function MarketplaceShell() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <DemoBanner />
       <MarketplaceHeader
         search={search}
         onSearchChange={setSearch}

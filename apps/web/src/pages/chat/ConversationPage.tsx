@@ -7,9 +7,8 @@ import { useSession } from "../../app/SessionProvider";
 import { useRealtime } from "../../app/RealtimeProvider";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { IS_MOCK } from "../../lib/env";
 import { apiFieldErrors, isApiError } from "../../lib/errors";
-import { Button, EmptyState, FormField, InlineAlert, StatusBadge, Textarea } from "../../components/ui";
+import { ApiImage, Button, EmptyState, FormField, InlineAlert, StatusBadge, Textarea } from "../../components/ui";
 import { ListLoading, OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
 import { ConversationList } from "./ConversationList";
 
@@ -114,10 +113,10 @@ function ChatThread({ id }: { id: string }) {
     {conversation.isPending ? <ListLoading /> : conversation.isError ? <QueryFailure error={conversation.error} retry={() => void conversation.refetch()} /> : data && <>
       <header className="flex min-h-16 items-center justify-between gap-3 border-b border-line bg-surface p-4"><h1 className="t-h3 truncate">{data.counterparty.name}</h1><Link to={`/users/${data.counterparty.id}`} className="shrink-0 text-brand">Xem hồ sơ</Link></header>
       <div className="border-b border-line bg-surface-subtle p-3">{data.product ? <Link to={`/products/${data.product.id}`} className="flex gap-3">
-        {data.product.image_url && <img src={data.product.image_url} alt="" className="h-12 w-12 rounded-control object-cover" />}<div className="min-w-0"><p className="truncate t-label">{data.product.title}</p><p>{formatVnd(data.product.price)}</p></div><StatusBadge {...PRODUCT_STATUS_LABELS[data.product.status]} />
+        {data.product.image_url && <ApiImage src={data.product.image_url} alt="" className="h-12 w-12 rounded-control object-cover" />}<div className="min-w-0"><p className="truncate t-label">{data.product.title}</p><p>{formatVnd(data.product.price)}</p></div><StatusBadge {...PRODUCT_STATUS_LABELS[data.product.status]} />
       </Link> : <p className="text-muted">Tin đăng không còn khả dụng</p>}</div>
       <OfflineNotice online={online} />
-      {!IS_MOCK && !connected && online && <InlineAlert tone="warning" title="Đang kết nối lại">Lịch sử vẫn cập nhật qua kết nối dự phòng.</InlineAlert>}
+      {!connected && online && <InlineAlert tone="warning" title="Đang kết nối lại">Lịch sử vẫn cập nhật qua kết nối dự phòng.</InlineAlert>}
       <div ref={area} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" onScroll={() => { const element = area.current; if (element) { nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; if (nearBottom.current) setNewCount(0); } }}>
         {history.hasNextPage && <Button variant="secondary" loading={history.isFetchingNextPage} onClick={() => { if (area.current) olderAnchor.current = area.current.scrollHeight; void history.fetchNextPage(); }}>Tải tin nhắn cũ</Button>}
         {history.isPending ? <ListLoading /> : history.isError ? <QueryFailure error={history.error} retry={() => void history.refetch()} /> : messages.length === 0 ? <EmptyState title="Bắt đầu cuộc trò chuyện" description="Gửi tin nhắn để trao đổi về món đồ." /> : messages.map((entry, index) => {

@@ -8,9 +8,10 @@ import {
 import type { ProductListItem } from "@remarket/shared";
 import { StatusBadge } from "./StatusBadge";
 import { HeartIcon, ImageIcon } from "./icons";
+import { MarketplaceImage } from "./MarketplaceImage";
 
 /**
- * The mock adapter flags deleted/blocked listings with `is_hidden`; keeping it
+ * Saved-item responses flag deleted/blocked listings with `is_hidden`; keeping it
  * optional lets plain ProductListItem values stay assignable to this card.
  */
 export type ProductCardData = ProductListItem & { is_hidden?: boolean };
@@ -54,10 +55,13 @@ export function ProductCard({
         <Link to={`/products/${product.id}`} className="block">
           <div className="relative aspect-[4/3] overflow-hidden bg-surface-subtle">
             {product.image_url ? (
-              <img
+              <MarketplaceImage
                 src={product.image_url}
                 alt={product.title}
                 loading="lazy"
+                variant="card"
+                width={480}
+                height={360}
                 className="h-full w-full object-cover"
               />
             ) : (

@@ -1,11 +1,16 @@
-// Real-browser auth smoke. Uses existing demo accounts, never changes roles or listings.
+// Real-browser auth smoke using operator-selected test accounts.
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
 
-const web = "http://localhost:5173";
+const web = process.env.SMOKE_WEB_URL ?? "http://localhost:5173";
+const adminEmail = process.env.SMOKE_ADMIN_EMAIL;
+const adminPassword = process.env.SMOKE_ADMIN_PASSWORD;
+const userEmail = process.env.SMOKE_USER_EMAIL;
+const userPassword = process.env.SMOKE_USER_PASSWORD;
+assert.ok(adminEmail && adminPassword && userEmail && userPassword, "Set SMOKE_ADMIN_EMAIL/PASSWORD and SMOKE_USER_EMAIL/PASSWORD for dedicated test accounts");
 const timingLabel = process.argv[2] ?? "browser";
 if (!/^[a-z-]+$/.test(timingLabel)) throw new Error("Invalid browser timing label");
 const chrome = process.env.CHROME_BIN ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -76,12 +81,12 @@ async function screenshot(tab, name) {
   const result = await tab.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   await writeFile(path.join(artifactDir, `${name}.png`), Buffer.from(result.data, "base64"));
 }
-async function login(tab, email) {
+async function login(tab, email, password) {
   await tab.send("Page.navigate", { url: `${web}/login` });
   await waitFor(tab, "Boolean(document.querySelector('#login-email'))", "login form");
   await evaluate(tab, `(() => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    for (const [id, value] of [['login-email', ${JSON.stringify(email)}], ['login-password', 'remarket-demo-2026']]) {
+    for (const [id, value] of [['login-email', ${JSON.stringify(email)}], ['login-password', ${JSON.stringify(password)}]]) {
       const input = document.getElementById(id); setter.call(input, value);
       input.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -118,7 +123,7 @@ try {
   }
   const tabA = await newTab();
   await measure("browser_login_to_dashboard", async () => {
-    await login(tabA, "admin@remarket.vn");
+    await login(tabA, adminEmail, adminPassword);
     await waitFor(tabA, "location.pathname === '/admin' && document.body.innerText.includes('Tổng user')", "admin dashboard data");
   });
   assert(!await evaluate(tabA, "document.body.innerText.includes('Chưa tải được dữ liệu')"));
@@ -158,7 +163,7 @@ try {
   });
   console.log("PASS: second tab logout completed");
   await measure("browser_member_login_to_home", async () => {
-    await login(tabB, "anh.mua@remarket.vn");
+    await login(tabB, userEmail, userPassword);
     await waitFor(tabB, "location.pathname === '/' && document.body.innerText.includes('Món đồ cũ. Giá trị mới.')", "member login");
   });
   const start = requests.length;

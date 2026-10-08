@@ -5,7 +5,7 @@ import { CONDITION_LABELS, DELIVERY_LABELS, PRODUCT_STATUS_LABELS, formatDateTim
 import { api } from "../../lib/api";
 import { isApiError } from "../../lib/errors";
 import { queryKeys } from "../../lib/queryClient";
-import { ConfirmDialog, DataTable, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
+import { ApiImage, ConfirmDialog, DataTable, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
 import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, isVersionConflict, readPage, useAdminParams } from "./adminShared";
 
@@ -82,7 +82,7 @@ export function AdminProductsPage() {
   });
 
   const columns: Array<DataTableColumn<AdminProductItem>> = [
-    { key: "title", header: "Tin đăng", render: (product) => <div className="flex min-w-[260px] items-center gap-3">{product.image_url ? <img src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div><p className="line-clamp-2 t-label text-ink">{product.title}</p><p className="t-meta text-brand">{formatVnd(product.price)}</p></div></div> },
+    { key: "title", header: "Tin đăng", render: (product) => <div className="flex min-w-[260px] items-center gap-3">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div><p className="line-clamp-2 t-label text-ink">{product.title}</p><p className="t-meta text-brand">{formatVnd(product.price)}</p></div></div> },
     { key: "seller", header: "Người bán", render: (product) => product.seller.name, hideOnMobile: true },
     { key: "category_name", header: "Danh mục", hideOnMobile: true },
     { key: "status", header: "Trạng thái", render: (product) => <ProductStatusView product={product} /> },
@@ -113,7 +113,7 @@ export function AdminProductsPage() {
 
     <Drawer open={selected !== null} onClose={() => apply({ selected: null }, { replace: true })} title="Xem xét tin đăng" widthClassName="max-w-[760px]" footer={footer}>
       {selected && <div className="grid gap-6 md:grid-cols-[45%_1fr]">
-        <div className="space-y-3">{selected.images.length > 0 ? selected.images.map((image, index) => <img key={image.id} src={image.url} alt={`${selected.title} — ảnh ${index + 1}`} className="w-full rounded-card border border-line object-cover" />) : <div className="aspect-[4/3] rounded-card bg-surface-subtle" />}</div>
+        <div className="space-y-3">{selected.images.length > 0 ? selected.images.map((image, index) => <ApiImage key={image.id} src={image.url} alt={`${selected.title} — ảnh ${index + 1}`} className="w-full rounded-card border border-line object-cover" />) : <div className="aspect-[4/3] rounded-card bg-surface-subtle" />}</div>
         <div className="space-y-5"><div><ProductStatusView product={selected} /><h2 className="mt-3 t-h2 text-ink">{selected.title}</h2><p className="mt-1 text-xl font-semibold text-brand">{formatVnd(selected.price)}</p></div>
           <dl className="grid grid-cols-2 gap-4 t-body"><div><dt className="t-meta text-muted">Người bán</dt><dd>{selected.seller.name}</dd></div><div><dt className="t-meta text-muted">Danh mục</dt><dd>{selected.category_name}</dd></div><div><dt className="t-meta text-muted">Tình trạng</dt><dd>{CONDITION_LABELS[selected.condition]}</dd></div><div><dt className="t-meta text-muted">Giao nhận</dt><dd>{DELIVERY_LABELS[selected.delivery_method]}</dd></div><div><dt className="t-meta text-muted">Đã dùng</dt><dd>{selected.usage_months === null ? "Không cung cấp" : `${selected.usage_months} tháng`}</dd></div><div><dt className="t-meta text-muted">Phí ship</dt><dd>{formatVnd(selected.shipping_fee)}</dd></div></dl>
           <div><p className="t-label text-ink">Mô tả</p><p className="mt-2 whitespace-pre-wrap t-body text-ink">{selected.description}</p></div>

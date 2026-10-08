@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { prisma } from "../utils/prisma.js";
+import { backgroundPrisma as prisma } from "../utils/background-prisma.js";
 import { enqueueOutbox, processOutboxBatch } from "../outbox/outbox.js";
 import { deliverAuthEmail } from "../services/email.js";
 import { deleteStorageObject } from "../services/storage.js";
@@ -269,7 +269,7 @@ async function drainOutbox(): Promise<void> {
         }
         await deleteStorageObject(payload.storage_path);
       }
-    });
+    }, BATCH_SIZE, prisma);
   } finally {
     outboxRunning = false;
   }

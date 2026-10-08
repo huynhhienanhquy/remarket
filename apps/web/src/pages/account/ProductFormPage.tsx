@@ -9,6 +9,7 @@ import { queryKeys } from "../../lib/queryClient";
 import { apiFieldErrors } from "../../lib/errors";
 import {
   Button,
+  ApiImage,
   Input,
   Select,
   Textarea,
@@ -367,7 +368,7 @@ export function ProductFormPage() {
             {form.images.map((img, idx) => (
               <div key={idx} className="relative aspect-square rounded-lg border border-neutral-200 overflow-hidden">
                 {img.url ? (
-                  <img src={img.url} alt={`Ảnh ${idx + 1}`} className="w-full h-full object-cover" />
+                  <ApiImage src={img.url} alt={`Ảnh ${idx + 1}`} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-neutral-100 text-neutral-400 text-sm">
                     Ảnh {idx + 1}

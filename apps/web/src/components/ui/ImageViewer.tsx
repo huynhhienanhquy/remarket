@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { ProductImage } from "@remarket/shared";
 import { useDialogBehavior } from "./Dialog";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "./icons";
+import { MarketplaceImage } from "./MarketplaceImage";
 
 export interface ImageViewerProps {
   images: ProductImage[];
@@ -76,7 +77,7 @@ export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerPro
         >
           <ChevronLeftIcon />
         </button>
-        <img
+        <MarketplaceImage
           src={current.url}
           alt={images.length > 1 ? `${alt} — ảnh ${index + 1}/${images.length}` : alt}
           className="max-h-full max-w-full object-contain"
@@ -107,7 +108,7 @@ export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerPro
                 active ? "outline outline-2 outline-brand" : "opacity-70 hover:opacity-100",
               ].join(" ")}
             >
-              <img src={image.url} alt="" className="h-full w-full object-cover" />
+              <MarketplaceImage src={image.url} variant="card" loading="lazy" alt="" className="h-full w-full object-cover" />
             </button>
           );
         })}

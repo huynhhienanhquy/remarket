@@ -70,9 +70,9 @@ export function unauthorizedError(
 }
 
 /**
- * Field messages of a 422 response, keyed by field name. The live transport
- * lifts `details.fields` into `ApiError.fields`, while the mock adapter only
- * puts them in `details`, so both shapes are read here (ui-spec 24).
+ * Field messages of a 422 response, keyed by field name. The HTTP transport
+ * lifts `details.fields` into `ApiError.fields`; also accept the original
+ * response detail shape (ui-spec 24).
  */
 export function apiFieldErrors(error: unknown): Record<string, string> | undefined {
   if (!isApiError(error)) return undefined;

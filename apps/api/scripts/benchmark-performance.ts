@@ -34,6 +34,9 @@ if (label.startsWith("connections")) {
     } finally { await client.$disconnect(); }
   }
 } else {
+  const email = process.env.BENCHMARK_ADMIN_EMAIL;
+  const password = process.env.BENCHMARK_ADMIN_PASSWORD;
+  assert.ok(email && password, "Set BENCHMARK_ADMIN_EMAIL and BENCHMARK_ADMIN_PASSWORD for an existing test account");
   process.env.NODE_ENV = "test";
   process.env.RUN_JOBS = "false";
   const { env } = await import("../src/config/env.js");
@@ -72,7 +75,7 @@ if (label.startsWith("connections")) {
   };
   try {
     if (label === "security") {
-      await run("login_for_rotation", "post", "/api/v1/auth/login", { email: "admin@remarket.vn", password: "remarket-demo-2026" });
+      await run("login_for_rotation", "post", "/api/v1/auth/login", { email, password });
       const originalCookie = cookie;
       const { sha256, newRefreshToken } = await import("../src/shared/tokens.js");
       const originalHash = sha256(decodeURIComponent(originalCookie.slice(originalCookie.indexOf("=") + 1)));
@@ -108,7 +111,7 @@ if (label.startsWith("connections")) {
       assert.deepEqual(await client.authToken.findUnique({ where: { id: initial.id } }), initial, "Failed replacement must not consume the original token");
       assert.deepEqual(await client.session.findUnique({ where: { id: initial.sessionId } }), sessionBefore, "Failed replacement must not change session hashes or dates");
       console.log("PASS: real DB rolls back failed issuance and rotation without partial sessions or consumed cookies");
-      await run("rotate_cookie", "post", "/api/v1/auth/bootstrap");
+      await run("rotate_cookie", "post", "/api/v1/auth/refresh");
       assert.notEqual(cookie, originalCookie, "Refresh must replace the original cookie");
       const original = await client.authToken.findUnique({ where: { tokenHash: sha256(decodeURIComponent(originalCookie.slice(originalCookie.indexOf("=") + 1))) } });
       assert(original?.consumedAt && original.sessionId, "Old token must be consumed in the committed transaction");
@@ -128,7 +131,7 @@ if (label.startsWith("connections")) {
       await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${access}`).expect(401);
       access = "";
       console.log("PASS: real database rotation/replay revocation and outbox deduplication");
-      await run("login_for_concurrent_refresh", "post", "/api/v1/auth/login", { email: "admin@remarket.vn", password: "remarket-demo-2026" });
+      await run("login_for_concurrent_refresh", "post", "/api/v1/auth/login", { email, password });
       const competing = await Promise.all([1, 2].map(() => request(app).post("/api/v1/auth/refresh")
         .set("Origin", "http://localhost:5173").set("Cookie", cookie)));
       assert.deepEqual(competing.map((response) => response.status).sort(), [200, 401], "Only one concurrent refresh may succeed");
@@ -140,7 +143,7 @@ if (label.startsWith("connections")) {
     await run("guest_bootstrap", "post", "/api/v1/auth/bootstrap");
     await run("guest_categories", "get", "/api/v1/categories");
     await run("guest_products", "get", "/api/v1/products");
-    await run("login_admin", "post", "/api/v1/auth/login", { email: "admin@remarket.vn", password: "remarket-demo-2026" });
+    await run("login_admin", "post", "/api/v1/auth/login", { email, password });
     await run("post_login_identity", "get", "/api/v1/auth/me");
     await run("authenticated_reload_bootstrap", "post", "/api/v1/auth/bootstrap");
     await run("admin_dashboard", "get", "/api/v1/admin/dashboard?from=2026-09-08&to=2026-10-07");

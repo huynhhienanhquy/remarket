@@ -8,7 +8,7 @@ import {
 } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, InlineAlert, Pagination, ProductCardSkeleton, StatusBadge } from "../../components/ui";
+import { Button, InlineAlert, MarketplaceImage, Pagination, ProductCardSkeleton, StatusBadge } from "../../components/ui";
 
 type Role = "buyer" | "seller";
 
@@ -136,9 +136,10 @@ export function OrdersPage({ role }: OrdersPageProps) {
                   <div className="flex flex-wrap items-center gap-4 lg:flex-row lg:justify-end">
                     <div className="flex items-center gap-2">
                       {order.items.slice(0, 3).map((snap) => (
-                        <img
+                        <MarketplaceImage
+                          variant="card"
                           key={snap.id}
-                          src={snap.image_url ?? undefined}
+                          src={snap.image_url ?? ""}
                           alt=""
                           className="h-10 w-10 rounded-control object-cover border border-line"
                         />

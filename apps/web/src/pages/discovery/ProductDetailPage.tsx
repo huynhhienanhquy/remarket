@@ -21,6 +21,7 @@ import {
   EmptyState,
   HeartIcon,
   ImageViewer,
+  MarketplaceImage,
   InlineAlert,
   SectionCard,
   Skeleton,
@@ -238,8 +239,9 @@ export function ProductDetailPage() {
               >
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-card bg-surface-subtle">
                   {mainImage ? (
-                    <img
+                    <MarketplaceImage
                       src={mainImage.url}
+                      variant="detail"
                       alt={`${product.title} — ảnh ${activeImage + 1}`}
                       className="h-full w-full object-contain"
                     />
@@ -262,8 +264,10 @@ export function ProductDetailPage() {
                         index === activeImage ? "border-brand" : "border-transparent",
                       ].join(" ")}
                     >
-                      <img
+                      <MarketplaceImage
                         src={image.url}
+                        variant="card"
+                        loading="lazy"
                         alt=""
                         className="h-full w-full object-cover"
                       />

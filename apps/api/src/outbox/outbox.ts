@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../utils/prisma.js";
 
 export interface RealtimeEvent {
@@ -37,10 +37,11 @@ function retryDelayMs(attempts: number): number {
 export async function processOutboxBatch(
   publish: OutboxPublisher,
   batchSize = 50,
+  client: PrismaClient = prisma,
 ): Promise<number> {
   const lockId = randomUUID();
   const staleBefore = new Date(Date.now() - LEASE_MS);
-  const rows = await prisma.$queryRaw<Array<{
+  const rows = await client.$queryRaw<Array<{
     id: string;
     eventType: string;
     aggregateId: string;
@@ -72,14 +73,14 @@ export async function processOutboxBatch(
         aggregateId: row.aggregateId,
         payload: row.payload,
       });
-      await prisma.outboxEvent.updateMany({
+      await client.outboxEvent.updateMany({
         where: { id: row.id, lockId },
         data: { processedAt: new Date(), lockedAt: null, lockId: null, lastError: null },
       });
     } catch (error) {
       const attempts = row.attempts + 1;
       const message = error instanceof Error ? error.message : "Unknown outbox error";
-      await prisma.outboxEvent.updateMany({
+      await client.outboxEvent.updateMany({
         where: { id: row.id, lockId },
         data: {
           attempts,

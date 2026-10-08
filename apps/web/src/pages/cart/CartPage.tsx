@@ -11,6 +11,7 @@ import {
   EmptyState,
   InlineAlert,
   ProductCardSkeleton,
+  MarketplaceImage,
   StatusBadge,
 } from "../../components/ui";
 
@@ -125,7 +126,8 @@ export function CartPage() {
                 className="flex gap-4 rounded-card border border-line bg-surface p-4"
               >
                 {item.image_url ? (
-                  <img
+                  <MarketplaceImage
+                    variant="card"
                     src={item.image_url}
                     alt=""
                     className="h-20 w-20 shrink-0 rounded-control object-cover"

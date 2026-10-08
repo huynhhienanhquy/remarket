@@ -4,6 +4,9 @@ import {
   createPrivateStorageUrl,
   getLocalStoragePath,
   verifyPrivateStorageUrl,
+  createPublicStorageUrl,
+  verifyImageStorageUrl,
+  decodeStorageResource,
 } from "../../src/services/storage.js";
 
 describe("private storage paths", () => {
@@ -34,6 +37,8 @@ describe("private storage preview URLs", () => {
     const url = new URL(createPrivateStorageUrl(storagePath, now), "http://api.test");
 
     expect(url.pathname).toBe("/api/v1/uploads/image.webp");
+    expect(url.href).not.toContain("users/");
+    expect(decodeStorageResource(url.searchParams.get("resource"))).toBe(storagePath);
     expect(
       verifyPrivateStorageUrl(
         storagePath,
@@ -59,5 +64,15 @@ describe("private storage preview URLs", () => {
 
     expect(verifyPrivateStorageUrl(storagePath, expires, signature, now + 301_000)).toBe(false);
     expect(verifyPrivateStorageUrl(storagePath, expires, "invalid", now)).toBe(false);
+  });
+
+  it("cannot turn a private preview into a publicly cacheable grant", () => {
+    const privateUrl = new URL(createPrivateStorageUrl(storagePath, now), "http://api.test");
+    expect(verifyImageStorageUrl(storagePath, privateUrl.searchParams.get("expires"), privateUrl.searchParams.get("signature"), "public", now)).toBe(false);
+    const publicUrl = new URL(createPublicStorageUrl(storagePath, now), "http://api.test");
+    expect(verifyImageStorageUrl(storagePath, publicUrl.searchParams.get("expires"), publicUrl.searchParams.get("signature"), "public", now)).toBe(true);
+    expect(verifyPrivateStorageUrl(storagePath, publicUrl.searchParams.get("expires"), publicUrl.searchParams.get("signature"), now)).toBe(false);
+    const resource = publicUrl.searchParams.get("resource")!;
+    expect(decodeStorageResource(`${resource[0] === "A" ? "B" : "A"}${resource.slice(1)}`)).toBeNull();
   });
 });

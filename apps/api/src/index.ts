@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { env } from "./config/env.js";
 import { createApp } from "./app.js";
 import { prisma } from "./utils/prisma.js";
+import { backgroundPrisma } from "./utils/background-prisma.js";
 import { startJobRunner } from "./jobs/runner.js";
 import { attachRealtime } from "./realtime/server.js";
 import { startRealtimeRelay } from "./realtime/relay.js";
@@ -33,7 +34,7 @@ async function shutdown(signal: string): Promise<void> {
   await realtime.close();
   server.close(async () => {
     try {
-      await prisma.$disconnect();
+      await Promise.all([prisma.$disconnect(), backgroundPrisma.$disconnect()]);
     } finally {
       process.exit(0);
     }

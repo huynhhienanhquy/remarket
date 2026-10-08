@@ -16,7 +16,7 @@ new screens match them.
 - `apps/web/src/components/features/**` — cross-screen modals
   (`ReportDialog.tsx` exists; add `ReviewDialog.tsx` here when needed).
 - `apps/web/src/lib/api/index.ts` — `api` is the single data entry point.
-  Never call `fetch`, never touch `mocks/**` from a screen.
+  Never call `fetch` directly from a screen; use the HTTP API adapter.
 - `apps/web/src/lib/errors.ts` — `ApiError`, `isApiError`, `errorTitle`.
 - `apps/web/src/lib/queryClient.ts` — `queryKeys` for every query. Reuse the
   existing keys; add one only for a genuinely new entity.
@@ -82,10 +82,11 @@ new screens match them.
   icon-only buttons an `aria-label`.
 - Light mode only.
 
-## Demo environment
+## API environment
 
-`VITE_API_MODE` defaults to `mock`, so every screen shows fixture data. The
-shell renders a demo banner; screens don't need to.
+Every screen uses the real HTTP API configured by `VITE_API_BASE_URL`.
+There is no demo mode or fixture fallback. Test responses belong only in test
+files; browser-test seed data is restricted to an isolated test schema.
 
 ## Before you report done
 

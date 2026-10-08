@@ -41,8 +41,7 @@ export function ImageUpload({
 
     setUploading(true);
     try {
-      // Use the selected app adapter. In mock mode this creates a local preview;
-      // in live mode the HTTP adapter sends authenticated multipart/form-data.
+      // Upload authenticated multipart/form-data through the HTTP adapter.
       const data = await api.uploads.upload(file, "product");
 
       if (!data.url || !data.storage_path) throw new Error("Phản hồi tải ảnh không hợp lệ.");

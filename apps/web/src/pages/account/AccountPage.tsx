@@ -7,7 +7,7 @@ import { useSession } from "../../app/SessionProvider";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { apiFieldErrors } from "../../lib/errors";
-import { Button, ConfirmDialog, FormField, InlineAlert, Input, Select, Textarea, useToast } from "../../components/ui";
+import { ApiImage, Button, ConfirmDialog, FormField, InlineAlert, Input, Select, Textarea, useToast } from "../../components/ui";
 import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
 
 function ProfileForm({ viewer }: { viewer: SessionUser }) {
@@ -32,7 +32,7 @@ function ProfileForm({ viewer }: { viewer: SessionUser }) {
     <OfflineNotice online={online} />
     <section className="rounded-card border border-line bg-surface p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center gap-4">
-        {viewer.avatar_url ? <img src={viewer.avatar_url} alt="Ảnh đại diện" className="h-20 w-20 rounded-full object-cover" /> : <span className="grid h-20 w-20 place-items-center rounded-full bg-brand-soft text-2xl text-brand">{viewer.full_name.slice(0, 1)}</span>}
+        {viewer.avatar_url ? <ApiImage src={viewer.avatar_url} alt="Ảnh đại diện" className="h-20 w-20 rounded-full object-cover" /> : <span className="grid h-20 w-20 place-items-center rounded-full bg-brand-soft text-2xl text-brand">{viewer.full_name.slice(0, 1)}</span>}
         <div><FormField label="Đổi ảnh" htmlFor="profile-avatar" helper="JPG, PNG hoặc WebP, tối đa 5 MB."><Input id="profile-avatar" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || !online} onChange={(event) => {
           const file = event.target.files?.[0]; event.target.value = ""; if (!file || busy || !online) return;
           if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) { toast.error("Ảnh cần là JPG, PNG hoặc WebP và không quá 5 MB."); return; }

@@ -18,6 +18,12 @@ const expiresAt = new Date(Date.now() + 60_000);
 const user = { id: "user", fullName: "Admin Test", email: "admin@example.test", role: "ADMIN", status: "ACTIVE", emailVerifiedAt: new Date(), joinedAt: new Date(), avatarUrl: null, phone: null, provinceCode: null, defaultAddress: null };
 const cookie = `${env.refreshCookie}=opaque-test-token`;
 const token = { id: "token", userId: user.id, sessionId: "session", purpose: "REFRESH", consumedAt: null, expiresAt };
+function lockedRow(record = token) {
+  return { ...user, lockedSessionId: "session", sessionUserId: user.id,
+    refreshHash: sha256("opaque-test-token"), revokedAt: null, sessionExpiresAt: expiresAt,
+    tokenId: record.id, tokenUserId: record.userId, tokenSessionId: record.sessionId,
+    purpose: record.purpose, consumedAt: record.consumedAt, tokenExpiresAt: record.expiresAt };
+}
 beforeEach(() => {
   vi.resetAllMocks();
   client.authToken.findUnique.mockResolvedValue(token);
@@ -26,9 +32,7 @@ beforeEach(() => {
   client.$executeRaw.mockResolvedValue(1);
   client.$queryRaw.mockImplementation(async (query: TemplateStringsArray) => {
     const sql = query.join("?");
-    if (sql.includes('FROM "User"')) return [await client.user.findUnique()];
-    if (sql.includes('FROM "Session"')) return [await client.session.findUnique()];
-    if (sql.includes('FROM "AuthToken"')) return [await client.authToken.findUnique()];
+    if (sql.includes("WITH locked_user")) return [lockedRow(await client.authToken.findUnique())];
     return [];
   });
   client.$transaction.mockImplementation((fn: (tx: typeof client) => Promise<unknown>) => fn(client));
@@ -51,13 +55,12 @@ describe("cookie session discovery", () => {
     expect(response.body.data.access_token).toBeTypeOf("string");
     expect(response.headers["set-cookie"]).toBeUndefined();
     expect(client.$executeRaw).not.toHaveBeenCalled();
-    expect(client.$queryRaw).toHaveBeenCalledTimes(3);
-    expect(client.$queryRaw.mock.calls.map(([query]) => (query as TemplateStringsArray).join("?")))
-      .toEqual([
-        expect.stringContaining('FROM "User"'),
-        expect.stringContaining('FROM "Session"'),
-        expect.stringContaining('FROM "AuthToken"'),
-      ]);
+    expect(client.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = client.$queryRaw.mock.calls[0]![0].join("?");
+    expect(sql).toContain('FROM "User"');
+    expect(sql).toContain('CROSS JOIN locked_user');
+    expect(sql).toContain('CROSS JOIN locked_session');
+    expect(sql.match(/FOR UPDATE/g)).toHaveLength(3);
     await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
     expect(client.$executeRaw).not.toHaveBeenCalled();
     expect(client.authToken.update).not.toHaveBeenCalled();
@@ -65,10 +68,7 @@ describe("cookie session discovery", () => {
   it("uses the profile and state returned by the locks without reading them again", async () => {
     client.user.findUnique.mockRejectedValue(new Error("Unexpected duplicate user read"));
     client.session.findUnique.mockRejectedValue(new Error("Unexpected duplicate session read"));
-    client.$queryRaw.mockReset()
-      .mockResolvedValueOnce([user])
-      .mockResolvedValueOnce([{ id: "session", userId: user.id, expiresAt, revokedAt: null, refreshHash: sha256("opaque-test-token") }])
-      .mockResolvedValueOnce([token]);
+    client.$queryRaw.mockReset().mockResolvedValueOnce([lockedRow()]);
     const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
     expect(response.body.data.user.role).toBe("ADMIN");
     expect(client.user.findUnique).not.toHaveBeenCalled();

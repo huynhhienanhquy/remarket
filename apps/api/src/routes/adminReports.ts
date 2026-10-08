@@ -121,7 +121,7 @@ async function loadHandledReport(id: string) {
   return report;
 }
 
-/** Optional follow-up action chosen together with a resolution (mock/contract). */
+/** Optional follow-up action chosen together with a resolution. */
 async function applyResolutionAction(
   tx: Prisma.TransactionClient,
   report: { id: string; targetType: string; targetProductId: string | null; targetUserId: string | null },

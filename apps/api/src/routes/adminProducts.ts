@@ -50,7 +50,7 @@ async function loadProduct(id: string | undefined) {
     where: { id },
     include: { images: { orderBy: { sortOrder: "asc" } }, seller: true, category: true },
   });
-  // Soft-deleted listings are invisible to moderation (same as the UI mock).
+  // Soft-deleted listings are invisible to moderation.
   if (product === null || product.deletedAt !== null) {
     throw notFound("Không tìm thấy tin đăng này.");
   }

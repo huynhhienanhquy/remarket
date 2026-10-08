@@ -32,7 +32,7 @@ against private test ports, then removes only its test schema/profile/uploads.
 - Copy `.env.example` to `.env` and replace every sample secret. Production boot fails until the JWT key, web origins/public URL, SMTP settings and Supabase Storage settings are complete.
 - Development defaults to `STORAGE_DRIVER=local`. Production requires `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, a server-only service-role key and a private `STORAGE_BUCKET`.
 
-The Prisma datasource uses `DATABASE_URL` for application traffic and `DIRECT_URL` for migration traffic by default. A persistent API may explicitly set `DATABASE_USE_DIRECT_URL=true` to reuse its verified direct/session-pooler connection; `DIRECT_URL` must point to the same database. `DATABASE_CONNECTION_LIMIT` defaults to 5 per process. Keep the default transaction-pooler connection for serverless deployments. Use separate test, staging and production databases. Never run a reset against staging or production.
+The Prisma datasource uses `DATABASE_URL` for application traffic and `DIRECT_URL` for migration traffic by default. A persistent API may explicitly set `DATABASE_USE_DIRECT_URL=true` to reuse its verified direct/session-pooler connection; `DIRECT_URL` must point to the same database. `DATABASE_CONNECTION_LIMIT` defaults to 5 for the HTTP pool (an explicit URL `connection_limit` takes precedence). Jobs/outbox/realtime use a separate client with `BACKGROUND_DATABASE_CONNECTION_LIMIT=1`; this overrides the inherited URL's limit. Optional `BACKGROUND_DATABASE_URL` must point to the same logical database/schema, otherwise it defaults to the selected API URL. Budget the sum of HTTP and background limits across API instances and any dedicated worker against the provider's limit. The current local HTTP limit stays 2, so the API's combined budget is 3. Keep the default transaction-pooler connection for serverless deployments. Use separate test, staging and production databases. Never run a reset against staging or production.
 
 ## First setup
 
@@ -58,7 +58,7 @@ the denied operation. Private UI is hidden during that check, and a server
 failure keeps it hidden behind the retry panel rather than treating it as guest.
 An unchanged ADMIN remains on the original error state without a refetch loop.
 
-For a real-browser regression check with the development seed accounts and
+For a real-browser regression check with dedicated test accounts and
 running API/web, use `node scripts/smoke-session-recovery.mjs` (Chrome must be
 installed; `CHROME_BIN` can select its path). It creates a separate temporary
 browser profile, verifies the admin API pages, then switches to USER in a second
@@ -91,7 +91,7 @@ checks, then combines only the dependent writes into one statement inside the
 existing transaction. The security check injects unique conflicts into its own
 test session to verify rollback and exercises concurrent old-cookie refreshes.
 
-From the repository root, with the development demo accounts:
+From the repository root, set BENCHMARK_ADMIN_EMAIL/BENCHMARK_ADMIN_PASSWORD for the API benchmark and SMOKE_ADMIN_EMAIL/SMOKE_ADMIN_PASSWORD plus SMOKE_USER_EMAIL/SMOKE_USER_PASSWORD for browser recovery. Use dedicated test accounts:
 
 ```text
 pnpm --filter @remarket/api exec tsx scripts/benchmark-performance.ts connections
@@ -110,6 +110,23 @@ reports are under `.artifacts/performance`. Latency varies with the remote DB an
 connection warm-up; page data timing is separate from authenticated bootstrap,
 and a full browser reload includes both. Do not run the destructive integration
 suite on the operational DB; use a disposable `TEST_DATABASE_URL` instead.
+
+Additional code-only checks (no operator credentials required):
+
+```text
+pnpm --filter @remarket/api exec tsx scripts/benchmark-public.ts public-code-final
+pnpm --filter @remarket/api exec tsx scripts/benchmark-images.ts
+node apps/api/scripts/verify-isolated.mjs --browser-only --benchmark
+node apps/api/scripts/verify-isolated.mjs --search-only
+```
+
+The public benchmark only reads existing tables, uses the configured HTTP pool,
+and measures both the initial and warm parallel batch. The image benchmark uses
+and cleans up its own filesystem fixture, without writing application tables.
+The isolated harness creates a random test schema, migrates/seeds only that schema,
+uses random test credentials and cleans up its own namespace/uploads. `--benchmark`
+also measures bootstrap and verifies transactional refresh/replay fault cases.
+Never substitute the application's schema for the isolated namespace.
 
 Run timing checks sequentially, without a concurrent build or another DB
 benchmark. Optional labels preserve separate browser reports, for example
@@ -139,7 +156,7 @@ also runs safely before the baseline exists and after the repair migration has
 already been applied. Stop the deployment and repair any reported rows before
 `prisma:deploy`.
 
-The seed is idempotent and creates demo users, categories, provinces, products, a completed order, chat, review, pending report and resolved support ticket. Its shared demo password is for development/staging only; do not seed production.
+The normal seed only inserts missing categories and provinces; it preserves existing operator edits. It never creates users, products, orders or sample activity. Create the first administrator with `admin:create` below. Browser test fixtures live under `apps/api/tests/fixtures`, require NODE_ENV=test and an isolated `remarket_verify_*` namespace, and use a temporary random password generated by the harness.
 
 Durable outbox enqueue uses `createMany({ skipDuplicates: true })` for a single
 insert. The database's unique dedupe key keeps the first payload and delivery
@@ -220,7 +237,7 @@ only that test schema. The database role must have schema creation privileges.
 It never resets or seeds existing application tables.
 
 Add `--browser` for integration plus live Chrome/adapter smoke, or use
-`--browser-only` to run just migrations, isolated seed and browser checks.
+`--browser-only` to run just migrations, isolated test fixtures and browser checks.
 The smoke uses private ports 5320/5321 and separate Chrome contexts for buyer,
 seller and admin. It refuses to reuse existing servers. It verifies responsive
 pages and the live upload-to-review lifecycle; screenshots/results are written
@@ -261,9 +278,27 @@ Graceful shutdown stops job polling, closes Socket.IO and HTTP, then disconnects
 
 ## Current storage topology
 
-Both storage drivers authorize every read through the API:
+Both storage drivers retain a private backing store. Resource visibility is
+checked before issuing an opaque, time-limited image capability:
 
 - `local` stores private files under `apps/api/uploads` and is intended for development or a single persistent-volume instance.
-- `supabase` writes to a private bucket with the server-only service-role key. After resource authorization, the API redirects to a signed URL whose TTL defaults to 300 seconds.
+- `supabase` writes to a private bucket with the server-only service-role key. The API redirects valid image capabilities to provider-signed URLs using their remaining lifetime, cached only for the same object/deadline.
+
+Signed reads verify the object, signature, visibility scope and expiry locally,
+without per-image session/metadata queries. Unsigned legacy URLs retain the DB
+authorization checks. Public capabilities have bounded public cache headers;
+owner/order/admin previews remain private. The TTL defaults to 300 seconds and
+is rounded down to a minute for reuse, so a newly issued URL lives 240–300 seconds.
+A previously issued URL or cached image can remain readable until that expiry
+after moderation/session changes; do not promise immediate revocation or CDN purge.
+Changing the signing key invalidates outstanding API capabilities.
+
+New uploads include 480px/card and 1600px/detail WebP derivatives, with no upscaling.
+Old local uploads generate derivatives lazily, with duplicate work coalesced and
+bounded transform concurrency; original bytes remain unchanged. Old Supabase
+uploads without derivatives fall back to originals; this code does not bulk
+backfill or modify existing storage objects. Deletion/compensation covers all
+three files. Frontend retries an original once then shows a stable placeholder;
+reserved `example.com/org/net` URLs are omitted without modifying stored rows.
 
 Orphan metadata is claimed under a database row lock. The same transaction removes the metadata and creates a `storage.delete` outbox event; physical deletion is retried by the worker. Before go-live, create the private bucket, keep anon access disabled, and smoke-test upload, authorized/unauthorized reads, order-snapshot access and deletion with the real Supabase project.

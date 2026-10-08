@@ -9,6 +9,7 @@ import { useSession } from "../../app/SessionProvider";
 import { loginPathFor } from "../../app/guards";
 import {
   Button,
+  ApiImage,
   EmptyState,
   InlineAlert,
   Pagination,
@@ -133,7 +134,7 @@ export function SellerProfilePage() {
       <section className="relative rounded-card border border-line bg-surface p-5 lg:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {seller.avatar_url ? (
-            <img
+            <ApiImage
               src={seller.avatar_url}
               alt=""
               className="h-20 w-20 shrink-0 rounded-full object-cover"
@@ -297,7 +298,7 @@ export function SellerProfilePage() {
                   >
                     <div className="flex items-start gap-3">
                       {review.reviewer.avatar_url ? (
-                        <img
+                        <ApiImage
                           src={review.reviewer.avatar_url}
                           alt=""
                           className="h-10 w-10 shrink-0 rounded-full object-cover"

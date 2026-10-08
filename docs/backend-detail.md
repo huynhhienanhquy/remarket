@@ -12,18 +12,20 @@ Backend phải phục vụ đầy đủ các luồng trong `detail-project.md` v
 - `packages/shared/src/enums.ts`
 - `apps/web/src/lib/api/contract.ts`
 - `apps/web/src/lib/api/httpAdapter.ts`
-- Các rule đã được mô phỏng trong `apps/web/src/mocks/adapter-*.ts`
+- Hành vi UI được kiểm thử qua HTTP adapter trong `apps/web/src/tests/`
 
 Thứ tự ưu tiên khi có khác biệt:
 
 1. Quyền, bảo mật, transaction và vòng đời nghiệp vụ: `detail-project.md`.
 2. Shape dữ liệu frontend cần: DTO trong `packages/shared`.
 3. URL/phương thức mà frontend live adapter đang gọi: `httpAdapter.ts`.
-4. Hành vi UI đang demo: mock adapter.
+4. Hành vi UI: các test sử dụng HTTP adapter.
 
 Không trả trực tiếp Prisma model. Mọi response phải đi qua mapper theo context để tránh lộ `passwordHash`, token, PII hoặc field nội bộ.
 
 ## 2. Hiện trạng và quyết định tích hợp
+
+> Phần hiện trạng bên dưới ghi nhận khi lập kế hoạch ngày 05/10/2026, không phải báo cáo runtime hiện tại. Từ 08/10/2026 ứng dụng không còn mock/demo; xem `backend-runbook.md` cho cách chạy và kiểm thử hiện tại.
 
 `apps/api` hiện là scaffold, chưa phải backend có thể dùng production. Các nhóm sai lệch chính:
 
@@ -653,7 +655,7 @@ OpenAPI phải mô tả đúng endpoint frontend đang gọi. Contract test sẽ
 ### Contract
 
 - Gọi API và validate response bằng schema dùng chung/OpenAPI.
-- Chạy frontend adapter contract test cho cả mock và live test server.
+- Chạy frontend HTTP adapter contract test và integration test trên database cách ly.
 - Kiểm tra mọi amount là string và mọi date là ISO timezone.
 
 ### E2E
@@ -708,5 +710,5 @@ Guest -> register -> verify -> seller đăng tin -> admin approve -> buyer cart/
 - OpenAPI khớp implementation.
 - Worker/outbox idempotent và có health/metric.
 - Upload private có validation file thực.
-- Seed tạo được luồng demo đầy đủ nhưng không có secret production cố định.
-- Frontend chạy `VITE_API_MODE=live` hoàn thành E2E chính mà không dùng fixture.
+- Seed thông thường chỉ tạo dữ liệu tham chiếu; browser fixtures chỉ chạy trong schema test tạm và dùng mật khẩu ngẫu nhiên.
+- Frontend chỉ dùng HTTP API thật và hoàn thành E2E chính với database test cách ly.

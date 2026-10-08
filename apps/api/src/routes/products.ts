@@ -35,9 +35,10 @@ import {
   versionConflict,
 } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
-import { isOwnerOrAdmin, toOwnProduct, toProductDetail, toProductListItem } from "../shared/dto-mappers.js";
+import { isOwnerOrAdmin, toOwnProduct, toProductDetail } from "../shared/dto-mappers.js";
 import type { ProductRow } from "../shared/dto-mappers.js";
-import { activeCategoryIds, buildProductContext, loadCategoryChain } from "../shared/viewer.js";
+import { buildProductContext, loadCategoryChain, viewerFrom } from "../shared/viewer.js";
+import { searchPublicProducts } from "../shared/product-search.js";
 import { isKnownProvinceCode } from "../shared/geography.js";
 
 /**
@@ -49,8 +50,7 @@ import { isKnownProvinceCode } from "../shared/geography.js";
  * `accountProductsRouter` at `/account/products` so undocumented mutation
  * aliases cannot leak under the account route.
  *
- * Validation messages mirror `apps/web/src/mocks/adapter-products.ts` so the
- * live API reports exactly what the form already shows.
+ * Validation messages match the product form and shared API contract.
  */
 
 const NOT_FOUND_MESSAGE = "Không tìm thấy tin đăng này.";
@@ -63,7 +63,7 @@ function viewerIdOf(req: AuthRequest): string {
   return req.user.id;
 }
 
-/** Own listings stay behind an ACTIVE account (mock `requireActive`). */
+/** Own listings stay behind an ACTIVE account. */
 function activeViewerIdOf(req: AuthRequest): string {
   const viewerId = viewerIdOf(req);
   if (req.user?.status !== "ACTIVE") throw accountLocked();
@@ -159,7 +159,7 @@ interface NormalizedProduct {
   images: { url: string; storagePath: string; sortOrder: number }[];
 }
 
-/** 1-8 images, contiguous `sort_order` from 0, every URL present (mock). */
+/** 1-8 images, contiguous `sort_order` from 0, every URL present. */
 function assertImages(images: readonly ImagePayload[]): void {
   if (images.length < 1 || images.length > PRODUCT_LIMITS.imagesMax) {
     throw validationError("Số lượng ảnh không hợp lệ.", {
@@ -182,8 +182,8 @@ function assertImages(images: readonly ImagePayload[]): void {
 }
 
 /**
- * Collects every field error first (one `VALIDATION_ERROR` with all messages,
- * like the mock), then normalizes the payload for the database.
+ * Collects every field error first (one `VALIDATION_ERROR` with all messages),
+ * then normalizes the payload for the database.
  */
 async function validateAndNormalize(
   fields: ProductFields,
@@ -212,7 +212,7 @@ async function validateAndNormalize(
   if (deliveryError) {
     errors.delivery_method = deliveryError;
   } else if (fields.delivery_method === "MEETUP") {
-    // Gặp trực tiếp: phí giao hàng bắt buộc bằng 0 (mock + detail-project 7.2).
+    // Gặp trực tiếp: phí giao hàng bắt buộc bằng 0 (detail-project 7.2).
     if (normalizeVndInput(fields.shipping_fee) !== "0") {
       errors.shipping_fee = "Gặp trực tiếp thì phí giao hàng phải bằng 0.";
     }
@@ -442,35 +442,6 @@ async function respondWithDetail(
   return ok(res, toProductDetail(row, ctx, chain.path, chain.active), status);
 }
 
-type CategoryLink = { id: string; parentId: string | null };
-
-function childrenOf(categories: readonly CategoryLink[]): Map<string, string[]> {
-  const children = new Map<string, string[]>();
-  for (const category of categories) {
-    if (category.parentId === null) continue;
-    const siblings = children.get(category.parentId);
-    if (siblings) siblings.push(category.id);
-    else children.set(category.parentId, [category.id]);
-  }
-  return children;
-}
-
-/** The category itself plus every descendant (a parent filter includes children). */
-function subtreeOf(rootId: string, children: Map<string, string[]>): string[] {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  const stack: string[] = [rootId];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (current === undefined || seen.has(current)) continue;
-    seen.add(current);
-    ids.push(current);
-    const kids = children.get(current);
-    if (kids) stack.push(...kids);
-  }
-  return ids;
-}
-
 /** Batched category projection for a page of own listings (no N+1). */
 async function loadCategoryIndex(): Promise<{
   path(categoryId: string): string[];
@@ -569,87 +540,13 @@ async function searchProducts(req: AuthRequest, res: Response): Promise<Response
   const priceRange = normalizePriceFilter(parsed.min_price ?? "", parsed.max_price ?? "");
   if (priceRange.error) throw validationError(priceRange.error, { price: priceRange.error });
 
-  const keyword = (parsed.q ?? "").trim();
-  const activeIds = await activeCategoryIds();
-
-  const where: Prisma.ProductWhereInput = {
-    status: { in: ["ACTIVE"] },
-    deletedAt: null,
-    isBlocked: false,
-    seller: { status: "ACTIVE", emailVerifiedAt: { not: null } },
-    categoryId: { in: [...activeIds] },
-  };
-
-  if (keyword !== "" || parsed.category_id !== undefined) {
-    const categories = await prisma.category.findMany({
-      select: { id: true, parentId: true, name: true },
-    });
-    const children = childrenOf(categories);
-
-    if (parsed.category_id !== undefined) {
-      const allowed = subtreeOf(parsed.category_id, children).filter((id) => activeIds.has(id));
-      where.categoryId = { in: allowed };
-    }
-
-    if (keyword !== "") {
-      const needle = keyword.toLowerCase();
-      const matching = new Set<string>();
-      for (const category of categories) {
-        if (category.name.toLowerCase().includes(needle)) {
-          for (const id of subtreeOf(category.id, children)) matching.add(id);
-        }
-      }
-      const clauses: Prisma.ProductWhereInput[] = [
-        { title: { contains: keyword, mode: "insensitive" } },
-        { description: { contains: keyword, mode: "insensitive" } },
-      ];
-      if (matching.size > 0) clauses.push({ categoryId: { in: [...matching] } });
-      where.OR = clauses;
-    }
-  }
-
-  if (condition !== undefined) where.condition = condition;
-  if (parsed.province_code !== undefined && parsed.province_code !== "") {
-    where.provinceCode = parsed.province_code;
-  }
-  if (priceRange.min !== null || priceRange.max !== null) {
-    const price: { gte?: string; lte?: string } = {};
-    if (priceRange.min !== null) price.gte = priceRange.min;
-    if (priceRange.max !== null) price.lte = priceRange.max;
-    where.price = price;
-  }
-  if (deliveryMethod === "BOTH") {
-    where.deliveryMethod = "BOTH";
-  } else if (deliveryMethod === "COD") {
-    where.deliveryMethod = { in: ["COD", "BOTH"] };
-  } else if (deliveryMethod === "MEETUP") {
-    where.deliveryMethod = { in: ["MEETUP", "BOTH"] };
-  }
-
-  const orderBy: Prisma.ProductOrderByWithRelationInput[] =
-    sort === "price_asc"
-      ? [{ price: "asc" }, { id: "asc" }]
-      : sort === "price_desc"
-        ? [{ price: "desc" }, { id: "asc" }]
-        : [{ publishedAt: { sort: "desc", nulls: "last" } }, { id: "desc" }];
-
-  const [total, rows] = await Promise.all([
-    prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      orderBy,
-      skip: offsetOf(paging),
-      take: paging.page_size,
-      include: PRODUCT_INCLUDE,
-    }),
-  ]);
-
-  const ctx = await buildProductContext(rows, req);
-  return okList(
-    res,
-    rows.map((row) => toProductListItem(row, ctx)),
-    pageMeta(paging, total),
-  );
+  const result = await searchPublicProducts({
+    keyword: (parsed.q ?? "").trim(), categoryId: parsed.category_id,
+    condition, provinceCode: parsed.province_code, deliveryMethod,
+    minPrice: priceRange.min, maxPrice: priceRange.max, sort,
+    offset: offsetOf(paging), limit: paging.page_size,
+  }, viewerFrom(req));
+  return okList(res, result.items, pageMeta(paging, result.total));
 }
 
 /* ------------------------------------------------------------------ *
@@ -666,8 +563,7 @@ async function getProductDetail(req: AuthRequest, res: Response): Promise<Respon
   });
   if (!product || product.deletedAt !== null) throw notFound(NOT_FOUND_MESSAGE);
 
-  const ctx = await buildProductContext([product], req);
-  const chain = await loadCategoryChain(product.categoryId);
+  const [ctx, chain] = await Promise.all([buildProductContext([product], req), loadCategoryChain(product.categoryId)]);
   if (!isOwnerOrAdmin(product, ctx)) {
     const visible =
       !product.isBlocked &&

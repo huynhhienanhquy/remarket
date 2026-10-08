@@ -1,16 +1,16 @@
 /**
- * Versioned geography dataset used until the API publishes its own
+ * Versioned geography dataset used by API reference data
  * (ui-spec 25 point 8: no hardcoded codes outside a versioned set).
  *
  * Codes are ISO 3166-2:VN subdivision identifiers from the dataset shipped
- * with the mock adapter; a live deployment must read them from the API.
+ * with the application; frontend forms read these values from the API.
  */
 export interface Province {
   code: string;
   name: string;
 }
 
-export const GEO_DATASET_VERSION = "mock-2026-01";
+export const GEO_DATASET_VERSION = "vn-2026-01";
 
 export const PROVINCES: Province[] = [
   { code: "VN-01", name: "Hà Nội" },

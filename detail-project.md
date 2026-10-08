@@ -583,8 +583,6 @@ Mục tiêu hiệu năng ban đầu: trên staging có 10.000 sản phẩm và 5
 4. Giao tiếp: chat text, outbox, notification, review, report và support.
 5. Hoàn thiện: admin dashboard, responsive/accessibility, kiểm thử cạnh tranh/E2E, deploy staging và kiểm tra vận hành.
 
-Bàn giao gồm source code, Prisma schema/SQL migrations, seed dev, OpenAPI/Postman collection, .env.example, hướng dẫn chạy/deploy/backup, bộ test và kết quả kiểm thử, tài khoản demo staging cùng danh sách giới hạn còn lại.
+Bàn giao gồm source code, Prisma schema/SQL migrations, seed dữ liệu tham chiếu, OpenAPI/Postman collection, .env.example, hướng dẫn chạy/deploy/backup, bộ test và kết quả kiểm thử, hướng dẫn tạo tài khoản quản trị, dữ liệu test cách ly cùng danh sách giới hạn còn lại.
 
 Trước go-live cần chốt nhà cung cấp email, nền tảng chạy backend/worker, custom domain/cookie, cấu hình backup thực tế và văn bản chính sách. Đây là các quyết định triển khai còn mở; các tính năng ngoài MVP phải có yêu cầu bổ sung trước khi xây dựng.
-
-

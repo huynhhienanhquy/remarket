@@ -7,6 +7,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import {
   Button,
+  ApiImage,
   DashboardSkeleton,
   InlineAlert,
   Input,
@@ -183,7 +184,7 @@ export function AdminDashboardPage() {
       {query.data && !query.isError && (
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
           <SectionCard title="Tin chờ duyệt" actions={<Link to="/admin/products" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
-            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3 p-4 hover:bg-surface-subtle">{product.image_url ? <img src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><span className="shrink-0 t-meta text-accent">{PRODUCT_STATUS_LABELS.PENDING.label}</span></Link></li>)}</ul>}
+            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3 p-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><span className="shrink-0 t-meta text-accent">{PRODUCT_STATUS_LABELS.PENDING.label}</span></Link></li>)}</ul>}
           </SectionCard>
           <SectionCard title="Yêu cầu hỗ trợ mới" actions={<Link to="/admin/support?status=OPEN" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
             {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="divide-y divide-line">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="flex items-center justify-between gap-3 p-4 hover:bg-surface-subtle"><div className="min-w-0"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><span className="shrink-0 t-meta text-accent">{TICKET_STATUS_LABELS.OPEN.label}</span></Link></li>)}</ul>}

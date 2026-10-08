@@ -1,14 +1,41 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../config/env.js";
 
 const LOCAL_UPLOAD_ROOT = fileURLToPath(new URL("../../uploads/", import.meta.url));
+const resourceKey = createHash("sha256").update(`image-resource:${env.jwtSecret}`).digest();
+const resourceTokens = new Map<string, { token: string; expiresAt: number }>();
 
-function storageReadSignature(storagePath: string, expiresAt: number): string {
+function encodeStorageResource(storagePath: string, expiresAt: number): string {
+  const key = `${storagePath}:${expiresAt}`;
+  const cached = resourceTokens.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  for (const [oldKey, old] of resourceTokens) if (old.expiresAt <= Date.now()) resourceTokens.delete(oldKey);
+  if (resourceTokens.size >= 1000) resourceTokens.delete(resourceTokens.keys().next().value!);
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", resourceKey, nonce);
+  const encrypted = Buffer.concat([cipher.update(storagePath, "utf8"), cipher.final()]);
+  const token = Buffer.concat([nonce, cipher.getAuthTag(), encrypted]).toString("base64url");
+  resourceTokens.set(key, { token, expiresAt: expiresAt * 1000 });
+  return token;
+}
+
+/** Opaque URL tokens keep private bucket/storage keys out of public DTOs. */
+export function decodeStorageResource(value: unknown): string | null {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{40,2000}$/.test(value)) return null;
+  try {
+    const data = Buffer.from(value, "base64url");
+    const decipher = createDecipheriv("aes-256-gcm", resourceKey, data.subarray(0, 12));
+    decipher.setAuthTag(data.subarray(12, 28));
+    return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString("utf8");
+  } catch { return null; }
+}
+
+function storageReadSignature(storagePath: string, expiresAt: number, visibility: "private" | "public" = "private"): string {
   return createHmac("sha256", env.jwtSecret)
-    .update(`${normalizedStoragePath(storagePath)}\n${expiresAt}`)
+    .update(`${normalizedStoragePath(storagePath)}\n${expiresAt}${visibility === "public" ? "\npublic" : ""}`)
     .digest("base64url");
 }
 
@@ -18,12 +45,23 @@ function storageReadSignature(storagePath: string, expiresAt: number): string {
  * to the exact storage object instead.
  */
 export function createPrivateStorageUrl(storagePath: string, now = Date.now()): string {
+  return createImageStorageUrl(storagePath, "private", now);
+}
+
+/** Public image capabilities are minted only after the resource's visibility check. */
+export function createPublicStorageUrl(storagePath: string, now = Date.now()): string {
+  return createImageStorageUrl(storagePath, "public", now);
+}
+
+function createImageStorageUrl(storagePath: string, visibility: "private" | "public", now: number): string {
   const normalized = normalizedStoragePath(storagePath);
   const filename = normalized.split("/").at(-1);
   if (!filename) throw new Error("Invalid storage path.");
-  const expiresAt = Math.floor(now / 1000) + env.storage.signedUrlTtlSeconds;
-  const signature = storageReadSignature(normalized, expiresAt);
-  const query = new URLSearchParams({ expires: String(expiresAt), signature });
+  // Stable within a minute for cache reuse; never extend beyond the preview TTL.
+  const expiresAt = Math.floor(now / 60_000) * 60 + env.storage.signedUrlTtlSeconds;
+  const signature = storageReadSignature(normalized, expiresAt, visibility);
+  const query = new URLSearchParams({ expires: String(expiresAt), signature, resource: encodeStorageResource(normalized, expiresAt) });
+  if (visibility === "public") query.set("visibility", "public");
   return `/api/v1/uploads/${encodeURIComponent(filename)}?${query.toString()}`;
 }
 
@@ -32,6 +70,13 @@ export function verifyPrivateStorageUrl(
   expiresValue: unknown,
   signatureValue: unknown,
   now = Date.now(),
+): boolean {
+  return verifyImageStorageUrl(storagePath, expiresValue, signatureValue, "private", now);
+}
+
+export function verifyImageStorageUrl(
+  storagePath: string, expiresValue: unknown, signatureValue: unknown,
+  visibility: "private" | "public", now = Date.now(),
 ): boolean {
   if (typeof expiresValue !== "string" || typeof signatureValue !== "string") return false;
   if (!/^\d{10}$/.test(expiresValue) || !/^[A-Za-z0-9_-]{43}$/.test(signatureValue)) return false;
@@ -46,7 +91,7 @@ export function verifyPrivateStorageUrl(
     return false;
   }
 
-  const expected = storageReadSignature(storagePath, expiresAt);
+  const expected = storageReadSignature(storagePath, expiresAt, visibility);
   return timingSafeEqual(Buffer.from(signatureValue), Buffer.from(expected));
 }
 
@@ -134,12 +179,12 @@ export async function putStorageObject(
 }
 
 export async function deleteStorageObject(storagePath: string): Promise<void> {
+  const paths = [storagePath, imageVariantPath(storagePath, "card"), imageVariantPath(storagePath, "detail")];
   if (env.storage.driver === "local") {
-    try {
-      await unlink(localAbsolutePath(storagePath));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
+    await Promise.all(paths.map(async (objectPath) => {
+      try { await unlink(localAbsolutePath(objectPath)); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    }));
     return;
   }
 
@@ -150,20 +195,35 @@ export async function deleteStorageObject(storagePath: string): Promise<void> {
     {
       method: "DELETE",
       headers: supabaseHeaders("application/json"),
-      body: JSON.stringify({ prefixes: [normalizedStoragePath(storagePath)] }),
+      body: JSON.stringify({ prefixes: paths.map(normalizedStoragePath) }),
       signal: AbortSignal.timeout(15_000),
     },
   );
   await assertStorageResponse(response, "delete");
 }
 
-/** Returns a five-minute provider URL, or null when local disk streams itself. */
-export async function createStorageReadUrl(storagePath: string): Promise<string | null> {
+const signedReads = new Map<string, { expiresAt: number; promise: Promise<string> }>();
+
+/** Reuse a provider capability only for the same path/deadline; never extend grants. */
+export async function createStorageReadUrl(storagePath: string, ttlSeconds = env.storage.signedUrlTtlSeconds): Promise<string | null> {
   if (env.storage.driver === "local") return null;
+  const ttl = Math.max(1, Math.min(ttlSeconds, env.storage.signedUrlTtlSeconds));
+  const expiresAt = Math.floor(Date.now() / 1000) + ttl;
+  const key = `${normalizedStoragePath(storagePath)}:${expiresAt}`;
+  const cached = signedReads.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  for (const [oldKey, old] of signedReads) if (old.expiresAt <= Date.now()) signedReads.delete(oldKey);
+  if (signedReads.size >= 1000) signedReads.delete(signedReads.keys().next().value!);
+  const promise = signProviderRead(storagePath, ttl);
+  signedReads.set(key, { expiresAt: expiresAt * 1000, promise });
+  try { return await promise; } catch (error) { signedReads.delete(key); throw error; }
+}
+
+async function signProviderRead(storagePath: string, ttlSeconds: number): Promise<string> {
   const response = await fetch(supabaseSignedUrlEndpoint(storagePath), {
     method: "POST",
     headers: supabaseHeaders("application/json"),
-    body: JSON.stringify({ expiresIn: env.storage.signedUrlTtlSeconds }),
+    body: JSON.stringify({ expiresIn: ttlSeconds }),
     signal: AbortSignal.timeout(10_000),
   });
   await assertStorageResponse(response, "signed URL");
@@ -180,4 +240,16 @@ export async function createStorageReadUrl(storagePath: string): Promise<string 
 export function getLocalStoragePath(storagePath: string): string {
   if (env.storage.driver !== "local") throw new Error("Local storage is not active.");
   return localAbsolutePath(storagePath);
+}
+
+export type ImageVariant = "original" | "card" | "detail";
+export function imageVariantPath(storagePath: string, variant: ImageVariant): string {
+  return variant === "original" ? storagePath : `${storagePath}.${variant}.webp`;
+}
+
+/** Legacy Supabase objects may not have derivatives yet: fall back to the original. */
+export async function createStorageImageReadUrl(storagePath: string, variant: ImageVariant, ttlSeconds: number): Promise<string | null> {
+  if (variant === "original" || env.storage.driver === "local") return createStorageReadUrl(storagePath, ttlSeconds);
+  try { return await createStorageReadUrl(imageVariantPath(storagePath, variant), ttlSeconds); }
+  catch { return createStorageReadUrl(storagePath, ttlSeconds); }
 }

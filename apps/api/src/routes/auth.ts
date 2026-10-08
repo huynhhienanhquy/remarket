@@ -28,6 +28,7 @@ import { sealEmailToken } from "../services/email.js";
 import { enqueueOutbox } from "../outbox/outbox.js";
 import { isKnownProvinceCode } from "../shared/geography.js";
 import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
+import { lockRefreshState } from "../services/refresh-locks.js";
 import type { IssuedSession } from "../services/session-issuance.js";
 import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
 
@@ -411,16 +412,9 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
       // Global auth lock order: User -> Session -> AuthToken. Account locking,
       // password reset and refresh rotation use the same order to avoid a
       // session/token deadlock under concurrent revocation.
-      // Return the locked rows themselves instead of issuing three reads again.
-      // Select only public profile fields: never include passwordHash in the DTO.
-      const [user] = await tx.$queryRaw<SessionProfile[]>`
-        SELECT "id", "fullName", "email", "avatarUrl", "role", "status",
-               "emailVerifiedAt", "phone", "provinceCode", "defaultAddress", "joinedAt"
-        FROM "User" WHERE "id" = ${candidate.userId} FOR UPDATE`;
-      const [session] = await tx.$queryRaw<Session[]>`
-        SELECT * FROM "Session" WHERE "id" = ${candidateSessionId} FOR UPDATE`;
-      const [current] = await tx.$queryRaw<AuthToken[]>`
-        SELECT * FROM "AuthToken" WHERE "id" = ${candidate.id} FOR UPDATE`;
+      const locked = await lockRefreshState(tx, { id: candidate.id, userId: candidate.userId, sessionId: candidateSessionId });
+      if (!locked) return { kind: "invalid" as const };
+      const { user, session, token: current } = locked;
       if (
         !current ||
         !session ||

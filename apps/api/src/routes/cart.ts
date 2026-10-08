@@ -13,6 +13,8 @@ import { notFound, productNotAvailable, unauthorized, validationError } from "..
 import { toSellerSummary } from "../shared/dto-mappers.js";
 import type { ProductRow } from "../shared/dto-mappers.js";
 import { EMPTY_AGGREGATES, loadSellerAggregates } from "../shared/seller-aggregates.js";
+import { createPublicStorageUrl } from "../services/storage.js";
+import { usableImageUrl } from "../shared/image-url.js";
 
 /**
  * Cart routes (detail-project 9.4): the view is grouped by seller and every
@@ -21,8 +23,7 @@ import { EMPTY_AGGREGATES, loadSellerAggregates } from "../shared/seller-aggrega
  * never duplicates the row.
  *
  * An item that is no longer purchasable keeps its identity but carries
- * `available: false` with the same reason string the UI already shows in the
- * mock adapter.
+ * `available: false` and a reason string for the UI.
  */
 
 const NOT_FOUND_MESSAGE = "Không tìm thấy tin đăng này.";
@@ -41,7 +42,7 @@ function viewerIdOf(req: AuthRequest): string {
   return req.user.id;
 }
 
-/** Mirrors the mock `isCategoryValid`: leaf with an all-ACTIVE ancestor chain. */
+/** A purchasable category is a leaf with an all-ACTIVE ancestor chain. */
 async function loadCategoryValidator(): Promise<(categoryId: string) => boolean> {
   const rows = await prisma.category.findMany({
     select: { id: true, parentId: true, status: true },
@@ -112,11 +113,15 @@ async function buildCartView(
 
     const reason = unavailableReason(product, viewerId, validCategory);
     const hidden = product.deletedAt !== null || product.isBlocked;
+    const image = product.images[0];
+    const publicImage = !hidden && ["ACTIVE", "RESERVED", "SOLD"].includes(product.status)
+      && product.seller.status === "ACTIVE" && product.seller.emailVerifiedAt !== null
+      && validCategory(product.categoryId);
     const item: CartItemView = {
       product_id: product.id,
       title: hidden ? "" : product.title,
       price: hidden ? "0" : product.price.toString(),
-      image_url: hidden ? null : (product.images[0]?.url ?? null),
+      image_url: !publicImage || !image ? null : image.storagePath ? createPublicStorageUrl(image.storagePath) : usableImageUrl(image.url),
       condition: product.condition,
       status: product.status,
       province_label: provinceLabel(product.provinceCode),

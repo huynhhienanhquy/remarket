@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { env } from "./config/env.js";
 import { startJobRunner } from "./jobs/runner.js";
-import { prisma } from "./utils/prisma.js";
+import { backgroundPrisma as prisma } from "./utils/background-prisma.js";
 
 const stop = startJobRunner(env.workerIntervalMs, env.outboxIntervalMs);
 

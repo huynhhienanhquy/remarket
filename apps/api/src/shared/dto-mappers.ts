@@ -47,7 +47,8 @@ import type {
   SupportTicketDetail,
   SupportTicketListItem,
 } from "@remarket/shared";
-import { createPrivateStorageUrl } from "../services/storage.js";
+import { createPrivateStorageUrl, createPublicStorageUrl } from "../services/storage.js";
+import { usableImageUrl } from "./image-url.js";
 import { REVIEW_LIMITS, provinceLabel } from "@remarket/shared";
 import type { SellerAggregates } from "./seller-aggregates.js";
 
@@ -85,7 +86,7 @@ export function toSessionUser(user: SessionProfile): SessionUser {
     id: user.id,
     full_name: user.fullName,
     email: user.email,
-    avatar_url: user.avatarUrl,
+    avatar_url: avatarReadUrl(user, false),
     role: user.role,
     status: user.status,
     email_verified_at: iso(user.emailVerifiedAt),
@@ -100,11 +101,22 @@ export function toPublicProfile(user: User, aggregates: SellerAggregates): Publi
   return { seller: toSellerSummary(user, aggregates) };
 }
 
-export function toSellerSummary(user: User, aggregates: SellerAggregates): SellerSummary {
+export type SellerProfile = Pick<User, "id" | "fullName" | "avatarUrl" | "provinceCode" | "joinedAt" | "status" | "emailVerifiedAt">;
+
+function avatarReadUrl(user: Pick<User, "id" | "avatarUrl" | "status" | "emailVerifiedAt">, publicRead = true): string | null {
+  const url = usableImageUrl(user.avatarUrl);
+  if (!url || (publicRead && (user.status !== "ACTIVE" || user.emailVerifiedAt === null))) return null;
+  const match = /^\/api\/v1\/uploads\/([A-Za-z0-9][A-Za-z0-9._-]*)$/.exec(url);
+  if (!match || match[1]!.includes("..")) return url;
+  const storagePath = `users/${user.id}/avatar/${match[1]}`;
+  return publicRead ? createPublicStorageUrl(storagePath) : createPrivateStorageUrl(storagePath);
+}
+
+export function toSellerSummary(user: SellerProfile, aggregates: SellerAggregates): SellerSummary {
   return {
     id: user.id,
     name: user.fullName,
-    avatar_url: user.avatarUrl,
+    avatar_url: avatarReadUrl(user),
     province_code: user.provinceCode,
     province_label: provinceLabel(user.provinceCode),
     joined_at: isoRequired(user.joinedAt),
@@ -119,7 +131,7 @@ export function toAdminUserItem(user: User): AdminUserItem {
     id: user.id,
     full_name: user.fullName,
     email: user.email,
-    avatar_url: user.avatarUrl,
+    avatar_url: avatarReadUrl(user, false),
     phone: user.phone,
     province_code: user.provinceCode,
     province_label: provinceLabel(user.provinceCode),
@@ -164,6 +176,14 @@ export type ProductRow = Product & {
   seller: User;
 };
 
+export type ProductListRow = Pick<Product,
+  "id" | "sellerId" | "title" | "price" | "condition" | "provinceCode" |
+  "publishedAt" | "createdAt" | "status" | "isBlocked" | "deletedAt"
+> & {
+  images: Pick<ProductImage, "url" | "storagePath" | "sortOrder">[];
+  seller: SellerProfile;
+};
+
 export interface ViewerContext {
   viewerId: string | null;
   viewerRole: "USER" | "ADMIN" | null;
@@ -187,38 +207,41 @@ export const ANONYMOUS_VIEWER: ViewerContext = {
 function sortedImages(product: ProductRow, includeStoragePath = false): ProductImageDto[] {
   return [...product.images]
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((image) => ({
-      id: image.id,
-      url:
-        includeStoragePath && image.storagePath
-          ? createPrivateStorageUrl(image.storagePath)
-          : image.url,
-      ...(includeStoragePath && image.storagePath ? { storage_path: image.storagePath } : {}),
-      sort_order: image.sortOrder,
-    }));
+    .flatMap((image) => {
+      const url = image.storagePath
+        ? includeStoragePath ? createPrivateStorageUrl(image.storagePath) : createPublicStorageUrl(image.storagePath)
+        : usableImageUrl(image.url);
+      return url === null ? [] : [{
+        id: image.id,
+        url,
+        ...(includeStoragePath && image.storagePath ? { storage_path: image.storagePath } : {}),
+        sort_order: image.sortOrder,
+      }];
+    });
 }
 
-function firstImageUrl(product: ProductRow, privatePreview = false): string | null {
+function firstImageUrl<T extends Pick<ProductListRow, "images">>(product: T, privatePreview = false, publicVisibilityChecked = true): string | null {
   const images = [...product.images].sort((a, b) => a.sortOrder - b.sortOrder);
-  const image = images[0];
-  if (!image) return null;
-  return privatePreview && image.storagePath
-    ? createPrivateStorageUrl(image.storagePath)
-    : image.url;
+  for (const image of images) {
+    if (image.storagePath && (privatePreview || publicVisibilityChecked)) return privatePreview ? createPrivateStorageUrl(image.storagePath) : createPublicStorageUrl(image.storagePath);
+    const url = usableImageUrl(image.url);
+    if (url) return url;
+  }
+  return null;
 }
 
-export function isOwnerOrAdmin(product: Product, ctx: ViewerContext): boolean {
+export function isOwnerOrAdmin(product: Pick<Product, "sellerId">, ctx: ViewerContext): boolean {
   if (ctx.viewerId === null) return false;
   return ctx.viewerId === product.sellerId || ctx.viewerRole === "ADMIN";
 }
 
-export function toProductListItem(product: ProductRow, ctx: ViewerContext): ProductListItem {
+export function toProductListItem(product: ProductListRow, ctx: ViewerContext, publicVisibilityChecked = true): ProductListItem {
   const privileged = isOwnerOrAdmin(product, ctx);
   const item: ProductListItem = {
     id: product.id,
     title: product.title,
     price: product.price.toString(),
-    image_url: firstImageUrl(product, privileged),
+    image_url: firstImageUrl(product, privileged, publicVisibilityChecked),
     condition: product.condition,
     province_code: product.provinceCode,
     province_label: provinceLabel(product.provinceCode),
@@ -246,7 +269,9 @@ export function toSavedProductListItem(
   product: ProductRow,
   ctx: ViewerContext,
 ): ProductListItem {
-  const item = toProductListItem(product, ctx);
+  // Saved rows can remain after category/seller visibility changes. Without
+  // a fresh public eligibility check, retain legacy DB-authorized image reads.
+  const item = toProductListItem(product, ctx, false);
   const hidden = product.isBlocked || product.deletedAt !== null;
   return {
     ...item,
@@ -409,7 +434,7 @@ export function toOrderItemSnapshot(item: OrderItem): import("@remarket/shared")
     image_path_snapshot: item.imagePathSnapshot,
     // Order DTOs are participant/admin scoped. Browser images cannot attach
     // the memory-only bearer token, including when the listing was removed.
-    image_url: item.imagePathSnapshot ? createPrivateStorageUrl(item.imagePathSnapshot) : item.imageUrl,
+    image_url: item.imagePathSnapshot ? createPrivateStorageUrl(item.imagePathSnapshot) : usableImageUrl(item.imageUrl),
     price: item.price.toString(),
   };
 }
@@ -631,13 +656,15 @@ export function toConversationListItem(
     counterparty: {
       id: counterparty.id,
       name: counterparty.fullName,
-      avatar_url: counterparty.avatarUrl,
+      avatar_url: avatarReadUrl(counterparty),
     },
     product: conversation.product
       ? {
           id: conversation.product.id,
           title: conversation.product.title,
-          image_url: firstImageUrl({ ...conversation.product, seller: counterparty }),
+          // Membership alone is not an image grant. Owners may preview their
+          // own object; other readers retain the legacy resource policy.
+          image_url: firstImageUrl(conversation.product, conversation.product.sellerId === viewerId, false),
           status: conversation.product.status,
           price: conversation.product.price.toString(),
         }
@@ -682,7 +709,7 @@ export function toReview(review: Review, reviewer: User): ReviewDto {
     reviewer: {
       id: reviewer.id,
       name: reviewer.fullName,
-      avatar_url: reviewer.avatarUrl,
+      avatar_url: avatarReadUrl(reviewer),
     },
     reviewed_user_id: review.reviewedUserId,
   };

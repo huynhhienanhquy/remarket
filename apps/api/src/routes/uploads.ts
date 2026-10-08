@@ -18,7 +18,12 @@ import {
   getLocalStoragePath,
   putStorageObject,
   verifyPrivateStorageUrl,
+  verifyImageStorageUrl,
+  createStorageImageReadUrl,
+  decodeStorageResource,
 } from "../services/storage.js";
+import { generateImageVariants, localImageVariant } from "../services/image-variants.js";
+import { env } from "../config/env.js";
 
 /**
  * Private upload endpoint (detail-project 16).
@@ -317,6 +322,7 @@ router.post(
 
     await putStorageObject(storagePath, processed, contentTypeOf(filename));
     try {
+      await generateImageVariants(storagePath, processed);
       await prisma.uploadAsset.create({
         data: {
           userId: authUser.id,
@@ -339,6 +345,34 @@ router.post(
 // stream local bytes or redirect to a five-minute Supabase signed URL.
 router.get(
   "/:filename",
+  // Signed URLs already encode a checked resource grant. Verify it locally,
+  // without authenticating or querying metadata again for every image.
+  asyncHandler(async (req, res, next) => {
+    if (req.query.resource === undefined) return next();
+    const storagePath = decodeStorageResource(req.query.resource);
+    const filename = req.params.filename;
+    const visibility = req.query.visibility === "public" ? "public" : "private";
+    const variant = req.query.variant ?? "original";
+    if (typeof storagePath !== "string" || typeof filename !== "string"
+      || !/^users\/[^/]+\/(product|avatar)\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(storagePath)
+      || storagePath.includes("..") || storagePath.split("/").at(-1) !== filename
+      || typeof variant !== "string" || !["original", "card", "detail"].includes(variant)
+      || !verifyImageStorageUrl(storagePath, req.query.expires, req.query.signature, visibility)) {
+      throw notFound("Không tìm thấy tệp.");
+    }
+    const imageVariant = variant === "card" ? "card" : variant === "detail" ? "detail" : "original";
+    const remaining = Math.max(0, Number(req.query.expires) - Math.floor(Date.now() / 1000));
+    res.setHeader("Cache-Control", visibility === "public"
+      ? `public, max-age=${remaining}, s-maxage=${remaining}, immutable`
+      : `private, max-age=${remaining}`);
+    if (env.storage.driver === "supabase") {
+      const url = await createStorageImageReadUrl(storagePath, imageVariant, remaining);
+      if (url) { res.redirect(302, url); return; }
+    }
+    const file = await localImageVariant(storagePath, imageVariant);
+    res.setHeader("Content-Type", imageVariant === "original" ? contentTypeOf(filename) : "image/webp");
+    res.sendFile(file, (error) => { if (error && !res.headersSent) next(error); });
+  }),
   optionalAuth,
   asyncHandler(async (req: AuthRequest, res, next) => {
     const filename = req.params.filename;

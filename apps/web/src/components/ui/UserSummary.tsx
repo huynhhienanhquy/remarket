@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { SellerSummary } from "@remarket/shared";
+import { ApiImage } from "./ApiImage";
 
 export interface UserSummaryProps {
   user: SellerSummary;
@@ -26,7 +27,7 @@ export function UserSummary({
   return (
     <div className={`flex items-center gap-3 ${className ?? ""}`}>
       {user.avatar_url ? (
-        <img
+        <ApiImage
           src={user.avatar_url}
           alt=""
           aria-hidden="true"

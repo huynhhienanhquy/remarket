@@ -35,8 +35,7 @@ function requireSession(user: SessionUser | null): SessionUser {
 
 /**
  * Live implementation of the adapter contract. Every method maps 1:1 to a
- * documented endpoint (detail-project 14.1); it is selected with
- * VITE_API_MODE=live and is never mixed with the mock adapter in a session.
+ * documented endpoint (detail-project 14.1).
  */
 
 const auth: AuthApi = {

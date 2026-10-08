@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../utils/prisma.js";
 
 /**
@@ -22,7 +23,7 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-/** Batch loader so a page of N products costs at most two extra queries. */
+/** Batch reputation loader: one fresh SQL query, without caching hidden reviews. */
 export async function loadSellerAggregates(
   sellerIds: readonly string[],
 ): Promise<Map<string, SellerAggregates>> {
@@ -30,34 +31,21 @@ export async function loadSellerAggregates(
   const result = new Map<string, SellerAggregates>();
   if (ids.length === 0) return result;
 
-  const [reviews, orders] = await Promise.all([
-    prisma.review.groupBy({
-      by: ["reviewedUserId"],
-      where: { reviewedUserId: { in: ids }, hiddenAt: null },
-      _avg: { rating: true },
-      _count: { _all: true },
-    }),
-    prisma.order.groupBy({
-      by: ["sellerId"],
-      where: { sellerId: { in: ids }, status: "COMPLETED" },
-      _count: { _all: true },
-    }),
-  ]);
-
-  for (const id of ids) result.set(id, { ...EMPTY_AGGREGATES });
-
-  for (const row of reviews) {
-    result.set(row.reviewedUserId, {
-      rating: row._avg.rating === null ? null : round1(row._avg.rating),
-      review_count: row._count._all,
-      completed_sales_count: result.get(row.reviewedUserId)?.completed_sales_count ?? 0,
-    });
-  }
-
-  for (const row of orders) {
-    const current = result.get(row.sellerId) ?? { ...EMPTY_AGGREGATES };
-    result.set(row.sellerId, { ...current, completed_sales_count: row._count._all });
-  }
+  const rows = await prisma.$queryRaw<Array<{ id: string; rating: number | null; review_count: bigint; completed_sales_count: bigint }>>(Prisma.sql`
+    WITH sellers(id) AS (VALUES ${Prisma.join(ids.map((id) => Prisma.sql`(${id}::text)`))})
+    SELECT s.id, reviews.rating, reviews.count AS review_count, sales.count AS completed_sales_count
+    FROM sellers s
+    CROSS JOIN LATERAL (
+      SELECT AVG(rating)::double precision AS rating, COUNT(*) AS count FROM "Review"
+      WHERE "reviewedUserId" = s.id AND "hiddenAt" IS NULL
+    ) reviews
+    CROSS JOIN LATERAL (
+      SELECT COUNT(*) AS count FROM "Order" WHERE "sellerId" = s.id AND status = 'COMPLETED'
+    ) sales`);
+  for (const row of rows) result.set(row.id, {
+    rating: row.rating === null ? null : round1(row.rating),
+    review_count: Number(row.review_count), completed_sales_count: Number(row.completed_sales_count),
+  });
 
   return result;
 }

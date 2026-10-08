@@ -48,9 +48,7 @@ import type {
 } from "@remarket/shared";
 
 /**
- * One adapter contract per session (ui-spec 1): the app talks to this
- * interface only, so the mock fixtures and the future REST API are
- * interchangeable as long as they return the same DTO shapes (ui-spec 25).
+ * Typed contract between the application and the REST API (ui-spec 25).
  *
  * Live implementation maps 1:1 to the endpoints in detail-project 14.1.
  */

@@ -5,7 +5,7 @@ Reference order when anything conflicts (`docs/backend-detail.md` §1):
 1. `detail-project.md` — permissions, security, transactions, lifecycle.
 2. `packages/shared/src/dto.ts` — response shapes.
 3. `apps/web/src/lib/api/httpAdapter.ts` — URL + method actually called.
-4. `apps/web/src/mocks/adapter-*.ts` — UI behaviour currently demoed.
+4. `apps/web/src/tests/` — UI behaviour verified through the HTTP adapter.
 
 ## Non-negotiable rules
 

@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import type { Socket } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "./SessionProvider";
-import { IS_MOCK, SOCKET_URL } from "../lib/env";
+import { SOCKET_URL } from "../lib/env";
 import { http, subscribeAccessToken } from "../lib/api/http";
 
 const RealtimeContext = createContext<{ socket: Socket | null; connected: boolean }>({ socket: null, connected: false });
@@ -17,7 +17,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const [state, setState] = useState<{ socket: Socket | null; connected: boolean }>({ socket: null, connected: false });
   useEffect(() => {
-    if (IS_MOCK || !viewerId || viewerStatus !== "ACTIVE") return;
+    if (!viewerId || viewerStatus !== "ACTIVE") return;
     let disposed = false;
     let reauthenticating = false;
     let authRetried = false;
@@ -55,6 +55,6 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     setState({ socket, connected: false });
     return () => { disposed = true; unsubscribe(); socket.removeAllListeners(); socket.disconnect(); };
   }, [viewerId, viewerStatus, client, refresh]);
-  const active = !IS_MOCK && viewer?.status === "ACTIVE";
+  const active = viewer?.status === "ACTIVE";
   return <RealtimeContext.Provider value={active ? state : { socket: null, connected: false }}>{children}</RealtimeContext.Provider>;
 }

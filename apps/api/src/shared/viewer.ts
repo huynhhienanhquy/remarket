@@ -57,17 +57,18 @@ export interface CategoryChain {
 }
 
 export async function loadCategoryChain(categoryId: string): Promise<CategoryChain> {
-  const rows = await prisma.$queryRaw<Category[]>`
+  const rows = await prisma.$queryRaw<Array<Pick<Category, "id" | "parentId" | "name" | "status"> & { isLeaf: boolean }>>`
     WITH RECURSIVE chain AS (
-      SELECT id, "parentId", name, status, 0 AS depth
+      SELECT id, "parentId", name, status
       FROM "Category" WHERE id = ${categoryId}
-      UNION ALL
-      SELECT c.id, c."parentId", c.name, c.status, chain.depth + 1
+      UNION
+      SELECT c.id, c."parentId", c.name, c.status
       FROM "Category" c
       JOIN chain ON c.id = chain."parentId"
     )
-    SELECT id, "parentId", name, status FROM "Category"
-    WHERE id IN (SELECT id FROM chain)
+    SELECT id, "parentId", name, status,
+      NOT EXISTS (SELECT 1 FROM "Category" child WHERE child."parentId" = ${categoryId}) AS "isLeaf"
+    FROM chain
     ORDER BY name
   `;
 
@@ -79,8 +80,8 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
   const leaf = byId.get(categoryId)!;
 
   // Walk parents up to the root to recover the real order.
-  const ordered: Category[] = [];
-  let cursor: Category | undefined = leaf;
+  const ordered: typeof rows = [];
+  let cursor: (typeof rows)[number] | undefined = leaf;
   const guard = new Set<string>();
   while (cursor && !guard.has(cursor.id)) {
     guard.add(cursor.id);
@@ -88,13 +89,11 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
     cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
   }
 
-  const childCount = await prisma.category.count({ where: { parentId: categoryId } });
-
   return {
     path: ordered.map((row) => row.name),
     exists: true,
-    active: ordered.every((row) => row.status === "ACTIVE"),
-    isLeaf: childCount === 0,
+    active: cursor === undefined && ordered[0]?.parentId === null && ordered.every((row) => row.status === "ACTIVE"),
+    isLeaf: leaf.isLeaf,
   };
 }
 

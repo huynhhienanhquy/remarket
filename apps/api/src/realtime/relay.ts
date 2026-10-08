@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { prisma } from "../utils/prisma.js";
+import { backgroundPrisma as prisma } from "../utils/background-prisma.js";
 import { publishRealtimeEvent } from "./events.js";
 
 interface ProcessedEventRow {

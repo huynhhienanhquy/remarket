@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,11 +11,9 @@ import {
 } from "@remarket/shared";
 import { useSession } from "../../app/SessionProvider";
 import { safeReturnTo } from "../../app/guards";
-import { IS_MOCK } from "../../lib/env";
 import { errorTitle, isApiError } from "../../lib/errors";
 import { Button, FormField, InlineAlert, Input } from "../../components/ui";
 
-const DEMO_PASSWORD = "remarket-demo-2026";
 
 function fieldMessages(caught: unknown): Record<string, string> | null {
   if (!isApiError(caught)) return null;
@@ -348,59 +346,6 @@ export function RegisterPage() {
           Đăng nhập
         </Link>
       </p>
-
-      {IS_MOCK && (
-        <section
-          aria-labelledby="demo-accounts-title"
-          className="rounded-card border border-dashed border-line bg-surface-subtle p-4"
-        >
-          <h2 id="demo-accounts-title" className="t-label text-ink">
-            Tài khoản demo (dữ liệu mẫu)
-          </h2>
-          <p className="mt-1 t-meta text-muted">
-            Chỉ hiện khi VITE_API_MODE=mock. Mật khẩu chung: {DEMO_PASSWORD}. Chọn một tài khoản
-            để điền vào biểu mẫu.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {[
-              { email: "anh.mua@remarket.vn", note: "Người dùng ACTIVE, đã xác minh email" },
-              { email: "lan.ban@remarket.vn", note: "Người bán ACTIVE, đã xác minh email" },
-              { email: "admin@remarket.vn", note: "Quản trị viên (ADMIN)" },
-              { email: "vy.moi@remarket.vn", note: "Tài khoản chưa xác minh email" },
-              { email: "long.bi.khoa@remarket.vn", note: "Tài khoản bị khóa (LOCKED)" },
-            ].map((account) => (
-              <li key={account.email}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail(account.email);
-                    setPassword(DEMO_PASSWORD);
-                    setConfirm(DEMO_PASSWORD);
-                    setFullNameTouched(false);
-                    setEmailTouched(false);
-                    setPhoneTouched(false);
-                    setPasswordTouched(false);
-                    setConfirmTouched(false);
-                    setFullNameError(null);
-                    setEmailError(null);
-                    setPhoneError(null);
-                    setPasswordError(null);
-                    setConfirmError(null);
-                    setFormError(null);
-                  }}
-                  className="flex w-full items-center justify-between gap-3 rounded-control border border-line bg-surface px-3 py-2 text-left transition-colors hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate t-meta text-ink">{account.email}</span>
-                    <span className="block t-meta text-muted">{account.note}</span>
-                  </span>
-                  <span className="shrink-0 t-meta text-brand">Điền</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

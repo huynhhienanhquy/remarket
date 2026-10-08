@@ -18,6 +18,8 @@ export * from "./Dialog";
 export * from "./Drawer";
 export * from "./Skeleton";
 export * from "./ImageViewer";
+export * from "./MarketplaceImage";
+export * from "./ApiImage";
 export * from "./OrderTimeline";
 export * from "./DataTable";
 export * from "./Toast";

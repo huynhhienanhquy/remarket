@@ -8,6 +8,7 @@ import { useSession } from "../SessionProvider";
 import { loginPathFor } from "../guards";
 import {
   BellIcon,
+  ApiImage,
   CartIcon,
   ChatIcon,
   ChevronLeftIcon,
@@ -111,7 +112,7 @@ function AccountMenu() {
         className="flex h-11 items-center gap-2 rounded-control px-1.5 transition-colors hover:bg-surface-subtle"
       >
         {viewer!.avatar_url ? (
-          <img
+          <ApiImage
             src={viewer!.avatar_url}
             alt=""
             className="h-8 w-8 rounded-full object-cover"

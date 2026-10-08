@@ -7,6 +7,7 @@ import { queryKeys } from "../../lib/queryClient";
 import { useSession } from "../../app/SessionProvider";
 import {
   Button,
+  ApiImage,
   Badge,
   InlineAlert,
   ProductCardSkeleton,
@@ -202,7 +203,7 @@ function ProductCard({ product, busy, onAction, onEdit, onView }: ProductCardPro
     <div className="group bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-lg transition-shadow">
       <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
         {product.image_url ? (
-          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <ApiImage src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-neutral-400">Không có ảnh</div>
         )}

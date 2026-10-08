@@ -5,6 +5,7 @@ import {
   toSavedProductListItem,
   toSupportTicketDetail,
   toOrderItemSnapshot,
+  toConversationListItem,
 } from "../../src/shared/dto-mappers.js";
 import type { ProductRow, ViewerContext } from "../../src/shared/dto-mappers.js";
 
@@ -68,8 +69,9 @@ describe("product DTO privacy", () => {
   it("does not expose private storage keys or moderation notes publicly", () => {
     const detail = toProductDetail(product, context("buyer-1"), ["Điện tử"], true);
     expect(detail.images[0]).not.toHaveProperty("storage_path");
-    expect(detail.images[0]?.url).toBe("/api/v1/uploads/image.jpg");
-    expect(detail.image_url).toBe("/api/v1/uploads/image.jpg");
+    expect(detail.images[0]?.url).toContain("visibility=public");
+    expect(detail.image_url).toContain("visibility=public");
+    expect(detail.image_url).not.toContain("users/");
     expect(detail.block_reason).toBeNull();
     expect(detail.rejection_reason).toBeNull();
   });
@@ -78,13 +80,30 @@ describe("product DTO privacy", () => {
     const detail = toProductDetail(product, context("seller-1"), ["Điện tử"], true);
     expect(detail.images[0]?.storage_path).toBe("users/seller-1/product/image.jpg");
     expect(detail.images[0]?.url).toMatch(
-      /^\/api\/v1\/uploads\/image\.jpg\?expires=\d+&signature=[A-Za-z0-9_-]+$/,
+      /^\/api\/v1\/uploads\/image\.jpg\?expires=\d+&signature=[A-Za-z0-9_-]+&resource=[A-Za-z0-9_-]+$/,
     );
     expect(detail.image_url).toMatch(
-      /^\/api\/v1\/uploads\/image\.jpg\?expires=\d+&signature=[A-Za-z0-9_-]+$/,
+      /^\/api\/v1\/uploads\/image\.jpg\?expires=\d+&signature=[A-Za-z0-9_-]+&resource=[A-Za-z0-9_-]+$/,
     );
     expect(detail.block_reason).toBe("ghi chú kiểm duyệt nội bộ");
     expect(detail.rejection_reason).toBe("lý do từ lần duyệt trước");
+  });
+  it("does not mint public image capabilities for saved rows without a fresh category check", () => {
+    const saved = toSavedProductListItem({ ...product, status: "INACTIVE" }, context("buyer-1"));
+    expect(saved.image_url).toBe("/api/v1/uploads/image.jpg");
+    expect(saved.image_url).not.toContain("signature=");
+  });
+  it("does not treat chat membership as permission to publicly cache a product image", () => {
+    const conversation = {
+      id: "conversation", updatedAt: new Date(), buyerId: "buyer-1", sellerId: product.sellerId,
+      buyer: { ...product.seller, id: "buyer-1" }, seller: product.seller,
+      product, messages: [],
+    };
+    const buyerView = toConversationListItem(conversation, "buyer-1", 0);
+    expect(buyerView.product?.image_url).toBe("/api/v1/uploads/image.jpg");
+    const ownerView = toConversationListItem(conversation, product.sellerId, 0);
+    expect(ownerView.product?.image_url).toContain("signature=");
+    expect(ownerView.product?.image_url).not.toContain("visibility=public");
   });
 
   it("redacts blocked content while retaining a private saved-item placeholder", () => {

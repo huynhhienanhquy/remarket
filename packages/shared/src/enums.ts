@@ -1,5 +1,5 @@
-﻿/**
- * Stable enum values shared by UI, mock adapter and (later) the API.
+/**
+ * Stable enum values shared by the UI and the API.
  * UI renders Vietnamese labels through `labels.ts`; these codes never change.
  */
 

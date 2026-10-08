@@ -1,5 +1,4 @@
 import { Link, Outlet, useSearchParams } from "react-router-dom";
-import { DEMO_BANNER } from "../../lib/env";
 import { Logo } from "./Logo";
 
 const BENEFITS = [
@@ -22,13 +21,6 @@ export function AuthShell() {
 
   return (
     <div className="min-h-screen bg-page">
-      {DEMO_BANNER && (
-        <div className="bg-warning-bg">
-          <div className="rm-container py-1.5 text-center t-meta text-accent">
-            Môi trường demo — dữ liệu là dữ liệu mẫu, không giao dịch thật.
-          </div>
-        </div>
-      )}
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[45fr_55fr]">
         {/* Illustration column (desktop only) */}
         <aside className="hidden bg-brand-soft px-10 py-12 lg:flex lg:flex-col lg:justify-between xl:px-16">

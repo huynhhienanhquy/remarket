@@ -10,7 +10,7 @@ Tài liệu này quy định giao diện React + TypeScript + Vite + Tailwind CS
 
 Các lựa chọn màu sắc, bố cục, component và câu chữ dưới đây là thiết kế đề xuất thống nhất cho MVP. Chỉ xây light mode. Giao diện tiếng Việt; enum và code bằng tiếng Anh. Không tự thêm ví, thanh toán online, mã giảm giá, hàng nhiều số lượng, nhắn ảnh, chat admin tự do, biểu đồ hay thống kê không có dữ liệu.
 
-Không gọi API mới do tự suy đoán. Mục 25 ghi rõ dữ liệu response cần có để UI hoạt động; đó là yêu cầu contract frontend/backend cần hiện thực, không phải xác nhận API đã tồn tại. Khi backend chưa sẵn sàng, dùng adapter mock có cùng shape và các trạng thái xác định; không trộn mock và dữ liệu thật trong cùng phiên.
+Không gọi API mới do tự suy đoán. Mục 25 ghi rõ dữ liệu response cần có để UI hoạt động; đó là yêu cầu contract frontend/backend cần hiện thực, không phải xác nhận API đã tồn tại. Ứng dụng chỉ dùng HTTP API thật. Khi backend chưa sẵn sàng, hiển thị trạng thái lỗi/chưa khả dụng và ghi rõ contract còn thiếu; không đưa dữ liệu kiểm thử vào runtime.
 
 ## 2. Định hướng thị giác
 
@@ -637,7 +637,6 @@ Cấu trúc đề xuất dưới apps/web/src:
     features/admin/
     lib/            API client, socket, money/date, errors
     styles/         Tokens và global styles
-    mocks/          DTO fixtures và adapter theo môi trường
     tests/          Test hành vi và E2E
 
 Mỗi feature có page/component/service/type cần thiết; tránh một file page chứa toàn bộ API, validation và layout. Chọn một cơ chế query cache/form/router phù hợp dự án khi triển khai; không cài nhiều thư viện làm cùng việc.
@@ -648,11 +647,11 @@ Dùng một ánh xạ enum → label/tone, một lớp quyền UI dùng chung gi
 
 Optimistic chỉ cho thao tác dễ rollback như favorite/read notification. Product moderation, checkout và order transitions phải chờ response server. Socket events invalidate/refetch hoặc merge theo ID/version; không tự suy ra transition tiếp theo.
 
-## 27. Fixture và checklist nghiệm thu UI
+## 27. Dữ liệu kiểm thử và checklist nghiệm thu UI
 
-Fixture dev phải có ít nhất: product đủ 6 status, blocked product, seller chưa có review, product title dài, 8 ảnh, description dài, empty lists, order mỗi status cho COD/MEETUP, nhiều seller, giá vừa đổi, unavailable cart item, open order ticket, expired session, unverified/locked account.
+Dữ liệu trong test tự động phải bao phủ ít nhất: product đủ 6 status, blocked product, seller chưa có review, product title dài, 8 ảnh, description dài, empty lists, order mỗi status cho COD/MEETUP, nhiều seller, giá vừa đổi, unavailable cart item, open order ticket, expired session, unverified/locked account.
 
-Có thể dùng món mẫu: Keychron K2 V2 1.100.000 ₫ tại Đà Nẵng, Sony WH-1000XM4 2.500.000 ₫ tại Hà Nội, bàn gỗ 650.000 ₫ tại TP.HCM. Gắn nhãn môi trường demo; fixture phải nhất quán totals/seller/status, không giả dữ liệu live. Ảnh chưa có dùng placeholder có label rõ, không tải ngẫu nhiên ảnh sai món.
+Dữ liệu kiểm thử chỉ nằm trong test hoặc schema PostgreSQL tạm do harness tạo; không được bundle vào ứng dụng hoặc seed vào database đang sử dụng. Fixture phải nhất quán totals/seller/status. Tài khoản test dùng mật khẩu ngẫu nhiên theo lần chạy; không có tài khoản demo hay mật khẩu mặc định.
 
 | Kiểm tra | Kết quả phải đạt |
 |---|---|
@@ -672,12 +671,12 @@ Có thể dùng món mẫu: Keychron K2 V2 1.100.000 ₫ tại Đà Nẵng, Sony
 | Data | Không lộ PII, số liệu giả, endpoint không khai báo hoặc URL storage tự ghép |
 | Production | Build/typecheck qua; routes trực tiếp hoạt động khi refresh trên hosting; asset/font tải đúng |
 
-Chụp và đối chiếu ít nhất home, search mobile filter, product detail mobile, product form, multi-seller checkout, order detail hai vai trò, chat và admin review drawer. Test hành vi thực, không chỉ snapshot so chữ. Ghi rõ màn nào đang dùng mock và màn nào đã nối backend.
+Chụp và đối chiếu ít nhất home, search mobile filter, product detail mobile, product form, multi-seller checkout, order detail hai vai trò, chat và admin review drawer. Test hành vi thực, không chỉ snapshot so chữ. Ghi rõ endpoint đã tích hợp và contract còn thiếu; mọi màn runtime phải dùng API thật.
 
 ## 28. Prompt bàn giao cho AI coding
 
 Có thể dùng nguyên yêu cầu sau khi bắt đầu xây dựng:
 
-> Đọc toàn bộ detail-project.md và ui-spec.md trong workspace. Xây frontend ReMarket bằng React + TypeScript + Vite + Tailwind CSS theo nghiệp vụ và UI đã mô tả. Kiểm tra source/instructions hiện có trước khi chỉnh sửa. Dùng ui-spec.md cho token, shell, responsive, route UI-01 đến UI-29, component và tương tác; dùng detail-project.md cho auth, quyền, API, validation, đơn hàng và phạm vi MVP. Không tự thêm thanh toán online, chat ảnh, quantity, dữ liệu giả như thật hoặc endpoint chưa có contract. Nếu backend chưa có, tạo mock adapter rõ ràng với DTO nhất quán và các tình huống ở mục 27; liệt kê contract còn cần hoàn thiện theo mục 25. Triển khai theo thứ tự: tokens/components/layouts → khám phá/detail → auth/profile/tin đăng → cart/checkout/orders → chat/notification/support/review/report → admin. Kiểm thử desktop/mobile, các lỗi và quyền theo từng màn; báo cáo phần đã hoàn thành, kết quả kiểm tra và giới hạn tích hợp thực tế.
+> Đọc toàn bộ detail-project.md và ui-spec.md trong workspace. Xây frontend ReMarket bằng React + TypeScript + Vite + Tailwind CSS theo nghiệp vụ và UI đã mô tả. Kiểm tra source/instructions hiện có trước khi chỉnh sửa. Dùng ui-spec.md cho token, shell, responsive, route UI-01 đến UI-29, component và tương tác; dùng detail-project.md cho auth, quyền, API, validation, đơn hàng và phạm vi MVP. Không tự thêm thanh toán online, chat ảnh, quantity, dữ liệu giả như thật hoặc endpoint chưa có contract. Nếu backend chưa có, liệt kê contract còn cần hoàn thiện theo mục 25 và hiển thị lỗi/chưa khả dụng; không tạo mock adapter runtime. Các tình huống ở mục 27 chỉ dùng trong kiểm thử cách ly. Triển khai theo thứ tự: tokens/components/layouts → khám phá/detail → auth/profile/tin đăng → cart/checkout/orders → chat/notification/support/review/report → admin. Kiểm thử desktop/mobile, các lỗi và quyền theo từng màn; báo cáo phần đã hoàn thành, kết quả kiểm tra và giới hạn tích hợp thực tế.
 
 Bản đặc tả này là tài liệu thiết kế và triển khai; chưa có giao diện hay kết quả kiểm thử frontend được tạo trong lần viết tài liệu.

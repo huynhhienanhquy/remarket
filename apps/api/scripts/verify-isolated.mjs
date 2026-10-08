@@ -26,9 +26,11 @@ const childEnv = {
   ...process.env,
   NODE_ENV: "test", RUN_JOBS: "false", STORAGE_DRIVER: "local",
   DATABASE_URL: isolatedUrl.toString(), DIRECT_URL: isolatedUrl.toString(),
+  BACKGROUND_DATABASE_URL: isolatedUrl.toString(),
   TEST_DATABASE_URL: isolatedUrl.toString(), DATABASE_USE_DIRECT_URL: "false",
   DATABASE_TRANSACTION_TIMEOUT_MS: "120000", DATABASE_TRANSACTION_MAX_WAIT_MS: "60000",
   JWT_SIGNING_KEY: randomUUID() + randomUUID(), JWT_SECRET: undefined,
+  TEST_ACCOUNT_PASSWORD: randomUUID() + randomUUID(),
   SMOKE_WEB_URL: "http://127.0.0.1:5321",
   SMOKE_LIFECYCLE_ONLY: process.argv.includes("--lifecycle-only") ? "true" : "false",
   SMOKE_EMAIL_ONLY: process.argv.includes("--email-only") ? "true" : "false",
@@ -63,18 +65,26 @@ try {
   assert.equal(current[0].name, schema, "Database did not select the isolated schema");
   console.log(`Isolated test schema: ${schema}`);
   await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"]);
-  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only")) {
+    await run("tsx/cli", ["tests/fixtures/browser-seed.ts"]);
+  }
+  if (process.argv.includes("--benchmark")) {
+    childEnv.BENCHMARK_ADMIN_EMAIL = "admin@example.test";
+    childEnv.BENCHMARK_ADMIN_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
+    await run("tsx/cli", ["scripts/benchmark-performance.ts", "supabase-code-final"]);
+    await run("tsx/cli", ["scripts/benchmark-performance.ts", "security"]);
+  }
   if (process.argv.includes("--browser") || process.argv.includes("--browser-only")) {
     for (const url of ["http://127.0.0.1:5320/health/live", "http://127.0.0.1:5321"]) {
       let alreadyRunning = false;
       try { alreadyRunning = (await fetch(url)).ok; } catch { /* port is free */ }
       assert.equal(alreadyRunning, false, `Refusing to reuse an existing server: ${url}`);
     }
-    await run("tsx/cli", ["scripts/seed.ts"]);
     const webDir = path.resolve(apiDir, "../web");
     const webRequire = createRequire(path.join(webDir, "package.json"));
     await startService("--import", ["tsx", "src/index.ts"], apiDir, { PORT: "5320", RUN_JOBS: "true", WEB_ORIGINS: childEnv.SMOKE_WEB_URL, PUBLIC_WEB_URL: childEnv.SMOKE_WEB_URL });
-    await startService(path.join(path.dirname(webRequire.resolve("vite/package.json")), "bin/vite.js"), ["--host", "127.0.0.1", "--port", "5321", "--strictPort"], webDir, { VITE_API_MODE: "live", VITE_API_BASE_URL: "/api/v1", VITE_SOCKET_URL: "", VITE_DEV_API_TARGET: "http://127.0.0.1:5320" });
+    await startService(path.join(path.dirname(webRequire.resolve("vite/package.json")), "bin/vite.js"), ["--host", "127.0.0.1", "--port", "5321", "--strictPort"], webDir, { VITE_API_BASE_URL: "/api/v1", VITE_SOCKET_URL: "", VITE_DEV_API_TARGET: "http://127.0.0.1:5320" });
     await Promise.all([waitForServer("http://127.0.0.1:5320/health/live"), waitForServer(childEnv.SMOKE_WEB_URL)]);
     await run("../../scripts/smoke-member-flows.mjs", [], path.resolve(apiDir, "../.."));
   }
@@ -91,9 +101,11 @@ try {
       const uploads = await isolated.uploadAsset.findMany({ select: { storagePath: true } });
       const uploadRoot = path.resolve(apiDir, "uploads");
       for (const upload of uploads) {
-        const file = path.resolve(uploadRoot, upload.storagePath.replace(/^users\//, ""));
-        assert(file.startsWith(uploadRoot + path.sep), "Refusing an upload path outside the test storage root");
-        await unlink(file).catch((error) => { if (error.code !== "ENOENT") throw error; });
+        for (const objectPath of [upload.storagePath, `${upload.storagePath}.card.webp`, `${upload.storagePath}.detail.webp`]) {
+          const file = path.resolve(uploadRoot, objectPath.replace(/^users\//, ""));
+          assert(file.startsWith(uploadRoot + path.sep), "Refusing an upload path outside the test storage root");
+          await unlink(file).catch((error) => { if (error.code !== "ENOENT") throw error; });
+        }
       }
       if (uploads.length) console.log(`Removed ${uploads.length} temporary upload files`);
     }

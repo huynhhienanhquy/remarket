@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import {
   ConfirmDialog,
+  ApiImage,
   DataTable,
   Drawer,
   EmptyState,
@@ -36,7 +37,7 @@ function UserIdentity({ user }: { user: AdminUserItem }) {
   return (
     <div className="flex min-w-[220px] items-center gap-3">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-soft t-label text-brand">
-        {user.avatar_url ? <img src={user.avatar_url} alt="" className="h-full w-full object-cover" /> : user.full_name.slice(0, 1).toUpperCase()}
+        {user.avatar_url ? <ApiImage src={user.avatar_url} alt="" className="h-full w-full object-cover" /> : user.full_name.slice(0, 1).toUpperCase()}
       </div>
       <div className="min-w-0">
         <p className="truncate t-label text-ink">{user.full_name}</p>
