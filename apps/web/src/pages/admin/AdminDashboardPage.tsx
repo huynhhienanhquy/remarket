@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PRODUCT_STATUS_LABELS, TICKET_STATUS_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
@@ -11,6 +11,7 @@ import {
   DashboardSkeleton,
   InlineAlert,
   Input,
+  Icon,
   SectionCard,
 } from "../../components/ui";
 import {
@@ -30,8 +31,8 @@ interface KpiSpec {
 }
 
 const KPIS: KpiSpec[] = [
-  { key: "total_users", label: "Tổng user", scope: "current" },
-  { key: "new_users_in_period", label: "User mới trong kỳ", scope: "period" },
+  { key: "total_users", label: "Tổng người dùng", scope: "current" },
+  { key: "new_users_in_period", label: "Người dùng mới trong kỳ", scope: "period" },
   { key: "pending_products", label: "Tin chờ duyệt", scope: "current" },
   { key: "completed_orders_in_period", label: "Đơn hoàn tất trong kỳ", scope: "period" },
   { key: "completed_order_value_in_period", label: "Giá trị giao dịch hoàn tất trong kỳ", scope: "period" },
@@ -56,16 +57,19 @@ function KpiCard({
   label,
   scope,
   value,
+  metric,
 }: {
   label: string;
   scope: KpiSpec["scope"];
   value: string;
+  metric: KpiSpec["key"];
 }) {
+  const highlight = metric === "completed_order_value_in_period";
   return (
-    <div className="rounded-card border border-line bg-surface p-4 lg:p-6">
-      <p className="t-meta text-muted">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-ink">{value}</p>
-      <p className="mt-1 t-meta text-muted">
+    <div className={`min-w-0 rounded-2xl border p-5 shadow-subtle ${highlight ? "border-brand/20 bg-brand-soft sm:col-span-2" : "border-line bg-surface"}`}>
+      <div className="flex items-start justify-between gap-3"><p className="text-sm leading-6 text-muted">{label}</p><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${highlight ? "bg-surface text-brand" : "bg-brand-soft text-brand"}`}><Icon name={metric.includes("users") ? "user" : metric === "pending_products" ? "image" : metric === "pending_reports" ? "alert-triangle" : metric === "unresolved_tickets" ? "chat" : "cart"} size={18} /></span></div>
+      <p className={`mt-4 break-words text-3xl font-semibold tracking-tight ${highlight ? "text-brand" : "text-ink"}`}>{value}</p>
+      <p className="mt-2 text-xs text-muted">
         {scope === "current" ? "Tổng hiện tại" : "Theo kỳ đã chọn"}
       </p>
     </div>
@@ -139,7 +143,9 @@ export function AdminDashboardPage() {
             30 ngày gần nhất
           </Button>
         </AdminToolbar>
+      </SectionCard>
 
+      <div className="mt-5">
         {!validRange ? (
           <InlineAlert tone="warning" title="Khoảng ngày chưa hợp lệ">
             Ngày bắt đầu phải trước hoặc bằng ngày kết thúc theo định dạng YYYY-MM-DD.
@@ -153,10 +159,11 @@ export function AdminDashboardPage() {
             title="Chưa tải được dữ liệu"
           />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {KPIS.map((kpi) => (
               <KpiCard
                 key={kpi.key}
+                metric={kpi.key}
                 label={kpi.label}
                 scope={kpi.scope}
                 value={kpiValues(query.data)[kpi.key]}
@@ -164,14 +171,14 @@ export function AdminDashboardPage() {
             ))}
           </div>
         )}
-      </SectionCard>
+      </div>
 
       {query.data && !query.isError && (
         <SectionCard className="mt-5" title="Sản phẩm theo trạng thái">
           <p className="mb-4 t-meta text-muted">Tổng hiện tại, không bao gồm tin đã xóa. Tin bị hạn chế vẫn được tính theo trạng thái giao dịch.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {(Object.keys(PRODUCT_STATUS_LABELS) as ProductStatus[]).map((status) => (
-              <Link key={status} to={`/admin/products?status=${status}`} className="rounded-card border border-line p-4 hover:bg-surface-subtle">
+              <Link key={status} to={`/admin/products?status=${status}`} className="rounded-xl border border-line bg-page/60 p-4 transition-colors hover:border-brand/30 hover:bg-brand-soft">
                 <p className="t-meta text-muted">{PRODUCT_STATUS_LABELS[status].label}</p>
                 <p className="mt-2 text-xl font-semibold text-ink">{query.data.products_by_status[status].toLocaleString("vi-VN")}</p>
               </Link>
@@ -184,7 +191,7 @@ export function AdminDashboardPage() {
       {query.data && !query.isError && (
         <div className="mt-5 grid gap-5 xl:grid-cols-2">
           <SectionCard title="Tin chờ duyệt" actions={<Link to="/admin/products" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
-            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3 p-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><span className="shrink-0 t-meta text-accent">{PRODUCT_STATUS_LABELS.PENDING.label}</span></Link></li>)}</ul>}
+            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3 p-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-12 w-16 shrink-0 rounded-xl bg-surface-subtle" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><span className="shrink-0 t-meta text-accent">{PRODUCT_STATUS_LABELS.PENDING.label}</span></Link></li>)}</ul>}
           </SectionCard>
           <SectionCard title="Yêu cầu hỗ trợ mới" actions={<Link to="/admin/support?status=OPEN" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
             {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="divide-y divide-line">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="flex items-center justify-between gap-3 p-4 hover:bg-surface-subtle"><div className="min-w-0"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><span className="shrink-0 t-meta text-accent">{TICKET_STATUS_LABELS.OPEN.label}</span></Link></li>)}</ul>}

@@ -1,170 +1,56 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useSession } from "../SessionProvider";
-import { Logo } from "./Logo";
-import { MenuIcon, XIcon, useToast } from "../../components/ui";
-import { errorTitle } from "../../lib/errors";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "../SessionProvider";
+import { Drawer, Icon, useToast } from "../../components/ui";
+import { ADMIN_NAVIGATION } from "../../components/features/AdminNavigation";
+import { errorTitle } from "../../lib/errors";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 
-const NAV = [
-  { to: "/admin", label: "Tổng quan", end: true },
-  { to: "/admin/users", label: "Người dùng" },
-  { to: "/admin/email-verifications", label: "Xác minh email" },
-  { to: "/admin/products", label: "Sản phẩm" },
-  { to: "/admin/categories", label: "Danh mục" },
-  { to: "/admin/reports", label: "Báo cáo" },
-  { to: "/admin/reviews", label: "Đánh giá" },
-  { to: "/admin/support", label: "Hỗ trợ" },
-  { to: "/admin/audit", label: "Nhật ký" },
-];
-
-function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
-  const { logout } = useSession();
+function AdminNav({ onNavigate, dark = false }: { onNavigate?: () => void; dark?: boolean }) {
+  const { viewer, logout } = useSession();
   const navigate = useNavigate();
   const toast = useToast();
   const [loggingOut, setLoggingOut] = useState(false);
   const requests = useQuery({ queryKey: queryKeys.adminEmailVerifications({ status: "PENDING", page: 1 }), queryFn: () => api.admin.emailVerifications({ status: "PENDING", page: 1 }), refetchInterval: 15000 });
-
   async function handleLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    try {
-      await logout();
-      navigate("/");
-    } catch (error) {
-      toast.error("Chưa thể đăng xuất", { description: errorTitle(error) });
-    } finally {
-      setLoggingOut(false);
-    }
+    try { await logout(); navigate("/"); }
+    catch (error) { toast.error("Chưa thể đăng xuất", { description: errorTitle(error) }); }
+    finally { setLoggingOut(false); }
   }
-
+  const groups = [...new Set(ADMIN_NAVIGATION.map(item => item.group))];
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center border-b border-line px-4">
-        <Logo to="/admin" />
-        <span className="ml-3 rounded-full bg-brand-soft px-2 py-0.5 t-meta font-semibold text-brand">
-          Quản trị
-        </span>
-      </div>
-      <nav aria-label="Khu vực quản trị" className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              [
-                "block rounded-control px-3 py-2.5 t-body transition-colors",
-                isActive
-                  ? "bg-brand-soft font-semibold text-brand"
-                  : "text-ink hover:bg-surface-subtle",
-              ].join(" ")
-            }
-          >
-            {item.label}
-            {item.to === "/admin/email-verifications" && !requests.isError && !!requests.data?.meta.total && <span className="ml-2 rounded-full bg-warning-bg px-2 t-meta text-accent" aria-label={`${requests.data.meta.total} yêu cầu chờ duyệt`}>{requests.data.meta.total > 99 ? "99+" : requests.data.meta.total}</span>}
-          </NavLink>
-        ))}
+    <div className="flex h-full min-h-0 flex-col">
+      {dark && <Link to="/admin" className="flex h-24 shrink-0 items-center gap-3 px-6" aria-label="ReMarket — Trang quản trị"><span className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-xl font-bold text-white">R</span><div><span className="text-xl font-semibold tracking-tight text-white">ReMarket</span><p className="mt-0.5 text-xs text-white/60">Không gian quản trị</p></div></Link>}
+      <nav aria-label="Khu vực quản trị" className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
+        {groups.map(group => <div key={group}><p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest ${dark ? "text-white/50" : "text-muted"}`}>{group}</p><div className="space-y-1">{ADMIN_NAVIGATION.filter(item => item.group === group).map(item => <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? dark ? "bg-brand text-white shadow-subtle" : "bg-brand-soft text-brand" : dark ? "text-white/75 hover:bg-white/10 hover:text-white" : "text-muted hover:bg-surface-subtle hover:text-ink"}`}><Icon name={item.icon} size={20} /><span className="flex-1">{item.label}</span>{item.to === "/admin/email-verifications" && !requests.isError && !!requests.data?.meta.total && <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-accent" aria-label={`${requests.data.meta.total} yêu cầu chờ duyệt`}>{requests.data.meta.total > 99 ? "99+" : requests.data.meta.total}</span>}</NavLink>)}</div></div>)}
       </nav>
-      <div className="space-y-1 border-t border-line p-3">
-        <Link
-          to="/"
-          onClick={onNavigate}
-          className="block rounded-control px-3 py-2.5 t-body text-ink transition-colors hover:bg-surface-subtle"
-        >
-          Về marketplace
-        </Link>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          aria-busy={loggingOut}
-          className="block w-full rounded-control px-3 py-2.5 text-left t-body text-danger transition-colors hover:bg-danger-bg"
-        >
-          {loggingOut ? "Đang đăng xuất…" : "Đăng xuất"}
-        </button>
+      <div className={`space-y-1 border-t p-3 ${dark ? "border-white/10" : "border-line"}`}>
+        <Link to="/" onClick={onNavigate} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm ${dark ? "text-white/75 hover:bg-white/10" : "text-muted hover:bg-surface-subtle"}`}><Icon name="external-link" size={20} />Về marketplace</Link>
+        <div className={`mt-2 flex min-w-0 items-center gap-3 rounded-xl p-3 ${dark ? "bg-white/5" : "bg-page"}`}><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-semibold text-brand">{viewer?.full_name.trim().slice(0, 1).toUpperCase() ?? "A"}</span><div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${dark ? "text-white" : "text-ink"}`}>{viewer?.full_name ?? "Quản trị viên"}</p><button type="button" onClick={handleLogout} disabled={loggingOut} aria-busy={loggingOut} className={`mt-1 min-h-11 text-xs underline-offset-4 hover:underline disabled:opacity-50 ${dark ? "text-white/60" : "text-muted"}`}>{loggingOut ? "Đang đăng xuất…" : "Đăng xuất"}</button></div></div>
       </div>
     </div>
   );
 }
 
-/**
- * AdminShell: fixed 240px sidebar, 64px header, 24px main padding (ui-spec 3.4).
- * Below lg the sidebar becomes a drawer; the header always names the admin
- * area so it can never be mistaken for a shopping account.
- */
 export function AdminShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
-
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setDrawerOpen(false);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [drawerOpen]);
-
+  const current = ADMIN_NAVIGATION.find(item => item.to === location.pathname);
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
   return (
-    <div className="min-h-screen bg-page">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-header hidden w-60 border-r border-line bg-surface lg:block">
-        <AdminNav />
-      </aside>
-
-      {/* Mobile drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-dialog lg:hidden">
-          <div
-            className="absolute inset-0 bg-ink/40"
-            onClick={() => setDrawerOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu quản trị"
-            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-surface shadow-pop"
-          >
-            <button
-              type="button"
-              aria-label="Đóng menu"
-              onClick={() => setDrawerOpen(false)}
-              className="absolute right-2 top-3 flex h-11 w-11 items-center justify-center rounded-control text-muted hover:bg-surface-subtle"
-            >
-              <XIcon />
-            </button>
-            <AdminNav onNavigate={() => setDrawerOpen(false)} />
-          </div>
-        </div>
-      )}
-
-      <div className="lg:pl-60">
-        <header className="sticky top-0 z-section flex h-16 items-center gap-3 border-b border-line bg-surface px-4 lg:px-6">
-          <button
-            type="button"
-            aria-label="Mở menu quản trị"
-            onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-control text-ink hover:bg-surface-subtle lg:hidden"
-          >
-            <MenuIcon />
-          </button>
-          <h1 className="t-h3 text-ink">Trang quản trị</h1>
-          <span className="hidden t-meta text-muted sm:inline">
-            Khu vực dành cho quản trị viên ReMarket
-          </span>
+    <div className="rm-admin-page min-h-screen bg-page">
+      <aside className="fixed inset-y-0 left-0 z-header hidden w-[264px] bg-ink lg:block"><AdminNav dark /></aside>
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Menu quản trị" widthClassName="max-w-[320px]"><AdminNav onNavigate={() => setDrawerOpen(false)} /></Drawer>
+      <div className="min-w-0 lg:pl-[264px]">
+        <header className="sticky top-0 z-section flex h-16 items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:h-20 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3"><button type="button" aria-label="Mở menu quản trị" onClick={() => setDrawerOpen(true)} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line text-ink hover:bg-surface-subtle lg:hidden"><Icon name="menu" /></button><div><p className="text-xs text-muted">Trang quản trị</p><p className="mt-0.5 text-sm font-semibold text-ink">{current?.label ?? "ReMarket"}</p></div></div>
+          <Link to="/" className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-line px-3 text-sm font-medium text-muted hover:bg-brand-soft hover:text-brand"><Icon name="external-link" size={18} /><span className="hidden sm:inline">Mở marketplace</span><span className="sr-only sm:hidden">Mở marketplace</span></Link>
         </header>
-        <main className="p-4 lg:p-6">
-          <Outlet />
-        </main>
+        <main className="mx-auto max-w-[1680px] min-w-0 p-4 sm:p-6 lg:p-8"><Outlet /></main>
       </div>
     </div>
   );

@@ -8,7 +8,9 @@ import {
 } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, InlineAlert, MarketplaceImage, Pagination, ProductCardSkeleton, StatusBadge } from "../../components/ui";
+import { Icon, MarketplaceImage, Pagination, StatusBadge } from "../../components/ui";
+import { AccountEmptyState, AccountFilters, AccountPageHeader } from "../../components/features/AccountPageHeader";
+import { ListLoading, OfflineNotice, QueryFailure, urlPage, useConnectivity } from "../../components/features/PageFeedback";
 
 type Role = "buyer" | "seller";
 
@@ -20,7 +22,8 @@ export function OrdersPage({ role }: OrdersPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const status = searchParams.get("status") ?? "ALL";
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const page = urlPage(searchParams.get("page"));
+  const online = useConnectivity();
 
   const orders = useQuery({
     queryKey: queryKeys.orders(role, status, page),
@@ -43,73 +46,16 @@ export function OrdersPage({ role }: OrdersPageProps) {
 
   const isBuyer = role === "buyer";
 
-  if (orders.isPending) {
-    return (
-      <div className="rm-container py-6 lg:py-8">
-        <h1 className="t-h1 text-ink mb-6">{isBuyer ? "Đơn mua" : "Đơn bán"}</h1>
-        <div className="space-y-3">
-          {Array.from({ length: 5 }, (_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (orders.isError) {
-    return (
-      <div className="rm-container py-6 lg:py-8">
-        <h1 className="t-h1 text-ink mb-6">{isBuyer ? "Đơn mua" : "Đơn bán"}</h1>
-        <InlineAlert
-          tone="danger"
-          title="Không tải được danh sách đơn hàng"
-          action={
-            <Button variant="secondary" onClick={() => orders.refetch()}>
-              Tải lại
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-
   const items = orders.data?.items ?? [];
   const meta = orders.data?.meta;
 
   return (
-    <div className="rm-container py-6 lg:py-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
-        <div>
-          <h1 className="t-h1 text-ink">{isBuyer ? "Đơn mua" : "Đơn bán"}</h1>
-          <p className="mt-1 t-body text-muted">
-            {meta?.total ?? 0} đơn hàng
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lọc theo trạng thái">
-          {(["ALL", "PENDING", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED"] as const).map((s) => (
-            <button
-              key={s}
-              role="tab"
-              aria-selected={status === s}
-              onClick={() => setStatus(s)}
-              className={[
-                "rounded-control px-3 py-1.5 t-label transition-colors",
-                status === s
-                  ? "bg-brand text-white"
-                  : "bg-surface text-ink hover:bg-surface-subtle border border-line",
-              ].join(" ")}
-            >
-              {s === "ALL" ? "Tất cả" : ORDER_STATUS_LABELS[s as keyof typeof ORDER_STATUS_LABELS]?.label ?? s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="rounded-card border border-line bg-surface p-8 text-center">
-          <p className="t-body text-muted">Không có đơn hàng nào ở trạng thái này.</p>
-        </div>
+    <div className="space-y-6">
+      <AccountPageHeader title={isBuyer ? "Đơn mua" : "Đơn bán"} description={isBuyer ? "Theo dõi đơn hàng và những món đồ bạn đã mua." : "Quản lý đơn hàng và giao dịch với người mua."} />
+      <OfflineNotice online={online} />
+      <AccountFilters options={(["ALL", "PENDING", "CONFIRMED", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED"] as const).map((entry) => ({ value: entry, label: entry === "ALL" ? "Tất cả" : ORDER_STATUS_LABELS[entry].label }))} value={status} onChange={setStatus} />
+      {orders.isPending ? <ListLoading /> : orders.isError ? <QueryFailure error={orders.error} retry={() => void orders.refetch()} /> : items.length === 0 ? (
+        <AccountEmptyState title={status === "ALL" ? (isBuyer ? "Bạn chưa có đơn mua" : "Bạn chưa có đơn bán") : "Không có đơn hàng ở trạng thái này"} description={status === "ALL" ? (isBuyer ? "Khám phá món đồ phù hợp và đặt đơn hàng đầu tiên của bạn." : "Đơn hàng sẽ xuất hiện tại đây khi có người mua món đồ của bạn.") : "Thử chọn một trạng thái khác để xem đơn hàng của bạn."} action={status === "ALL" ? { label: isBuyer ? "Khám phá sản phẩm" : "Xem tin đăng", to: isBuyer ? "/products" : "/account/products" } : undefined} />
       ) : (
         <>
           <div className="space-y-3">
@@ -117,23 +63,25 @@ export function OrdersPage({ role }: OrdersPageProps) {
               <Link
                 key={order.id}
                 to={isBuyer ? `/orders/${order.id}` : `/sales/${order.id}`}
-                className="block rounded-card border border-line bg-surface p-4 hover:border-brand transition-colors"
+                className="rm-account-card block p-5 transition-colors hover:border-brand"
               >
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div>
-                      <p className="t-body font-semibold text-ink">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Icon name="inbox" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold text-ink">
                         {isBuyer ? "Đơn mua" : "Đơn bán"} #{order.code.slice(0, 8).toUpperCase()}
                       </p>
-                      <p className="t-meta text-muted truncate max-w-[300px]">
+                      <p className="mt-1 truncate text-sm text-muted">
                         {isBuyer
                           ? `Người bán: ${order.counterparty.name}`
                           : `Người mua: ${order.counterparty.name}`}
                       </p>
                     </div>
+                    <Icon name="chevron-right" className="shrink-0 text-muted" />
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 lg:flex-row lg:justify-end">
+                  <div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
                     <div className="flex items-center gap-2">
                       {order.items.slice(0, 3).map((snap) => (
                         <MarketplaceImage
@@ -146,8 +94,8 @@ export function OrdersPage({ role }: OrdersPageProps) {
                       ))}
                     </div>
 
-                    <div className="flex flex-col items-end gap-1">
-                      <p className="t-body text-ink font-semibold">{formatVnd(order.total_amount)}</p>
+                    <div className="flex flex-col gap-1 sm:items-end">
+                      <p className="text-lg font-semibold text-brand">{formatVnd(order.total_amount)}</p>
                       <p className="t-meta text-muted">{DELIVERY_LABELS[order.delivery_method]}</p>
                     </div>
 

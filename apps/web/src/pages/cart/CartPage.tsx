@@ -1,16 +1,16 @@
 ﻿import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addVnd, formatVnd } from "@remarket/shared";
+import { addVnd, conditionLabel, formatVnd } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { useSession } from "../../app/SessionProvider";
-import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
+import { ListLoading, OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
+import { AccountEmptyState, AccountPageHeader } from "../../components/features/AccountPageHeader";
 import {
   Button,
-  EmptyState,
+  Icon,
   InlineAlert,
-  ProductCardSkeleton,
   MarketplaceImage,
   StatusBadge,
 } from "../../components/ui";
@@ -64,19 +64,17 @@ export function CartPage() {
 
   if (cart.isPending) {
     return (
-      <div className="rm-container py-6 lg:py-8">
-        <h1 className="t-h1 text-ink mb-6">Giỏ hàng</h1>
-        {Array.from({ length: 3 }, (_, i) => (
-          <ProductCardSkeleton key={i} />
-        ))}
+      <div className="space-y-6">
+        <AccountPageHeader title="Giỏ hàng" description="Xem lại những món đồ bạn muốn mua trước khi đặt hàng." />
+        <ListLoading />
       </div>
     );
   }
 
   if (cart.isError) {
     return (
-      <div className="rm-container py-6 lg:py-8">
-        <h1 className="t-h1 text-ink mb-6">Giỏ hàng</h1>
+      <div className="space-y-6">
+        <AccountPageHeader title="Giỏ hàng" description="Xem lại những món đồ bạn muốn mua trước khi đặt hàng." />
         <InlineAlert
           tone="danger"
           title="Không tải được giỏ hàng"
@@ -92,9 +90,9 @@ export function CartPage() {
 
   if (groups.length === 0) {
     return (
-      <div className="rm-container py-6 lg:py-8">
-        <h1 className="t-h1 text-ink mb-6">Giỏ hàng</h1>
-        <EmptyState
+      <div className="space-y-6">
+        <AccountPageHeader title="Giỏ hàng" description="Xem lại những món đồ bạn muốn mua trước khi đặt hàng." />
+        <AccountEmptyState icon="cart"
           title="Giỏ hàng trống"
           description="Bạn chưa thêm món đồ nào vào giỏ hàng."
           action={{ label: "Khám phá sản phẩm", to: "/products" }}
@@ -104,26 +102,31 @@ export function CartPage() {
   }
 
   return (
-    <div className="rm-container py-6 lg:py-8">
-      <h1 className="t-h1 text-ink mb-6">Giỏ hàng</h1>
+    <div className="space-y-6">
+      <AccountPageHeader title="Giỏ hàng" description="Xem lại những món đồ bạn muốn mua trước khi đặt hàng." />
       <OfflineNotice online={online} />
       {removeItem.isError && <QueryFailure error={removeItem.error} />}
 
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="space-y-5">
       {groups.map((group) => (
-        <section key={group.seller.id} className="mb-8">
-          <div className="mb-4">
+        <section key={group.seller.id} className="rm-account-card overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-line p-4">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Icon name="user" /></span>
+            <div><p className="mb-1 text-xs text-muted">Người bán</p>
             <h2 className="t-h3 text-ink">
               <Link to={`/users/${group.seller.id}`} className="hover:text-brand">
                 {group.seller.name}
               </Link>
             </h2>
+            </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="divide-y divide-line">
             {group.items.map((item) => (
               <div
                 key={item.product_id}
-                className="flex gap-4 rounded-card border border-line bg-surface p-4"
+                className="flex flex-wrap gap-3 p-4 sm:gap-4"
               >
                 {item.image_url ? (
                   <MarketplaceImage
@@ -136,7 +139,7 @@ export function CartPage() {
                   <div
                     className="h-20 w-20 shrink-0 rounded-control bg-surface-subtle flex items-center justify-center"
                   >
-                    <span className="t-meta text-muted">Ảnh</span>
+                    <Icon name="image" className="text-muted" />
                   </div>
                 )}
 
@@ -147,20 +150,14 @@ export function CartPage() {
                   >
                     {item.title}
                   </Link>
-                  <p className="mt-1 t-price-card text-ink">{formatVnd(item.price)}</p>
+                  <p className="mt-2 t-price-card text-brand">{formatVnd(item.price)}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="t-meta text-muted">
                       {item.province_label ?? "Chưa cập nhật khu vực"}
                     </span>
                     <span className="t-meta text-muted">·</span>
                     <span className="t-meta text-muted">
-                      {item.condition === "LIKE_NEW"
-                        ? "Rất tốt"
-                        : item.condition === "GOOD"
-                        ? "Tốt"
-                        : item.condition === "FAIR"
-                        ? "Bình thường"
-                        : "Mới"}
+                      {conditionLabel(item.condition)}
                     </span>
                   </div>
 
@@ -169,7 +166,7 @@ export function CartPage() {
                   )}
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex w-full items-center justify-end gap-2 border-t border-line pt-2">
                   {(!item.available || item.unavailable_reason) && <StatusBadge label="Không khả dụng" tone="neutral" />}
                     <Button
                       variant="ghost"
@@ -178,7 +175,7 @@ export function CartPage() {
                       disabled={!online || removeItem.isPending}
                       aria-label={`Xóa ${item.title} khỏi giỏ hàng`}
                     >
-                      Xóa
+                      <span className="flex items-center gap-2"><Icon name="trash" size={16} />Xóa</span>
                     </Button>
                 </div>
               </div>
@@ -186,16 +183,18 @@ export function CartPage() {
           </div>
         </section>
       ))}
+      </div>
 
       <div
         className={[
-          "sticky bottom-0 z-section bg-surface/95 backdrop-blur border-t border-line p-4 lg:static lg:border-t lg:pt-6",
+          "rm-account-card sticky bottom-[calc(64px+env(safe-area-inset-bottom))] z-section p-5 xl:top-[104px]",
         ].join(" ")}
       >
         <div className="max-w-3xl mx-auto space-y-3">
-          <div className="flex justify-between t-body text-ink">
+          <h2 className="text-lg font-semibold text-ink">Thông tin đặt hàng</h2>
+          <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4 text-sm text-muted">
             <span>Tạm tính ({selectedIds.length} món)</span>
-            <span>{formatVnd(subtotal)}</span>
+            <span className="text-xl font-bold text-ink">{formatVnd(subtotal)}</span>
           </div>
           <p className="t-meta text-muted">
             Phí giao hàng sẽ được tính khi đặt hàng theo từng người bán.
@@ -209,9 +208,10 @@ export function CartPage() {
           >
             {selectedIds.length === 0
               ? "Chọn món đồ để tiếp tục"
-              : `Tiến hành đặt hàng ({selectedIds.length})`}
+              : `Tiến hành đặt hàng (${selectedIds.length})`}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

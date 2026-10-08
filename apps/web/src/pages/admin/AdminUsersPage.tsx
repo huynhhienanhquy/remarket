@@ -7,7 +7,6 @@ import { queryKeys } from "../../lib/queryClient";
 import {
   ConfirmDialog,
   ApiImage,
-  DataTable,
   Drawer,
   EmptyState,
   Input,
@@ -20,7 +19,9 @@ import {
 } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
 import {
+  AdminDataTable as DataTable,
   AdminHeading,
+  AdminAdvancedFilters,
   AdminToolbar,
   QueryErrorAlert,
   RowAction,
@@ -125,9 +126,10 @@ export function AdminUsersPage() {
                 <option value="">Tất cả</option><option value="USER">Người dùng</option><option value="ADMIN">Quản trị viên</option>
               </Select>
             </ToolbarField>
+<AdminAdvancedFilters fields={["handled_by", "from", "to"]}>
             <ToolbarField label="Từ ngày" htmlFor="user-from"><Input id="user-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
             <ToolbarField label="Người xử lý" htmlFor="user-handler"><Input id="user-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
-            <ToolbarField label="Đến ngày" htmlFor="user-to"><Input id="user-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+            <ToolbarField label="Đến ngày" htmlFor="user-to"><Input id="user-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
           </AdminToolbar>
           {query.isError ? <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} /> : null}
         </div>

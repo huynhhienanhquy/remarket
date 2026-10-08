@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { OwnProduct, ProductAction } from "@remarket/shared";
 import { api } from "../../lib/api";
@@ -9,16 +9,18 @@ import {
   Button,
   ApiImage,
   Badge,
-  InlineAlert,
+  Pagination,
   ProductCardSkeleton,
-  EmptyState,
   ConfirmDialog,
   useToast,
+  buttonClasses,
 } from "../../components/ui";
-import { conditionLabel, formatVnd, formatRelative } from "@remarket/shared";
-import { OfflineNotice, useConnectivity } from "../../components/features/PageFeedback";
+import { PRODUCT_STATUS_LABELS, conditionLabel, formatVnd, formatRelative } from "@remarket/shared";
+import { OfflineNotice, QueryFailure, urlPage, useConnectivity } from "../../components/features/PageFeedback";
+import { AccountEmptyState, AccountFilters, AccountPageHeader } from "../../components/features/AccountPageHeader";
 
 type StatusFilter = "ALL" | "PENDING" | "ACTIVE" | "REJECTED" | "INACTIVE" | "RESERVED" | "SOLD";
+const FILTERS: StatusFilter[] = ["ALL", "PENDING", "ACTIVE", "REJECTED", "INACTIVE", "RESERVED", "SOLD"];
 
 export function MyProductsPage() {
   const navigate = useNavigate();
@@ -28,11 +30,11 @@ export function MyProductsPage() {
   const online = useConnectivity();
   const refreshProducts = () => { for (const key of ["products", "profiles", "cart", "favorites"]) void client.invalidateQueries({ queryKey: [key] }); };
 
-  const [status, setStatus] = useState<StatusFilter>("ALL");
-  const [page, setPage] = useState(1);
+  const [params, setParams] = useSearchParams();
+  const status = FILTERS.find((entry) => entry === params.get("status")) ?? "ALL";
+  const page = urlPage(params.get("page"));
+  const setPage = (next: number) => { const updated = new URLSearchParams(params); updated.set("page", String(next)); setParams(updated); };
   const [dialog, setDialog] = useState<{ open: boolean; productId: string; action: "delete" | "hide" } | null>(null);
-
-  useEffect(() => setPage(1), [status]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.ownProducts({ status, page }),
@@ -86,43 +88,18 @@ export function MyProductsPage() {
 
   return (
     <div className="space-y-6">
+      <AccountPageHeader title="Tin đăng của tôi" description="Quản lý tin đăng và theo dõi trạng thái món đồ bạn đang bán." action={<Link to="/account/products/new" className={buttonClasses("primary", "md")}>Đăng tin mới</Link>} />
       <OfflineNotice online={online} />
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tin đăng của tôi</h1>
-        <Button onClick={() => navigate("/account/products/new")} className="min-w-[140px]">
-          Đăng tin mới
-        </Button>
-      </div>
-
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-neutral-200 pb-2">
-        {(["ALL", "PENDING", "ACTIVE", "REJECTED", "INACTIVE", "RESERVED", "SOLD"] as StatusFilter[]).map((s) => (
-          <Button
-            key={s}
-            variant={status === s ? "primary" : "ghost"}
-            size="md"
-            onClick={() => setStatus(s)}
-          >
-            {s === "ALL" ? "Tất cả" : s === "PENDING" ? "Chờ duyệt" : s === "ACTIVE" ? "Đang bán" :
-             s === "REJECTED" ? "Bị từ chối" : s === "INACTIVE" ? "Đã ẩn" : s === "RESERVED" ? "Đang giữ" : "Đã bán"}
-          </Button>
-        ))}
-      </div>
-
-      {error && (
-        <InlineAlert tone="danger" title="Lỗi tải dữ liệu" onClose={() => refetch()}>
-          Không tải được danh sách tin. <Button variant="ghost" size="md" onClick={() => refetch()}>Thử lại</Button>
-        </InlineAlert>
-      )}
+      <AccountFilters options={FILTERS.map((entry) => ({ value: entry, label: entry === "ALL" ? "Tất cả" : PRODUCT_STATUS_LABELS[entry].label }))} value={status} onChange={(value) => setParams(value === "ALL" ? {} : { status: value })} />
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
         </div>
-      ) : !data || data.items.length === 0 ? (
-        <EmptyState
+      ) : error ? <QueryFailure error={error} retry={() => void refetch()} /> : !data || data.items.length === 0 ? (
+        <AccountEmptyState icon="edit"
           title="Chưa có tin đăng nào"
-          description={status === "ALL" ? "Hãy đăng tin đầu tiên của bạn ngay hôm nay." : `Không có tin ở trạng thái "${status}".`}
+          description={status === "ALL" ? "Hãy đăng tin đầu tiên của bạn ngay hôm nay." : `Không có tin ở trạng thái “${PRODUCT_STATUS_LABELS[status].label}”.`}
           action={{
             label: "Đăng tin mới",
             onClick: () => navigate("/account/products/new"),
@@ -143,30 +120,7 @@ export function MyProductsPage() {
             ))}
           </div>
 
-          {/* Pagination */}
-          {data && data.meta.total_pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="ghost"
-                size="md"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Trước
-              </Button>
-              <span className="px-3 text-sm text-neutral-600">
-                Trang {page} / {data.meta.total_pages}
-              </span>
-              <Button
-                variant="ghost"
-                size="md"
-                onClick={() => setPage((p) => Math.min(data.meta.total_pages, p + 1))}
-                disabled={page === data.meta.total_pages}
-              >
-                Sau
-              </Button>
-            </div>
-          )}
+          <Pagination page={page} totalPages={data.meta.total_pages} total={data.meta.total} onPageChange={setPage} />
         </>
       )}
 
@@ -200,12 +154,12 @@ function ProductCard({ product, busy, onAction, onEdit, onView }: ProductCardPro
   const showActions = product.allowed_actions.some((action) => action !== "view" && action !== "edit");
 
   return (
-    <div className="group bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
+    <div className="rm-account-card flex h-full flex-col overflow-hidden transition-shadow hover:shadow-card-hover">
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface-subtle">
         {product.image_url ? (
-          <ApiImage src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <ApiImage src={product.image_url} alt={product.title} className="h-full w-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-400">Không có ảnh</div>
+          <div className="flex h-full w-full items-center justify-center text-muted">Không có ảnh</div>
         )}
         <div className="absolute top-2 left-2 flex gap-1.5">
           <Badge
@@ -217,38 +171,33 @@ function ProductCard({ product, busy, onAction, onEdit, onView }: ProductCardPro
               product.status === "RESERVED" ? "info" : "neutral"
             }
           >
-            {product.status === "PENDING" ? "Chờ duyệt" : product.status === "ACTIVE" ? "Đang bán" :
-             product.status === "REJECTED" ? "Bị từ chối" : product.status === "INACTIVE" ? "Đã ẩn" :
-             product.status === "RESERVED" ? "Đang giữ" : "Đã bán"}
+            {PRODUCT_STATUS_LABELS[product.status].label}
           </Badge>
           {product.is_blocked && <Badge variant="danger">Bị hạn chế</Badge>}
           {product.is_hidden && <Badge variant="neutral">Đã ẩn</Badge>}
         </div>
       </div>
 
-      <div className="p-4 space-y-2.5">
-        <h3 className="font-medium text-neutral-900 line-clamp-2 group-hover:text-primary transition-colors">
+      <div className="flex flex-1 flex-col gap-2.5 p-4">
+        <h3 className="line-clamp-2 text-base font-semibold leading-6 text-ink">
           {product.title}
         </h3>
 
-        <div className="flex items-center gap-3 text-sm text-neutral-500">
-          <span>{conditionLabel(product.condition)}</span>
-          <span>•</span>
-          <span>{formatVnd(product.price)}</span>
-        </div>
+        <p className="t-price-card text-brand">{formatVnd(product.price)}</p>
+        <p className="t-label text-muted">{conditionLabel(product.condition)}</p>
 
-        <div className="flex items-center justify-between text-sm text-neutral-500">
-          <span>{formatRelative(product.created_at)}</span>
-          {product.published_at && <span>• Đã duyệt: {formatRelative(product.published_at)}</span>}
+        <div className="flex flex-wrap items-center gap-2 t-meta text-muted">
+          <time dateTime={product.created_at}>{formatRelative(product.created_at)}</time>
+          {product.published_at && <time dateTime={product.published_at}>· Đã duyệt: {formatRelative(product.published_at)}</time>}
         </div>
 
         {product.rejection_reason && (
-          <p className="text-sm text-danger bg-danger/5 rounded p-2">
+          <p className="rounded-control bg-danger-bg p-2 text-sm text-danger">
             Lý do từ chối: {product.rejection_reason}
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100">
+        <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
           {product.allowed_actions.includes("edit") && <Button variant="secondary" size="md" onClick={onEdit} disabled={busy} className="flex-1">
             Chỉnh sửa
           </Button>}
@@ -268,7 +217,7 @@ function ProductCard({ product, busy, onAction, onEdit, onView }: ProductCardPro
                   size="md"
                   className={
                     action === "delete" ? "text-danger border-danger" :
-                    action === "hide" ? "border-warning text-warning" : ""
+                    action === "hide" ? "text-accent" : ""
                   }
                   onClick={() => onAction(action, product.id)}
                   disabled={busy}

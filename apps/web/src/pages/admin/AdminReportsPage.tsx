@@ -4,9 +4,9 @@ import type { AdminReportItem, ReportReason, ReportStatus } from "@remarket/shar
 import { REPORT_REASON_LABELS, REPORT_STATUS_LABELS, formatDateTime } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, ConfirmDialog, DataTable, Drawer, EmptyState, Input, Pagination, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
+import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, readPage, useAdminParams } from "./adminShared";
 
 const REPORT_TABS = [
   { value: "PENDING", label: "Chờ xử lý" },
@@ -66,9 +66,10 @@ export function AdminReportsPage() {
       <div className="p-4 lg:p-6"><AdminToolbar>
         <ToolbarField label="Đối tượng" htmlFor="report-target"><Select id="report-target" value={targetType ?? ""} onChange={(event) => apply({ target_type: event.target.value || null })}><option value="">Tất cả</option><option value="product">Tin đăng</option><option value="user">Người dùng</option></Select></ToolbarField>
         <ToolbarField label="Lý do" htmlFor="report-reason"><Select id="report-reason" value={reason ?? ""} onChange={(event) => apply({ reason: event.target.value || null })}><option value="">Tất cả</option>{Object.entries(REPORT_REASON_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></ToolbarField>
+<AdminAdvancedFilters fields={["handled_by", "from", "to"]}>
         <ToolbarField label="Người xử lý" htmlFor="report-handler"><Input id="report-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="report-from"><Input id="report-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
-        <ToolbarField label="Đến ngày" htmlFor="report-to"><Input id="report-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+        <ToolbarField label="Đến ngày" htmlFor="report-to"><Input id="report-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
       </AdminToolbar></div>
       {query.isError && <div className="p-4 lg:p-6"><QueryErrorAlert error={query.error} onRetry={() => query.refetch()} /></div>}
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có báo cáo" description="Không có báo cáo phù hợp với trạng thái đã chọn." />} />}

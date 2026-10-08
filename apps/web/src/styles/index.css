@@ -60,9 +60,97 @@
   .rm-safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  .rm-account-card {
+    @apply rounded-2xl border border-line bg-surface shadow-subtle;
+  }
+
+  .rm-account-heading {
+    @apply rounded-2xl border border-line bg-surface p-5 shadow-subtle sm:p-6;
+  }
+
+  .rm-account-heading-action > * {
+    @apply w-full sm:w-auto;
+  }
+
+  .rm-account-empty > span {
+    @apply h-16 w-16 rounded-2xl bg-brand-soft text-brand;
+  }
+
+  .rm-account-empty > h2 {
+    @apply text-xl;
+  }
+
+  .rm-account-empty > p {
+    @apply text-sm leading-6;
+  }
+
+  .rm-account-page button,
+  .rm-account-page input,
+  .rm-account-page select,
+  .rm-account-page textarea {
+    @apply rounded-xl;
+  }
+
+  .rm-account-page input:not([type="file"]),
+  .rm-account-page select,
+  .rm-account-page textarea {
+    @apply border-input-line bg-page/60;
+  }
+
+  .rm-account-page input:focus,
+  .rm-account-page select:focus,
+  .rm-account-page textarea:focus {
+    @apply border-brand bg-surface;
+  }
 }
 
 /* Keep scrollbar of horizontal thumbnail rows out of the layout flow. */
 .scrollbar-thin {
   scrollbar-width: thin;
+}
+/* Admin uses the same controls and palette, with denser desktop data views. */
+@layer components {
+  .rm-admin-page main section {
+    @apply min-w-0 rounded-2xl shadow-subtle;
+  }
+  .rm-admin-page button, .rm-admin-page input,
+  .rm-admin-page select, .rm-admin-page textarea {
+    @apply rounded-xl;
+  }
+  .rm-admin-page input, .rm-admin-page select, .rm-admin-page textarea {
+    @apply border-input-line bg-surface;
+  }
+  .rm-admin-toolbar > div { max-width: 100%; }
+  .rm-admin-page [role="tablist"] {
+    @apply gap-1 rounded-xl border-0 bg-page p-1;
+    overflow-y: hidden;
+  }
+  .rm-admin-page [role="tab"] { @apply m-0 min-h-11 border-0; }
+  .rm-admin-page [role="tab"][aria-selected="true"] { @apply bg-surface text-brand shadow-subtle; }
+  .rm-admin-table thead th { @apply whitespace-nowrap bg-page text-xs font-semibold; }
+  .rm-admin-table tbody td { @apply py-4 text-sm; }
+  .rm-admin-table tbody tr:last-child { border-bottom: 0; }
+  .rm-admin-table tbody tr:focus-visible { @apply outline outline-2 outline-focus -outline-offset-2; }
+  @media (max-width: 639px) {
+    .rm-admin-table { overflow-x: visible; }
+    .rm-admin-table table, .rm-admin-table tbody { display: block; }
+    .rm-admin-table thead { display: none; }
+    .rm-admin-table tbody tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+      padding: 20px;
+    }
+    .rm-admin-table tbody td { display: block; min-width: 0; padding: 0; }
+    .rm-admin-table tbody td.hidden { display: none; }
+    .rm-admin-table tbody td:first-child,
+    .rm-admin-table tbody td:last-child,
+    .rm-admin-table tbody td[colspan] { grid-column: 1 / -1; }
+    .rm-admin-table tbody td:has(.rm-admin-cell-wide) { grid-column: 1 / -1; }
+    .rm-admin-table .rm-admin-cell div { min-width: 0; overflow-wrap: anywhere; }
+    .rm-admin-table .rm-admin-cell > div > * { min-width: 0; }
+    .rm-admin-table .rm-admin-cell p { white-space: normal; }
+    .rm-admin-table tbody td[colspan] { padding: 16px 0; }
+  }
 }

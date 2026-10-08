@@ -4,9 +4,9 @@ import type { AdminSupportTicketDetail, AdminSupportTicketItem, TicketStatus, Ti
 import { ORDER_STATUS_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, ConfirmDialog, DataTable, Dialog, Drawer, EmptyState, FormField, Input, OrderTimeline, Pagination, SectionCard, Select, StatusBadge, Textarea, useToast } from "../../components/ui";
+import { Button, ConfirmDialog, Dialog, Drawer, EmptyState, FormField, Input, OrderTimeline, Pagination, SectionCard, Select, StatusBadge, Textarea, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, fieldError, readEnumParam, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, fieldError, readEnumParam, readPage, useAdminParams } from "./adminShared";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const TYPES = ["ACCOUNT", "ORDER_PROBLEM", "PRODUCT", "OTHER"] as const;
@@ -107,9 +107,10 @@ export function AdminSupportPage() {
       <div className="p-4 lg:p-6"><AdminToolbar>
         <ToolbarField label="Trạng thái" htmlFor="ticket-status"><Select id="ticket-status" value={status} onChange={(event) => apply({ status: event.target.value || null })}><option value="">Tất cả</option>{STATUSES.map((value) => <option key={value} value={value}>{TICKET_STATUS_LABELS[value].label}</option>)}</Select></ToolbarField>
         <ToolbarField label="Loại yêu cầu" htmlFor="ticket-type"><Select id="ticket-type" value={type} onChange={(event) => apply({ type: event.target.value || null })}><option value="">Tất cả</option>{TYPES.map((value) => <option key={value} value={value}>{TICKET_TYPE_LABELS[value]}</option>)}</Select></ToolbarField>
+<AdminAdvancedFilters fields={["assigned_admin_id", "from", "to"]}>
         <ToolbarField label="Người phụ trách" htmlFor="ticket-assignee"><Input id="ticket-assignee" value={params.get("assigned_admin_id") ?? ""} onChange={(event) => apply({ assigned_admin_id: event.target.value || null })} placeholder="UUID hoặc UNASSIGNED" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="ticket-from"><Input id="ticket-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
-        <ToolbarField label="Đến ngày" htmlFor="ticket-to"><Input id="ticket-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+        <ToolbarField label="Đến ngày" htmlFor="ticket-to"><Input id="ticket-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
       </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</div>
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có yêu cầu hỗ trợ" description="Hãy thay đổi bộ lọc hoặc kiểm tra lại sau." />} />}
       {query.data && <Pagination className="p-4 lg:px-6" page={query.data.meta.page} totalPages={query.data.meta.total_pages} total={query.data.meta.total} onPageChange={(next) => apply({ page: String(next) })} />}

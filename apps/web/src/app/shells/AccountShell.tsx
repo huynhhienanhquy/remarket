@@ -1,158 +1,80 @@
 import { useCallback, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../SessionProvider";
-import { CompactHeader, MarketplaceHeader } from "./MarketplaceHeader";
+import { ApiImage, Drawer, Icon } from "../../components/ui";
+import { ACCOUNT_GROUPS, ACCOUNT_ITEMS } from "../../components/features/AccountNavigation";
+import { MarketplaceHeader } from "./MarketplaceHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
 
-interface NavItem {
-  to: string;
-  label: string;
-  end?: boolean;
+function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
+  return <div className="space-y-5">
+    {ACCOUNT_GROUPS.map((group) => <div key={group.title}>
+      <h2 className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{group.title}</h2>
+      <ul className="mt-2 space-y-1">
+        {group.items.map((item) => <li key={item.to}>
+          <NavLink to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => [
+            "group flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm leading-5 transition-colors",
+            isActive ? "bg-brand font-semibold text-white" : "font-medium text-muted hover:bg-surface-subtle hover:text-ink",
+          ].join(" ")}>
+            <Icon name={item.icon} className="shrink-0" />
+            <span className="flex-1">{item.label}</span>
+            <Icon name="chevron-right" size={16} className="shrink-0 opacity-50" />
+          </NavLink>
+        </li>)}
+      </ul>
+    </div>)}
+  </div>;
 }
-
-const GROUPS: { title: string; items: NavItem[] }[] = [
-  { title: "Tài khoản", items: [{ to: "/account", label: "Hồ sơ cá nhân", end: true }] },
-  {
-    title: "Mua sắm",
-    items: [
-      { to: "/favorites", label: "Yêu thích" },
-      { to: "/cart", label: "Giỏ hàng" },
-      { to: "/orders", label: "Đơn mua" },
-    ],
-  },
-  {
-    title: "Bán hàng",
-    items: [
-      { to: "/account/products", label: "Tin đăng của tôi" },
-      { to: "/sales", label: "Đơn bán" },
-    ],
-  },
-  {
-    title: "Giao tiếp",
-    items: [
-      { to: "/messages", label: "Tin nhắn" },
-      { to: "/notifications", label: "Thông báo" },
-      { to: "/support", label: "Hỗ trợ" },
-    ],
-  },
-];
 
 function Sidebar() {
-  return (
-    <nav aria-label="Tài khoản" className="hidden w-[220px] shrink-0 lg:block">
-      <div className="sticky top-[104px] space-y-6">
-        {GROUPS.map((group) => (
-          <div key={group.title}>
-            <h2 className="t-meta text-muted">{group.title}</h2>
-            <ul className="mt-2 space-y-1">
-              {group.items.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      [
-                        "block rounded-control px-3 py-2 t-body transition-colors",
-                        isActive
-                          ? "bg-brand-soft font-semibold text-brand"
-                          : "text-ink hover:bg-surface-subtle",
-                      ].join(" ")
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </nav>
-  );
+  const { viewer } = useSession();
+  return <nav aria-label="Tài khoản" className="rm-account-card sticky top-[104px] hidden max-h-[calc(100dvh-128px)] w-[240px] shrink-0 self-start overflow-y-auto p-3 lg:block">
+    <div className="mb-5 flex items-center gap-3 border-b border-line px-2 pb-5 pt-2">
+      {viewer?.avatar_url ? <ApiImage src={viewer.avatar_url} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" /> : <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-lg font-semibold text-brand">{viewer?.full_name.slice(0, 1)}</span>}
+      <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{viewer?.full_name}</p><p className="mt-1 truncate text-xs text-muted">Tài khoản của bạn</p></div>
+    </div>
+    <AccountLinks />
+  </nav>;
 }
 
-/** Compact mobile titles for each account sub-page (ui-spec 3.2). */
-const TITLES: Record<string, string> = {
-  "/account/products": "Tin đăng của tôi",
-  "/favorites": "Yêu thích",
-  "/cart": "Giỏ hàng",
-  "/orders": "Đơn mua",
-  "/sales": "Đơn bán",
-  "/notifications": "Thông báo",
-  "/support": "Hỗ trợ",
-};
-
-/**
- * AccountShell: marketplace header + 220px sidebar (ui-spec 3.2). On mobile
- * the sidebar collapses into the menu list on /account; child pages get a
- * compact "Quay lại + tiêu đề" header instead.
- */
 export function AccountShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { viewer } = useSession();
   const [search, setSearch] = useState("");
-
+  const [menuOpen, setMenuOpen] = useState(false);
   const isIndex = location.pathname === "/account";
-  const childTitle = TITLES[location.pathname];
-
+  const childTitle = ACCOUNT_ITEMS.find((item) => item.to === location.pathname)?.label;
   const submitSearch = useCallback(() => {
     const value = search.trim();
     navigate(value ? `/products?q=${encodeURIComponent(value)}` : "/products");
   }, [navigate, search]);
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <MarketplaceHeader
-        search={search}
-        onSearchChange={setSearch}
-        onSearchSubmit={submitSearch}
-        categories={[]}
-        showSearchRow={false}
-      />
-      {childTitle && <CompactHeader title={childTitle} backTo="/account" />}
-      <main className="flex-1">
-        <div className="rm-container flex gap-8 py-6 lg:py-8">
-          <Sidebar />
-          <div className="min-w-0 flex-1">
-            {isIndex ? (
-              <>
-                <div className="mb-6">
-                  <p className="mt-1 t-body text-muted">
-                    Chào {viewer?.full_name ?? ""}, quản lý hồ sơ và giao dịch của bạn.
-                  </p>
-                </div>
-                <Outlet />
-                {/* Profile stays visible before the mobile navigation menu. */}
-                <nav aria-label="Tài khoản" className="mt-8 space-y-6 lg:hidden">
-                  {GROUPS.map((group) => (
-                    <div key={group.title}>
-                      <h2 className="t-meta text-muted">{group.title}</h2>
-                      <ul className="mt-2 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface">
-                        {group.items.map((item) => (
-                          <li key={item.to}>
-                            <Link
-                              to={item.to}
-                              className="flex min-h-[48px] items-center justify-between px-4 t-body text-ink"
-                            >
-                              {item.label}
-                              <span aria-hidden="true" className="text-muted">
-                                ›
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </nav>
-              </>
-            ) : null}
-            {!isIndex && <Outlet />}
-          </div>
-        </div>
-      </main>
-      <MobileBottomNav />
+  return <div className="flex min-h-screen flex-col">
+    <div className={`${childTitle && !isIndex ? "hidden lg:block " : ""}sticky top-0 z-header`}>
+      <MarketplaceHeader search={search} onSearchChange={setSearch} onSearchSubmit={submitSearch} categories={[]} showSearchRow={false} showCategories={false} />
     </div>
-  );
+    {childTitle && !isIndex && <header className="sticky top-0 z-header border-b border-line bg-surface lg:hidden">
+      <div className="rm-container flex h-14 items-center gap-2">
+        <Link to="/account" aria-label="Quay lại" className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ink hover:bg-surface-subtle"><Icon name="chevron-left" /></Link>
+        <p className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{childTitle}</p>
+        <button type="button" aria-label="Mở menu tài khoản" onClick={() => setMenuOpen(true)} className="grid h-11 w-11 place-items-center rounded-xl border border-line text-ink hover:bg-surface-subtle"><Icon name="menu" /></button>
+      </div>
+    </header>}
+    <main className="rm-account-page flex-1 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="rm-container flex items-start gap-8 py-6 lg:py-8">
+        <Sidebar />
+        <div className="min-w-0 flex-1">
+          {isIndex && <nav aria-label="Truy cập nhanh tài khoản" className="rm-account-card mb-6 p-4 lg:hidden">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-ink">Không gian của bạn</p><p className="mt-1 text-xs text-muted">Mua sắm, bán hàng và kết nối.</p></div><button type="button" aria-label="Mở menu tài khoản" onClick={() => setMenuOpen(true)} className="flex min-h-[44px] items-center gap-2 rounded-xl bg-brand-soft px-3 text-sm font-semibold text-brand"><Icon name="menu" />Menu</button></div>
+          </nav>}
+          <Outlet />
+          {isIndex && <nav aria-label="Tài khoản" className="rm-account-card mt-6 p-3 lg:hidden"><AccountLinks /></nav>}
+        </div>
+      </div>
+    </main>
+    <MobileBottomNav />
+    <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Tài khoản của bạn">
+      <nav aria-label="Menu tài khoản"><AccountLinks onNavigate={() => setMenuOpen(false)} /></nav>
+    </Drawer>
+  </div>;
 }

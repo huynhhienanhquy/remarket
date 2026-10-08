@@ -5,9 +5,9 @@ import { CONDITION_LABELS, DELIVERY_LABELS, PRODUCT_STATUS_LABELS, formatDateTim
 import { api } from "../../lib/api";
 import { isApiError } from "../../lib/errors";
 import { queryKeys } from "../../lib/queryClient";
-import { ApiImage, ConfirmDialog, DataTable, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
+import { ApiImage, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, isVersionConflict, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, isVersionConflict, readPage, useAdminParams } from "./adminShared";
 
 const TABS = [
   { value: "PENDING", label: "Chờ duyệt" },
@@ -82,7 +82,7 @@ export function AdminProductsPage() {
   });
 
   const columns: Array<DataTableColumn<AdminProductItem>> = [
-    { key: "title", header: "Tin đăng", render: (product) => <div className="flex min-w-[260px] items-center gap-3">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 rounded-control object-cover" /> : <div className="h-12 w-16 rounded-control bg-surface-subtle" />}<div><p className="line-clamp-2 t-label text-ink">{product.title}</p><p className="t-meta text-brand">{formatVnd(product.price)}</p></div></div> },
+    { key: "title", header: "Tin đăng", render: (product) => <div className="flex min-w-[260px] items-center gap-3">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-12 w-16 shrink-0 rounded-xl bg-surface-subtle" />}<div><p className="line-clamp-2 t-label text-ink">{product.title}</p><p className="t-meta text-brand">{formatVnd(product.price)}</p></div></div> },
     { key: "seller", header: "Người bán", render: (product) => product.seller.name, hideOnMobile: true },
     { key: "category_name", header: "Danh mục", hideOnMobile: true },
     { key: "status", header: "Trạng thái", render: (product) => <ProductStatusView product={product} /> },
@@ -102,10 +102,11 @@ export function AdminProductsPage() {
       <div className="p-4 lg:p-6"><AdminToolbar>
         <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} placeholder="Tìm theo tiêu đề" label="Tìm tin đăng" className="sm:max-w-sm" />
         <ToolbarField label="Danh mục" htmlFor="product-category"><Select id="product-category" value={params.get("category_id") ?? ""} onChange={(event) => apply({ category_id: event.target.value || null })}><option value="">Tất cả danh mục</option>{allCategories.map((category) => <option key={category.id} value={category.id}>{category.parent_id ? "— " : ""}{category.name}</option>)}</Select></ToolbarField>
+<AdminAdvancedFilters fields={["seller_id", "handled_by", "from", "to"]}>
         <ToolbarField label="Mã người bán" htmlFor="product-seller"><Input id="product-seller" value={params.get("seller_id") ?? ""} onChange={(event) => apply({ seller_id: event.target.value || null })} placeholder="UUID người bán" /></ToolbarField>
         <ToolbarField label="Người xử lý" htmlFor="product-handler"><Input id="product-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="product-from"><Input id="product-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
-        <ToolbarField label="Đến ngày" htmlFor="product-to"><Input id="product-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+        <ToolbarField label="Đến ngày" htmlFor="product-to"><Input id="product-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
       </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</div>
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có tin đăng trong hàng đợi" description="Hãy chọn trạng thái hoặc bộ lọc khác." />} />}
       {query.data && <Pagination className="p-4 lg:px-6" page={query.data.meta.page} totalPages={query.data.meta.total_pages} total={query.data.meta.total} onPageChange={(next) => apply({ page: String(next) })} />}

@@ -4,7 +4,7 @@ import type { CategoryNode } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
 import { Button, ConfirmDialog, EmptyState, FormField, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, ToolbarField, errorDescription, fieldError, readEnumParam, readPage, useAdminParams } from "./adminShared";
+import { AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, ToolbarField, errorDescription, fieldError, readEnumParam, readPage, useAdminParams } from "./adminShared";
 
 function slugify(value: string): string {
   return value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -81,16 +81,17 @@ export function AdminCategoriesPage() {
   const editorVisible = creating || selected !== null;
 
   return <div>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><AdminHeading title="Danh mục" description="Quản lý cây danh mục tối đa hai cấp và trạng thái nhận tin đăng." /><Button onClick={() => apply({ new: "1", selected: null })}>Thêm danh mục</Button></div>
+    <AdminHeading title="Danh mục" description="Quản lý cây danh mục tối đa hai cấp và trạng thái nhận tin đăng." actions={<Button onClick={() => apply({ new: "1", selected: null })}>Thêm danh mục</Button>} />
     <AdminToolbar>
       <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} label="Tìm danh mục" placeholder="Tên danh mục" />
       <ToolbarField label="Trạng thái" htmlFor="category-status"><Select id="category-status" value={status} onChange={(event) => apply({ status: event.target.value || null })}><option value="">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Vô hiệu</option></Select></ToolbarField>
+<AdminAdvancedFilters fields={["handled_by", "from", "to"]}>
       <ToolbarField label="Người xử lý" htmlFor="category-handler"><Input id="category-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
       <ToolbarField label="Thao tác từ ngày" htmlFor="category-from"><Input id="category-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
-      <ToolbarField label="Đến ngày" htmlFor="category-to"><Input id="category-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+      <ToolbarField label="Đến ngày" htmlFor="category-to"><Input id="category-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
     </AdminToolbar>
     {tree.isError && <QueryErrorAlert error={tree.error} onRetry={() => tree.refetch()} />}
-    {query.isError ? <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} /> : <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+    {query.isError ? <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} /> : <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
       <SectionCard title="Cây danh mục" bodyClassName="p-2 lg:p-2">
         <p className="px-3 py-2 t-meta text-muted">Mỗi trang gồm các nhóm có danh mục phù hợp bộ lọc; giữ cả danh mục cha và con để dễ quản lý.</p>
         {query.isPending ? <div className="p-4 t-body text-muted">Đang tải danh mục…</div> : roots.length === 0 ? <EmptyState title="Chưa có danh mục" action={{ label: "Thêm danh mục", onClick: () => apply({ new: "1", selected: null }) }} /> : <ul className="space-y-1">

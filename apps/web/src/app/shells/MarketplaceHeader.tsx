@@ -316,6 +316,7 @@ export function MarketplaceHeader({
   onSearchSubmit,
   categories,
   showSearchRow,
+  showCategories = true,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
@@ -323,6 +324,7 @@ export function MarketplaceHeader({
   categories: CategoryNode[];
   /** Mobile second row with search: only on discovery pages (ui-spec 3). */
   showSearchRow: boolean;
+  showCategories?: boolean;
 }) {
   const { viewer } = useSession();
   const location = useLocation();
@@ -384,7 +386,7 @@ export function MarketplaceHeader({
         </div>
       </div>
 
-      <CategoryBar categories={categories} />
+      {showCategories && <CategoryBar categories={categories} />}
 
       {/* Mobile header: 56px logo row (+ 48px search row on discovery) */}
       <div className="border-b border-line lg:hidden">
@@ -400,7 +402,7 @@ export function MarketplaceHeader({
                   <BellIcon />
                 </IconButton>
                 <Link
-                  to={loginPathFor(location.pathname, location.search)}
+                  to="/account"
                   aria-label="Tài khoản"
                   className="flex h-11 w-11 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
                 >

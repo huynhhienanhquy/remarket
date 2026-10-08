@@ -4,9 +4,9 @@ import type { AdminReviewItem } from "@remarket/shared";
 import { formatDateTime } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, ConfirmDialog, DataTable, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/ui";
+import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, errorDescription, readPage, useAdminParams } from "./adminShared";
 
 function Stars({ value }: { value: number }) {
   return <span aria-label={`${value} trên 5 sao`} className="whitespace-nowrap text-accent">{"★".repeat(value)}<span className="text-line">{"★".repeat(5 - value)}</span></span>;
@@ -58,9 +58,10 @@ export function AdminReviewsPage() {
         <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} placeholder="Tìm trong nội dung đánh giá" label="Tìm đánh giá" className="sm:max-w-sm" />
         <ToolbarField label="Số sao" htmlFor="review-rating"><Select id="review-rating" value={rating ?? ""} onChange={(event) => apply({ rating: event.target.value || null })}><option value="">Tất cả</option>{[5,4,3,2,1].map((value) => <option key={value} value={value}>{value} sao</option>)}</Select></ToolbarField>
         <ToolbarField label="Hiển thị" htmlFor="review-visibility"><Select id="review-visibility" value={visibility ?? ""} onChange={(event) => apply({ visibility: event.target.value || null })}><option value="">Tất cả</option><option value="VISIBLE">Đang hiển thị</option><option value="HIDDEN">Đã ẩn</option></Select></ToolbarField>
+<AdminAdvancedFilters fields={["handled_by", "from", "to"]}>
         <ToolbarField label="Từ ngày" htmlFor="review-from"><Input id="review-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
         <ToolbarField label="Người xử lý" htmlFor="review-handler"><Input id="review-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
-        <ToolbarField label="Đến ngày" htmlFor="review-to"><Input id="review-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+        <ToolbarField label="Đến ngày" htmlFor="review-to"><Input id="review-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
       </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</div>
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có đánh giá phù hợp" description="Hãy thay đổi từ khóa hoặc số sao." />} />}
       {query.data && <Pagination className="p-4 lg:px-6" page={query.data.meta.page} totalPages={query.data.meta.total_pages} total={query.data.meta.total} onPageChange={(next) => apply({ page: String(next) })} />}

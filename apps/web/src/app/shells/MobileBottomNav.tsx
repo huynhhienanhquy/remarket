@@ -16,7 +16,7 @@ const TABS: Tab[] = [
   { to: "/favorites", label: "Yêu thích", icon: HeartIcon, match: (p) => p.startsWith("/favorites"), authOnly: true },
   { to: "/account/products/new", label: "Đăng bán", icon: PlusIcon, match: (p) => p.startsWith("/account/products/new") },
   { to: "/messages", label: "Tin nhắn", icon: ChatIcon, match: (p) => p.startsWith("/messages"), authOnly: true },
-  { to: "/account", label: "Tài khoản", icon: UserIcon, match: (p) => p.startsWith("/account"), authOnly: true },
+  { to: "/account", label: "Tài khoản", icon: UserIcon, match: (p) => ["/account", "/cart", "/orders", "/sales", "/notifications", "/support"].some((prefix) => p === prefix || p.startsWith(`${prefix}/`)), authOnly: true },
 ];
 
 /**

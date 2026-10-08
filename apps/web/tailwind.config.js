@@ -4,18 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        page: "#F7F8F5",
+        page: "#F5F7FA",
         surface: "#FFFFFF",
-        "surface-subtle": "#F0F3EE",
-        ink: "#17251D",
-        muted: "#56645B",
+        "surface-subtle": "#EFF3F6",
+        ink: "#18313B",
+        muted: "#5D6C7A",
         brand: {
-          DEFAULT: "#17633F",
-          hover: "#104C30",
-          soft: "#E8F3EC",
+          DEFAULT: "#0F766E",
+          hover: "#115E59",
+          soft: "#E8F6F3",
         },
-        line: "#DDE4DC",
-        "input-line": "#829087",
+        line: "#E1E8EE",
+        "input-line": "#8797A5",
         accent: "#B45309",
         "warning-bg": "#FFF4DA",
         danger: {
@@ -55,6 +55,7 @@ export default {
       boxShadow: {
         pop: "0 4px 16px rgba(23, 37, 29, 0.08)",
         "card-hover": "0 4px 12px rgba(23, 37, 29, 0.08)",
+        subtle: "0 2px 8px rgba(24, 49, 59, 0.03)",
       },
       transitionDuration: {
         DEFAULT: "150ms",

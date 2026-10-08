@@ -3,10 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDateTime, type EmailVerificationRequest } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { Button, ConfirmDialog, DataTable, EmptyState, Pagination, SectionCard, Select, StatusBadge, useToast } from "../../components/ui";
+import { Button, ConfirmDialog, EmptyState, Pagination, SectionCard, Select, StatusBadge, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
 import { OfflineNotice, QueryFailure, useConnectivity } from "../../components/features/PageFeedback";
-import { AdminHeading, AdminToolbar, ToolbarField, readEnumParam, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminToolbar, ToolbarField, readEnumParam, readPage, useAdminParams } from "./adminShared";
 
 export function AdminEmailVerificationsPage() {
   const { params, apply } = useAdminParams();

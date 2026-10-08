@@ -82,7 +82,6 @@ const router = createBrowserRouter([
           { path: "products", element: <SearchPage /> },
           { path: "products/:id", element: <ProductDetailPage /> },
           { path: "users/:id", element: <SellerProfilePage /> },
-          { path: "cart", element: privateRoute(<CartPage />) },
           { path: "403", element: <ForbiddenBody /> },
           { path: "404", element: <NotFoundBody /> },
           { path: "*", element: <NotFoundBody /> },
@@ -94,11 +93,9 @@ const router = createBrowserRouter([
         children: [{ index: true, element: privateRoute(<CheckoutPage />) }],
       },
       {
-        path: "messages",
         element: <ChatShell />,
         children: [
-          { index: true, element: privateRoute(<MessagesPage />) },
-          { path: ":id", element: privateRoute(<ConversationPage />) },
+          { path: "messages/:id", element: privateRoute(<ConversationPage />) },
         ],
       },
       {
@@ -153,6 +150,8 @@ const router = createBrowserRouter([
             element: <RequireVerified><ProductFormPage /></RequireVerified>,
           },
           { path: "favorites", element: <FavoritesPage /> },
+          { path: "cart", element: <CartPage /> },
+          { path: "messages", element: <MessagesPage /> },
           { path: "notifications", element: <NotificationsPage /> },
           { path: "orders", element: <OrdersPage role="buyer" /> },
           { path: "orders/:id", element: <OrderDetailPage role="buyer" /> },

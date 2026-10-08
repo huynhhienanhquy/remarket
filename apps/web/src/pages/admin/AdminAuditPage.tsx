@@ -4,9 +4,9 @@ import type { AuditLogItem } from "@remarket/shared";
 import { formatDateTime } from "@remarket/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryClient";
-import { DataTable, Drawer, EmptyState, Input, Pagination, SectionCard, useToast } from "../../components/ui";
+import { Drawer, EmptyState, Input, Pagination, SectionCard, useToast } from "../../components/ui";
 import type { DataTableColumn } from "../../components/ui";
-import { AdminHeading, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, readPage, useAdminParams } from "./adminShared";
+import { AdminDataTable as DataTable, AdminHeading, AdminAdvancedFilters, AdminToolbar, QueryErrorAlert, RowAction, ToolbarField, readPage, useAdminParams } from "./adminShared";
 
 function safeMetadata(metadata: Record<string, unknown>): string {
   return JSON.stringify(metadata, null, 2);
@@ -39,15 +39,16 @@ export function AdminAuditPage() {
   }
 
   return <div>
-    <AdminHeading title="Nhật ký thao tác" description="Theo dõi các thay đổi quản trị đã được server lọc; nhật ký không thể sửa hoặc xóa." />
+    <AdminHeading title="Nhật ký thao tác" description="Tra cứu lịch sử xử lý và các thay đổi trong khu vực quản trị." />
     <SectionCard bodyClassName="p-0 lg:p-0">
       <form className="p-4 lg:p-6" onSubmit={(event) => { event.preventDefault(); submitFilters(); }}><AdminToolbar>
         <ToolbarField label="Hành động" htmlFor="audit-action" className="sm:min-w-64"><Input id="audit-action" value={action} onChange={(event) => setAction(event.target.value)} placeholder="Ví dụ: product.approve" /></ToolbarField>
         <ToolbarField label="Loại đối tượng" htmlFor="audit-entity" className="sm:min-w-52"><Input id="audit-entity" value={entityType} onChange={(event) => setEntityType(event.target.value)} placeholder="product, user, report…" /></ToolbarField>
+<AdminAdvancedFilters fields={["entity_id", "actor_id", "from", "to"]}>
         <ToolbarField label="Mã đối tượng" htmlFor="audit-entity-id" className="sm:min-w-64"><Input id="audit-entity-id" value={params.get("entity_id") ?? ""} onChange={(event) => apply({ entity_id: event.target.value || null })} placeholder="UUID đối tượng" /></ToolbarField>
-        <ToolbarField label="Mã actor" htmlFor="audit-actor-id" className="sm:min-w-64"><Input id="audit-actor-id" value={params.get("actor_id") ?? ""} onChange={(event) => apply({ actor_id: event.target.value || null })} placeholder="UUID người thực hiện" /></ToolbarField>
+        <ToolbarField label="Mã người thực hiện" htmlFor="audit-actor-id" className="sm:min-w-64"><Input id="audit-actor-id" value={params.get("actor_id") ?? ""} onChange={(event) => apply({ actor_id: event.target.value || null })} placeholder="UUID người thực hiện" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="audit-from"><Input id="audit-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
-        <ToolbarField label="Đến ngày" htmlFor="audit-to"><Input id="audit-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField>
+        <ToolbarField label="Đến ngày" htmlFor="audit-to"><Input id="audit-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
         <button type="submit" className="min-h-[44px] rounded-control bg-brand px-4 t-label text-white">Lọc nhật ký</button>
       </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</form>
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có nhật ký phù hợp" description="Hãy thay đổi action hoặc loại đối tượng." />} />}
