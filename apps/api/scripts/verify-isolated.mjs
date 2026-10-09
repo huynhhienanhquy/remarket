@@ -34,11 +34,15 @@ const childEnv = {
   SMOKE_WEB_URL: "http://127.0.0.1:5321",
   SMOKE_ADMIN_EMAIL: "admin@example.test",
   SMOKE_USER_EMAIL: "buyer@example.test",
+  SMOKE_SECOND_USER_EMAIL: "seller@example.test",
   SMOKE_LIFECYCLE_ONLY: process.argv.includes("--lifecycle-only") ? "true" : "false",
+  SMOKE_AUTH_ONLY: process.argv.includes("--auth-browser") ? "true" : "false",
   SMOKE_EMAIL_ONLY: process.argv.includes("--email-only") ? "true" : "false",
+  SMOKE_CHAT_ONLY: process.argv.includes("--chat-badge-only") ? "true" : "false",
 };
 childEnv.SMOKE_ADMIN_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
 childEnv.SMOKE_USER_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
+childEnv.SMOKE_SECOND_USER_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
 async function run(moduleName, args, cwd = apiDir) {
   const child = spawn(process.execPath, [require.resolve(moduleName), ...args], {
     cwd, env: childEnv, stdio: "inherit", windowsHide: true,

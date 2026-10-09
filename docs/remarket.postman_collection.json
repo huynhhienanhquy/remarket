@@ -3434,6 +3434,36 @@
           "response": []
         },
         {
+          "name": "GET /conversations/unread-count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                "unread-count"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /conversations/{conversationId}",
           "request": {
             "method": "GET",

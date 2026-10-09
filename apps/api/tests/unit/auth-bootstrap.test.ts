@@ -39,6 +39,47 @@ beforeEach(() => {
 });
 
 describe("cookie session discovery", () => {
+  const scope = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const otherScope = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const sharedJar = `${env.refreshCookie}_${otherScope}=other-token; ${cookie}; ${env.refreshCookie}_${scope}=opaque-test-token`;
+
+  it("discovers only the selected tab cookie in a jar containing multiple accounts", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("X-Session-Scope", scope).set("Cookie", sharedJar).expect(200);
+    expect(response.body.data.user.id).toBe(user.id);
+    expect(client.authToken.findUnique.mock.calls[0]![0]).toEqual({ where: { tokenHash: sha256("opaque-test-token") } });
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("never falls back to another tab or legacy cookie when its own cookie is absent", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("X-Session-Scope", scope).set("Cookie", `${cookie}; ${env.refreshCookie}_${otherScope}=other-token`).expect(200);
+    expect(response.body.data.user).toBeNull();
+    expect(client.authToken.findUnique).not.toHaveBeenCalled();
+    expect(response.headers["set-cookie"]).toHaveLength(1);
+    expect(response.headers["set-cookie"]?.[0]).toMatch(new RegExp(`^${env.refreshCookie}_${scope}=`));
+  });
+
+  it("rotates only the selected cookie and keeps all security attributes", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/refresh").set("X-Session-Scope", scope).set("Cookie", sharedJar).expect(200);
+    expect(response.headers["set-cookie"]).toHaveLength(1);
+    expect(response.headers["set-cookie"]?.[0]).toMatch(new RegExp(`^${env.refreshCookie}_${scope}=`));
+    for (const attribute of ["HttpOnly", "SameSite=Lax", "Path=/api/v1/auth"]) expect(response.headers["set-cookie"]?.[0]).toContain(attribute);
+  });
+
+  it.each(["../admin", "toString", "", "a".repeat(1000)])("rejects an invalid scope before touching persistence or cookies", async (invalid) => {
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("X-Session-Scope", invalid).set("Cookie", sharedJar).expect(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(client.authToken.findUnique).not.toHaveBeenCalled();
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("allows the scope header in credentialed CORS requests", async () => {
+    const response = await request(createApp()).options("/api/v1/auth/bootstrap")
+      .set("Origin", "http://localhost:5173").set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "x-session-scope").expect(204);
+    expect(response.headers["access-control-allow-headers"]).toContain("X-Session-Scope");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
   it("returns a successful guest session without hitting persistence", async () => {
     const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Origin", "http://localhost:5173").expect(200);
     expect(response.body.data).toEqual({ user: null, access_token: null });

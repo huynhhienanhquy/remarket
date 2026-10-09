@@ -347,6 +347,7 @@ export interface OrderReviewState {
   can_review: boolean;
   /** Reason shown when review is not allowed (already reviewed / expired). */
   reason: string | null;
+  /** Review of this order, readable by its buyer and seller; only the buyer may submit. */
   existing: Review | null;
 }
 

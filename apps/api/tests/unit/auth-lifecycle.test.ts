@@ -11,7 +11,7 @@ const client = vi.hoisted(() => ({
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
 import { createApp } from "../../src/app.js";
 import { env } from "../../src/config/env.js";
-import { signAccessToken } from "../../src/shared/tokens.js";
+import { sha256, signAccessToken } from "../../src/shared/tokens.js";
 
 const user = { id: "owner", fullName: "Test Owner", email: "owner@example.test", role: "USER", status: "ACTIVE", emailVerifiedAt: null, joinedAt: new Date(), avatarUrl: null, phone: null, provinceCode: null, defaultAddress: null, passwordHash: await bcrypt.hash("test-password-2026", 4) };
 const cookie = `${env.refreshCookie}=opaque-test-token`;
@@ -28,6 +28,27 @@ beforeEach(() => {
 });
 
 describe("authentication lifecycle", () => {
+  const scope = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const otherScope = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+  it("issues login credentials only into the requested tab's protected cookie", async () => {
+    const response = await request(createApp()).post("/api/v1/auth/login").set("X-Session-Scope", scope)
+      .send({ email: user.email, password: "test-password-2026" }).expect(200);
+    expect(response.headers["set-cookie"]).toHaveLength(1);
+    expect(response.headers["set-cookie"]?.[0]).toMatch(new RegExp(`^${env.refreshCookie}_${scope}=`));
+    expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");
+  });
+
+  it("logs out only the selected session and clears only its cookie in a shared jar", async () => {
+    const sharedJar = `${env.refreshCookie}_${otherScope}=other-token; ${cookie}; ${env.refreshCookie}_${scope}=opaque-test-token`;
+    const response = await request(createApp()).post("/api/v1/auth/logout").set("X-Session-Scope", scope)
+      .set("Cookie", sharedJar).set("Authorization", `Bearer ${signAccessToken(user.id, "session")}`).expect(200);
+    expect(client.authToken.findUnique).toHaveBeenCalledWith({ where: { tokenHash: sha256("opaque-test-token") } });
+    expect(client.session.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "session", userId: user.id, revokedAt: null } }));
+    expect(response.headers["set-cookie"]).toHaveLength(1);
+    expect(response.headers["set-cookie"]?.[0]).toMatch(new RegExp(`^${env.refreshCookie}_${scope}=`));
+  });
+
   it("does not issue a session if reset changed the password during bcrypt", async () => {
     client.user.findUnique.mockResolvedValueOnce(user).mockResolvedValueOnce({ ...user, passwordHash: "changed" });
     await request(createApp()).post("/api/v1/auth/login").send({ email: user.email, password: "test-password-2026" }).expect(401);

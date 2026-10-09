@@ -31,6 +31,19 @@ import { chatRateLimit } from "../middleware/rate-limit.js";
 const router = Router();
 router.use(requireActive);
 
+// Aggregate across all participant threads, independently of inbox pagination.
+router.get("/unread-count", asyncHandler(async (req: AuthRequest, res) => {
+  const viewer = viewerOf(req);
+  const unread = await prisma.message.count({
+    where: {
+      readAt: null,
+      senderId: { not: viewer.id },
+      conversation: { OR: [{ buyerId: viewer.id }, { sellerId: viewer.id }] },
+    },
+  });
+  ok(res, unread);
+}));
+
 const DEFAULT_MESSAGE_PAGE_SIZE = 30;
 const MAX_MESSAGE_PAGE_SIZE = 100;
 

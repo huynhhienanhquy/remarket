@@ -29,8 +29,25 @@ Có thể chạy riêng `pnpm dev:web` hoặc `pnpm dev:api`.
 Frontend luôn gọi API thật; không có chế độ mock hoặc tài khoản demo.
 Lệnh `pnpm --filter @remarket/api seed` chỉ tạo danh mục và tỉnh thành còn thiếu,
 không tạo người dùng, sản phẩm hay giao dịch. Tạo admin bằng `admin:create`.
-Schema/migrations được hỗ trợ nằm trong
-`apps/api/prisma`; các file Prisma cũ ở root không phải nguồn migration của API.
+Schema/migrations nằm trong `apps/api/prisma`. Chạy các lệnh Prisma qua
+`pnpm --filter @remarket/api` để dùng đúng schema và phiên bản của API.
+
+## Đăng nhập nhiều tài khoản trên cùng trình duyệt
+
+Mỗi tab có phiên riêng: mở các tab mới và đăng nhập admin, người mua hoặc
+người bán qua `/login`. Reload giữ tài khoản của tab đó. Đăng nhập/đăng xuất
+ở một tab không thay đổi các tab khác. Access token chỉ ở memory; refresh
+token vẫn nằm trong cookie HttpOnly. `sessionStorage` chỉ giữ UUID chọn cookie,
+không chứa token hay thông tin tài khoản. Client cũ không gửi `X-Session-Scope`
+vẫn dùng cookie chung cũ; tab mới của web không tự nhận phiên cũ này.
+
+Backend và web phải được cập nhật cùng nhau vì API cần nhận header
+`X-Session-Scope`. Đăng xuất tất cả và đặt lại mật khẩu vẫn thu hồi toàn bộ
+phiên của **tài khoản đó**. Nếu trình duyệt chặn sessionStorage, đăng nhập vẫn
+hoạt động trên trang hiện tại nhưng không giữ được phiên qua reload.
+
+Kiểm thử ba tài khoản trong một Chrome profile, dùng schema PostgreSQL tạm:
+`node apps/api/scripts/verify-isolated.mjs --browser-only --auth-browser`.
 
 ## Kiểm tra
 

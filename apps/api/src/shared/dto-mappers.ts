@@ -588,18 +588,20 @@ export function toOrderDetail(
 
   let reviewState: OrderReviewState;
   if (!isBuyer) {
-    reviewState = { can_review: false, reason: "Chỉ người mua được đánh giá đơn hàng.", existing: null };
+    reviewState = {
+      can_review: false,
+      reason: "Chỉ người mua được đánh giá đơn hàng.",
+      existing: order.sellerId === viewer.id && context.existingReview
+        ? toReview(context.existingReview, order.buyer)
+        : null,
+    };
   } else if (order.status !== "COMPLETED") {
     reviewState = { can_review: false, reason: "Chỉ đánh giá sau khi đơn hàng hoàn tất.", existing: null };
   } else if (context.existingReview) {
     reviewState = {
       can_review: false,
       reason: "Bạn đã đánh giá đơn hàng này.",
-      existing: toReview(context.existingReview, {
-        id: context.existingReview.reviewerId,
-        fullName: "",
-        avatarUrl: null,
-      } as User),
+      existing: toReview(context.existingReview, order.buyer),
     };
   } else if (!withinWindow) {
     reviewState = { can_review: false, reason: "Đã hết thời gian đánh giá đơn hàng.", existing: null };

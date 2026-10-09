@@ -55,8 +55,18 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 
 const REFRESH_COOKIE_PATH = "/api/v1/auth";
 
-function setRefreshCookie(res: Response, token: string): void {
-  res.cookie(env.refreshCookie, token, {
+/** The scope selects a cookie, never grants access; the opaque token is still required. */
+function refreshCookieName(req: Request): string {
+  const scope = req.headers["x-session-scope"];
+  if (scope === undefined) return env.refreshCookie;
+  if (typeof scope !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(scope)) {
+    throw validationError("Mã phiên tab không hợp lệ.");
+  }
+  return `${env.refreshCookie}_${scope}`;
+}
+
+function setRefreshCookie(req: Request, res: Response, token: string): void {
+  res.cookie(refreshCookieName(req), token, {
     httpOnly: true,
     sameSite: "lax",
     secure: env.cookieSecure,
@@ -65,8 +75,8 @@ function setRefreshCookie(res: Response, token: string): void {
   });
 }
 
-function clearRefreshCookie(res: Response): void {
-  res.clearCookie(env.refreshCookie, {
+function clearRefreshCookie(req: Request, res: Response): void {
+  res.clearCookie(refreshCookieName(req), {
     httpOnly: true,
     sameSite: "lax",
     secure: env.cookieSecure,
@@ -74,13 +84,14 @@ function clearRefreshCookie(res: Response): void {
   });
 }
 
-function readRefreshCookie(req: { headers: { cookie?: string | undefined } }): string | null {
+function readRefreshCookie(req: Request): string | null {
+  const cookieName = refreshCookieName(req);
   const header = req.headers.cookie;
   if (!header) return null;
   for (const pair of header.split(";")) {
     const eq = pair.indexOf("=");
     if (eq === -1) continue;
-    if (pair.slice(0, eq).trim() !== env.refreshCookie) continue;
+    if (pair.slice(0, eq).trim() !== cookieName) continue;
     const raw = pair.slice(eq + 1).trim();
     try {
       return decodeURIComponent(raw);
@@ -97,6 +108,8 @@ function readRefreshCookie(req: { headers: { cookie?: string | undefined } }): s
 
 /** Browser endpoints that create, rotate or clear a cookie require a trusted Origin. */
 function requireTrustedOrigin(req: Request, _res: Response, next: NextFunction): void {
+  // Validate before any DB writes or Set-Cookie side effects.
+  refreshCookieName(req);
   const value = req.headers.origin;
   if (!value) {
     if (env.isProduction) throw forbidden("Nguồn yêu cầu không được phép.");
@@ -387,15 +400,15 @@ router.post(
       if (!live || live.passwordHash !== user.passwordHash) throw unauthorized("Email hoặc mật khẩu không đúng.");
       return { issued: await createSession(tx, live.id), identity: live };
     });
-    setRefreshCookie(res, issued.refreshToken);
+    setRefreshCookie(req, res, issued.refreshToken);
     // Login already loaded the identity; avoid a second HTTP + DB round trip.
     ok(res, { access_token: issued.accessToken, user: toSessionUser(identity) });
   }),
 );
 
 /** Guest discovery must not manufacture 401 errors or hide database failures. */
-function unavailableSession(res: Response, bootstrap: boolean) {
-  clearRefreshCookie(res);
+function unavailableSession(req: Request, res: Response, bootstrap: boolean) {
+  clearRefreshCookie(req, res);
   if (bootstrap) return ok(res, { user: null, access_token: null });
   throw sessionExpired();
 }
@@ -405,12 +418,12 @@ function unavailableSession(res: Response, bootstrap: boolean) {
 // Explicit refresh retains atomic rotation and strict replay detection.
 async function refreshSession(req: Request, res: Response, bootstrap = false) {
     const presented = readRefreshCookie(req);
-    if (!presented) return unavailableSession(res, bootstrap);
+    if (!presented) return unavailableSession(req, res, bootstrap);
 
     const presentedHash = sha256(presented);
     const candidate = await prisma.authToken.findUnique({ where: { tokenHash: presentedHash } });
     if (!candidate || candidate.purpose !== "REFRESH" || !candidate.sessionId) {
-      return unavailableSession(res, bootstrap);
+      return unavailableSession(req, res, bootstrap);
     }
     const candidateSessionId = candidate.sessionId;
 
@@ -489,17 +502,17 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
         aggregateId: result.sessionId,
         payload: { session_ids: [result.sessionId] },
       });
-      return unavailableSession(res, bootstrap);
+      return unavailableSession(req, res, bootstrap);
     }
-    if (result.kind !== "rotated" && result.kind !== "discovered") return unavailableSession(res, bootstrap);
+    if (result.kind !== "rotated" && result.kind !== "discovered") return unavailableSession(req, res, bootstrap);
 
     if (bootstrap) {
       // Discovery does not extend the session lifetime or issue a new cookie.
-      if (!result.user) return unavailableSession(res, true);
+      if (!result.user) return unavailableSession(req, res, true);
       return ok(res, { user: toSessionUser(result.user), access_token: signAccessToken(result.userId, result.sessionId) });
     }
 
-    setRefreshCookie(res, nextToken);
+    setRefreshCookie(req, res, nextToken);
     ok(res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
 }
 
@@ -566,7 +579,7 @@ router.post(
         payload: { session_ids: [sessionId] },
       });
     }
-    clearRefreshCookie(res);
+    clearRefreshCookie(req, res);
     ok(res, { ok: true });
   }),
 );
@@ -609,7 +622,7 @@ router.post(
         payload: { user_id: authUser.id },
       });
     }
-    clearRefreshCookie(res);
+    clearRefreshCookie(req, res);
     ok(res, { ok: true });
   }),
 );
@@ -646,7 +659,7 @@ router.post(
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: sessionProfileSelect });
       return { issued: await createSession(tx, userId), user };
     });
-    setRefreshCookie(res, issued.refreshToken);
+    setRefreshCookie(req, res, issued.refreshToken);
     ok(res, { access_token: issued.accessToken, user: toSessionUser(user) });
   }),
 );
@@ -744,7 +757,7 @@ router.post(
       payload: { user_id: resetUserId },
     });
 
-    clearRefreshCookie(res);
+    clearRefreshCookie(req, res);
     ok(res, { accepted: true as const });
   }),
 );

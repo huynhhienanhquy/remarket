@@ -123,6 +123,11 @@ async function main() {
     console.log(`✓ User ${u.email}`);
   }
 
+  if (process.env.SMOKE_AUTH_ONLY === "true") {
+    console.log("Isolated auth browser fixtures ready.");
+    return;
+  }
+
   await seedReferenceData(prisma);
 
   const now = new Date();
@@ -349,6 +354,36 @@ async function main() {
     },
   });
   console.log("✓ Chat, review, report and support seeded");
+
+  if (process.env.SMOKE_CHAT_ONLY === "true") {
+    // Push an unread thread beyond the first inbox page. Only isolated fixtures.
+    const chatFixtureNow = Date.now();
+    const extraProducts = Array.from({ length: 21 }, (_, index) => ({
+      id: crypto.randomUUID(), sellerId: users[1]!.id, categoryId: "cat-11",
+      title: `Sản phẩm kiểm thử badge ${index + 1}`, description: "Dữ liệu kiểm thử trong schema riêng.",
+      price: "100000", condition: "GOOD" as const, provinceCode: "VN-29",
+      deliveryMethod: "COD" as const, shippingFee: "0", status: "ACTIVE" as const,
+    }));
+    await prisma.product.createMany({ data: extraProducts });
+    const extraConversations = extraProducts.map((product, index) => ({
+      id: crypto.randomUUID(), productId: product.id, buyerId: users[4]!.id, sellerId: users[1]!.id,
+      updatedAt: new Date(chatFixtureNow + (22 - index) * 1000),
+    }));
+    await prisma.conversation.createMany({ data: extraConversations });
+    const last = extraConversations.at(-1)!;
+    await prisma.message.createMany({ data: [
+      { conversationId: last.id, senderId: users[4]!.id, clientMessageId: "badge-incoming", content: "Tin chưa đọc ở trang hai", readAt: null },
+      { conversationId: last.id, senderId: users[1]!.id, clientMessageId: "badge-outgoing", content: "Tin người bán gửi không tính vào badge của người bán", readAt: null },
+    ] });
+    const privateThread = await prisma.conversation.create({ data: {
+      productId: extraProducts[0]!.id, buyerId: users[3]!.id, sellerId: users[2]!.id,
+    } });
+    await prisma.message.create({ data: {
+      conversationId: privateThread.id, senderId: users[3]!.id,
+      clientMessageId: "badge-unrelated", content: "Tin riêng của người khác", readAt: null,
+    } });
+    console.log("✓ Isolated paginated chat badge fixtures ready");
+  }
 
   console.log("Isolated browser fixtures ready.");
 }

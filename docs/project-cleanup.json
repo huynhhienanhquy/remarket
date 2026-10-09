@@ -1,0 +1,154 @@
+{
+  "cleanedAt": "2026-10-09T13:07:55.1841283Z",
+  "targets": [
+    {
+      "path": "package-lock.json",
+      "reason": "pnpm is the package manager used by all workspace scripts and CI",
+      "files": 1,
+      "bytes": 61961
+    },
+    {
+      "path": "prisma7.config.ts",
+      "reason": "unused root Prisma 7 scaffold; application uses Prisma 5.22",
+      "files": 1,
+      "bytes": 374
+    },
+    {
+      "path": "prisma",
+      "reason": "legacy schema; active schema and migrations live in apps/api/prisma",
+      "files": 1,
+      "bytes": 20919
+    },
+    {
+      "path": ".artifacts",
+      "reason": "completed verification workspaces, browser artifacts, old refactor snapshots and temporary audit scripts",
+      "files": 14553,
+      "bytes": 256563282
+    },
+    {
+      "path": ".pnpm-store",
+      "reason": "inactive workspace cache; installed pnpm storeDir is D:/.pnpm-store/v11 outside this workspace",
+      "files": 1,
+      "bytes": 8192
+    },
+    {
+      "path": "apps/api/.prisma",
+      "reason": "four obsolete engine copies; no client entry or override, real generated client is in pnpm virtual store",
+      "files": 4,
+      "bytes": 75931648
+    },
+    {
+      "path": "node_modules/.cache",
+      "reason": "rebuildable Prisma/jiti caches",
+      "files": 3,
+      "bytes": 19262080
+    },
+    {
+      "path": "node_modules/.vite-temp",
+      "reason": "temporary Vite config compilation",
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "node_modules/.package-lock.json",
+      "reason": "npm install metadata unused by current pnpm installation",
+      "files": 1,
+      "bytes": 61812
+    },
+    {
+      "path": "apps/api/node_modules/.cache",
+      "reason": "rebuildable Prisma cache",
+      "files": 6,
+      "bytes": 37408000
+    },
+    {
+      "path": "apps/api/node_modules/.vite",
+      "reason": "Vitest results cache",
+      "files": 1,
+      "bytes": 2121
+    },
+    {
+      "path": "apps/api/node_modules/.vite-temp",
+      "reason": "temporary Vitest config compilation",
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "apps/web/node_modules/.vite",
+      "reason": "Vite prebundle and Vitest results cache",
+      "files": 27,
+      "bytes": 5366270
+    },
+    {
+      "path": "apps/web/node_modules/.vite-temp",
+      "reason": "temporary Vite config compilation",
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "packages/shared/node_modules/.vite",
+      "reason": "Vitest results cache",
+      "files": 1,
+      "bytes": 175
+    },
+    {
+      "path": "apps/api/dist",
+      "reason": "rebuildable backend bundle, no project process uses dist",
+      "files": 85,
+      "bytes": 494069
+    },
+    {
+      "path": "apps/web/dist",
+      "reason": "rebuildable frontend bundle, no project process uses dist",
+      "files": 63,
+      "bytes": 775347
+    },
+    {
+      "path": "node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma/client/query_engine-windows.dll.node.tmp27416",
+      "reason": "incomplete engine copy from a terminated generator; original engine remains",
+      "files": 1,
+      "bytes": 19261952
+    }
+  ],
+  "summary": {
+    "removableFiles": 14749,
+    "logicalBytes": 415218202,
+    "reclaimableUniqueBytes": 186738129,
+    "protectedFiles": 14134,
+    "preservedLinks": 1343
+  },
+  "sourceAudits": [
+    {
+      "name": "web",
+      "files": 181,
+      "unreachable": []
+    },
+    {
+      "name": "api",
+      "files": 103,
+      "unreachable": [
+        "apps/api/tests/fixtures/browser-seed.ts"
+      ],
+      "indirectEntrypoints": [
+        "apps/api/tests/fixtures/browser-seed.ts"
+      ],
+      "unreachableAfterDynamicEntryReview": []
+    },
+    {
+      "name": "shared",
+      "files": 11,
+      "unreachable": []
+    }
+  ],
+  "retainedFileHashesVerified": 14134,
+  "preservedJunctionsVerified": 1343,
+  "verification": {
+    "testsPassed": 337,
+    "databaseTestsSkipped": 23,
+    "typecheck": "passed before cleanup",
+    "lint": "passed before cleanup",
+    "build": "passed after cleanup",
+    "prismaValidate": "passed after cleanup",
+    "finalOutputsRemoved": true
+  }
+}

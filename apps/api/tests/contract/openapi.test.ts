@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { API_ERROR_CODES } from "@remarket/shared";
 import YAML from "yaml";
@@ -27,6 +28,7 @@ const requiredOperations: Array<[string, HttpMethod]> = [
   ["/orders/{orderId}/reviews", "post"], ["/conversations", "get"],
   ["/conversations", "post"], ["/conversations/{conversationId}/messages", "get"],
   ["/conversations/{conversationId}", "get"],
+  ["/conversations/unread-count", "get"],
   ["/conversations/{conversationId}/messages", "post"],
   ["/conversations/{conversationId}/read", "post"], ["/users/{id}", "get"],
   ["/users/{id}/products", "get"], ["/users/{id}/reviews", "get"],
@@ -170,8 +172,8 @@ describe("OpenAPI contract", () => {
 
   it("keeps every live frontend HTTP call aligned with an OpenAPI method and path", async () => {
     const openApiPath = fileURLToPath(new URL("../../../../docs/openapi.yaml", import.meta.url));
-    const adapterPath = fileURLToPath(
-      new URL("../../../web/src/lib/api/httpAdapter.ts", import.meta.url),
+    const servicesDirectory = fileURLToPath(
+      new URL("../../../web/src/services/", import.meta.url),
     );
     const document = asNode(YAML.parse(await readFile(openApiPath, "utf8")));
     const openApiOperations = new Set<string>();
@@ -183,7 +185,11 @@ describe("OpenAPI contract", () => {
       }
     }
 
-    const source = await readFile(adapterPath, "utf8");
+    const serviceFiles = (await readdir(servicesDirectory, { recursive: true }))
+      .filter((file) => file.endsWith(".ts") && !file.split(/[\\/]/).includes("__tests__"));
+    const source = (await Promise.all(
+      serviceFiles.map((file) => readFile(join(servicesDirectory, file), "utf8")),
+    )).join("\n");
     const callPattern = /http\.(getOrNull|get|post|put|patch|delete)(?:<[^>]+>)?\(\s*([`"'])(\/[^`"']+)\2/g;
     const calls = [...source.matchAll(callPattern)].map((match) => {
       const method = match[1] === "getOrNull" ? "GET" : match[1]!.toUpperCase();

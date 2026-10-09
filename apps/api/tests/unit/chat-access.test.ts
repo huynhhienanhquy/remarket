@@ -24,6 +24,25 @@ beforeEach(() => {
   client.$transaction.mockImplementation(async (action: (tx: typeof client) => unknown) => action(client));
 });
 describe("conversation access and delivery", () => {
+  it.each([0, 104])("returns the aggregate unread count %i using the static route", async (count) => {
+    client.message.count.mockResolvedValue(count);
+    const response = await request(createApp()).get("/api/v1/conversations/unread-count")
+      .set("Authorization", `Bearer ${signAccessToken(user.id, "session")}`).expect(200);
+    expect(response.body.data).toBe(count);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(client.conversation.findUnique).not.toHaveBeenCalled();
+  });
+  it("requires authentication for the message badge count", async () => {
+    await request(createApp()).get("/api/v1/conversations/unread-count").expect(401);
+    expect(client.message.count).not.toHaveBeenCalled();
+  });
+  it("does not expose an unread count to locked accounts", async () => {
+    client.session.findUnique.mockResolvedValue({ userId: user.id, revokedAt: null, expiresAt: new Date(Date.now() + 60000), user: { ...user, status: "LOCKED" } });
+    const response = await request(createApp()).get("/api/v1/conversations/unread-count")
+      .set("Authorization", `Bearer ${signAccessToken(user.id, "session")}`).expect(403);
+    expect(response.body.error.code).toBe("ACCOUNT_LOCKED");
+    expect(client.message.count).not.toHaveBeenCalled();
+  });
   it.each([null, { buyerId: "other", sellerId: "seller" }])("does not reveal a private conversation to a nonparticipant", async (conversation) => {
     client.conversation.findUnique.mockResolvedValue(conversation);
     const response = await request(createApp()).get(`/api/v1/conversations/${id}`).set("Authorization", `Bearer ${signAccessToken(user.id, "session")}`).expect(404);

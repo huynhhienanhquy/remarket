@@ -10,6 +10,8 @@ const adminEmail = process.env.SMOKE_ADMIN_EMAIL;
 const adminPassword = process.env.SMOKE_ADMIN_PASSWORD;
 const userEmail = process.env.SMOKE_USER_EMAIL;
 const userPassword = process.env.SMOKE_USER_PASSWORD;
+const secondUserEmail = process.env.SMOKE_SECOND_USER_EMAIL;
+const secondUserPassword = process.env.SMOKE_SECOND_USER_PASSWORD;
 assert.ok(adminEmail && adminPassword && userEmail && userPassword, "Set SMOKE_ADMIN_EMAIL/PASSWORD and SMOKE_USER_EMAIL/PASSWORD for dedicated test accounts");
 const timingLabel = process.argv[2] ?? "browser";
 if (!/^[a-z-]+$/.test(timingLabel)) throw new Error("Invalid browser timing label");
@@ -22,6 +24,7 @@ const requests = [];
 const exceptions = [];
 const clients = [];
 const timings = [];
+const sessionTabs = [];
 
 async function measure(operation, action) {
   const start = performance.now();
@@ -73,11 +76,13 @@ async function waitFor(tab, expression, label) {
     if (await evaluate(tab, expression)) return;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  await screenshot(tab, "failure");
   console.error(JSON.stringify({ stage: label, recent_requests: requests.slice(-12), visible_text: (await evaluate(tab, "document.body.innerText")).slice(0, 900) }));
+  await screenshot(tab, "failure").catch((error) => console.error(`Failure screenshot unavailable: ${error.message}`));
   throw new Error(`UI timeout: ${label}; path=${await evaluate(tab, "location.pathname")}`);
 }
 async function screenshot(tab, name) {
+  // Inactive headless targets may have no surface to capture until activated.
+  await tab.send("Page.bringToFront");
   const result = await tab.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   await writeFile(path.join(artifactDir, `${name}.png`), Buffer.from(result.data, "base64"));
 }
@@ -117,6 +122,7 @@ try {
     assert(target, "Created target must be discoverable");
     const tab = connect(target.webSocketDebuggerUrl);
     clients.push(tab);
+    sessionTabs.push(tab);
     await tab.send("Page.enable"); await tab.send("Runtime.enable"); await tab.send("Network.enable");
     await tab.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1024, deviceScaleFactor: 1, mobile: false });
     return tab;
@@ -152,47 +158,72 @@ try {
   }
   console.log("PASS: all eight admin screens load with 200");
 
-  // Another tab logs out the shared browser session, then logs in as USER.
+  // All targets use the same Chrome profile and cookie jar, with separate scopes.
   tabB = await newTab();
   await tabB.send("Page.navigate", { url: `${web}/admin` });
-  await waitFor(tabB, "Boolean([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Đăng xuất'))", "second admin tab");
-  await measure("browser_logout_button", async () => {
-    await evaluate(tabB, "[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Đăng xuất').click()");
-    await waitFor(tabB, "Boolean([...document.querySelectorAll('button')].find(b => b.textContent.includes('Đang đăng xuất') && b.disabled))", "immediate logout feedback");
-    await waitFor(tabB, "location.pathname === '/' || location.pathname === '/login'", "logout");
-  });
-  console.log("PASS: second tab logout completed");
-  await waitFor(tabA, "!document.querySelector('nav[aria-label=\"Khu vực quản trị\"]')", "broadcast removes private admin UI");
-  const start = requests.length;
+  await waitFor(tabB, "location.pathname === '/login' && Boolean(document.querySelector('#login-email'))", "new tab has no inherited admin session");
   await measure("browser_member_login_to_home", async () => {
     await login(tabB, userEmail, userPassword);
     await waitFor(tabB, "location.pathname === '/' && document.body.innerText.includes('Món đồ cũ. Giá trị mới.')", "member login");
   });
+  const tabs = [tabA, tabB];
+  const expectedEmails = [adminEmail, userEmail];
+  const expectedRoles = ["ADMIN", "USER"];
+  if (secondUserEmail && secondUserPassword) {
+    const tabC = await newTab();
+    await login(tabC, secondUserEmail, secondUserPassword);
+    await waitFor(tabC, "location.pathname === '/' && document.body.innerText.includes('Món đồ cũ. Giá trị mới.')", "second member login");
+    console.log("PASS: second member logged in to a third tab");
+    tabs.push(tabC); expectedEmails.push(secondUserEmail); expectedRoles.push("USER");
+  }
+  const identity = "(async () => { const { getSessionUser } = await import('/src/stores/sessionStore.ts'); return getSessionUser()?.email; })()";
   await tabA.send("Page.bringToFront");
-  await waitFor(tabA, `(async () => { const { getSessionUser } = await import('/src/lib/api/session.ts'); return getSessionUser()?.email === ${JSON.stringify(userEmail)}; })()`, "foreign tab restores current USER without waiting for 401");
-  assert(!await evaluate(tabA, "Boolean(document.querySelector('nav[aria-label=\"Khu vực quản trị\"]'))"));
-  const recovered = requests.slice(start);
-  assert(recovered.some((request) => request.path === "/api/v1/auth/bootstrap" && request.status === 200), "Cookie restores the USER session");
-  assert(!recovered.some((request) => request.path.startsWith("/api/v1/admin/") && request.status === 403), "No admin request is replayed under USER");
-  await screenshot(tabA, "stale-admin-recovered");
-  // Expired/invalid access in both tabs must serialize actual cookie rotation.
+  assert.deepEqual(await Promise.all(tabs.map((tab) => evaluate(tab, identity))), expectedEmails);
+  assert(await evaluate(tabA, "Boolean(document.querySelector('nav[aria-label=\"Khu vực quản trị\"]'))"));
+  const scopes = await Promise.all(tabs.map((tab) => evaluate(tab, "sessionStorage.getItem('remarket:session-scope')")));
+  assert.equal(new Set(scopes).size, tabs.length, "Every account has a separate cookie scope");
+  for (let index = 0; index < tabs.length; index++) {
+    const tab = tabs[index];
+    await tab.send("Page.reload", { ignoreCache: false });
+    await waitFor(tab, `(async () => { const { getSessionUser } = await import('/src/stores/sessionStore.ts'); return getSessionUser()?.email === ${JSON.stringify(expectedEmails[index])}; })()`, "reload restores the same account");
+    assert.equal(await evaluate(tab, "sessionStorage.getItem('remarket:session-scope')"), scopes[index]);
+    console.log(`PASS: tab ${index + 1} retained its account and scope after reload`);
+  }
+  console.log(`PASS: ${tabs.length} accounts stay independent in one browser, including focus and reload`);
+  await screenshot(tabA, "independent-admin");
+  await screenshot(tabB, "independent-member");
+  // Expired access in every tab rotates only that tab's refresh cookie.
   const recoveryStart = requests.length;
-  await Promise.all([tabA, tabB].map((tab) => evaluate(tab, "(async () => { const { http } = await import('/src/lib/api/index.ts'); http.setAccessToken('expired-diagnostic-token'); })()")));
-  const restored = await Promise.all([tabA, tabB].map((tab) => evaluate(tab, "(async () => { const { api } = await import('/src/lib/api/index.ts'); return (await api.auth.me())?.role; })()")));
-  assert.deepEqual(restored, ["USER", "USER"]);
+  await Promise.all(tabs.map((tab) => evaluate(tab, "(async () => { const { http } = await import('/src/services/api.ts'); http.setAccessToken('expired-diagnostic-token'); })()")));
+  const recovery = await Promise.all(tabs.map((tab) => evaluate(tab, `(async () => {
+    const { api } = await import('/src/services/api.ts');
+    const { getSessionUser, getSessionRevision } = await import('/src/stores/sessionStore.ts');
+    const before = { user: getSessionUser(), revision: getSessionRevision(), scope: sessionStorage.getItem('remarket:session-scope') };
+    try { return { role: (await api.auth.me())?.role, before, after: { user: getSessionUser(), revision: getSessionRevision() } }; }
+    catch (error) { return { error: error.code, before, after: { user: getSessionUser(), revision: getSessionRevision() } }; }
+  })()`)));
+  if (recovery.some((result) => result.error)) console.error(JSON.stringify({ recovery, recent_requests: requests.slice(recoveryStart) }));
+  const restored = recovery.map((result) => result.role);
+  assert.deepEqual(restored, expectedRoles);
   const rotations = requests.slice(recoveryStart).filter((request) => request.path === "/api/v1/auth/refresh");
-  assert.equal(rotations.length, 2, "Each tab performs one serialized refresh");
+  assert.equal(rotations.length, tabs.length, "Each tab performs one refresh");
   assert(rotations.every((request) => request.status === 200), "No concurrent cookie replay revokes the session");
   console.log("PASS: simultaneous cross-tab access recovery rotates cookies without replay or logout");
+  await evaluate(tabB, "(async () => { const { api } = await import('/src/services/api.ts'); await api.auth.logout(); })()");
+  assert.equal(await evaluate(tabB, identity), undefined);
+  assert.equal(await evaluate(tabA, identity), adminEmail);
+  if (tabs[2]) assert.equal(await evaluate(tabs[2], identity), secondUserEmail);
+  const dashboard = await evaluate(tabA, "(async () => { const { http } = await import('/src/services/api.ts'); return await http.get('/admin/dashboard'); })()");
+  assert(dashboard, "Admin API still works after another tab logs out");
+  console.log("PASS: member logout leaves admin and other member sessions active");
   assert.equal(exceptions.length, 0, "No uncaught browser exceptions");
-  console.log("PASS: second-tab USER login removes stale admin UI; no forbidden admin replay");
   console.log(`Screenshots: ${artifactDir}`);
   await mkdir(path.resolve(".artifacts/performance"), { recursive: true });
   await writeFile(path.resolve(`.artifacts/performance/${timingLabel}.json`), JSON.stringify(timings, null, 2));
 } finally {
-  // Logout only this isolated browser's test session; never logout-all.
-  if (tabB) {
-    try { await evaluate(tabB, "(async () => { const { api, http } = await import('/src/lib/api/index.ts'); if (http.getAccessToken()) await api.auth.logout(); })()"); }
+  // Logout each isolated browser test session; never logout-all.
+  for (const tab of sessionTabs) {
+    try { await evaluate(tab, "(async () => { const { api, http } = await import('/src/services/api.ts'); if (http.getAccessToken()) await api.auth.logout(); })()"); }
     catch { console.error("Test-session logout unavailable; its normal expiry remains in effect."); }
   }
   if (browser) await browser.send("Browser.close").catch(() => undefined);

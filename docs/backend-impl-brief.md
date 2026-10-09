@@ -4,7 +4,7 @@ Reference order when anything conflicts (`docs/backend-detail.md` §1):
 
 1. `detail-project.md` — permissions, security, transactions, lifecycle.
 2. `packages/shared/src/dto.ts` — response shapes.
-3. `apps/web/src/lib/api/httpAdapter.ts` — URL + method actually called.
+3. `apps/web/src/services/httpAdapter.ts` + `services/endpoints/` — URL + method actually called.
 4. `apps/web/src/tests/` — UI behaviour verified through the HTTP adapter.
 
 ## Non-negotiable rules
@@ -126,7 +126,7 @@ Each validator returns `string | null` (the message) — turn non-null into
   "meta": { "request_id": "uuid" } }
 ```
 
-`apps/web/src/lib/api/http.ts` unwraps `body.data`, so anything wrapped twice
+`apps/web/src/services/http.ts` unwraps `body.data`, so anything wrapped twice
 breaks the UI.
 
 ## Endpoint list owned by each router

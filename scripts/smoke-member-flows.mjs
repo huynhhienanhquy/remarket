@@ -48,6 +48,7 @@ async function wait(tab, expression, label) {
   while (Date.now() < deadline) { if (await evaluate(tab, expression)) return; await new Promise((resolve) => setTimeout(resolve, 200)); }
   await screenshot(tab, "failure");
   console.error(JSON.stringify({ stage: label, requests: requests.slice(-20), cookies: (await tab.send('Network.getAllCookies')).cookies.map(({name,domain,path,secure,expires}) => ({name,domain,path,secure,expires})) }));
+  console.error(JSON.stringify(await evaluate(tab, "({visibility:document.visibilityState, receivedMessages:document.querySelectorAll('[data-received-id]').length})")));
   throw new Error(`Timeout ${label}: ${(await evaluate(tab, "document.body.innerText")).slice(0, 1500)}`);
 }
 async function fill(tab, selector, value) {
@@ -64,14 +65,14 @@ async function visit(tab, route, visible, label, mobile = false) {
   await wait(tab, "!document.querySelector('main [aria-busy=\"true\"], main .rm-skeleton') && !document.body.innerText.includes('Đang khôi phục phiên')", label + " loaded");
   // Public routes render before session recovery; protected adapter calls must
   // wait for the logged-in identity instead of racing bootstrap in the harness.
-  await wait(tab, "import('/src/lib/api/http.ts').then(m => Boolean(m.getAccessToken()))", label + " session ready");
+  await wait(tab, "import('/src/services/http.ts').then(m => Boolean(m.getAccessToken()))", label + " session ready");
   await wait(tab, "[...document.querySelectorAll('img')].filter(img => new URL(img.src).pathname.startsWith('/api/v1/uploads/')).every(img => img.complete && img.naturalWidth > 0)", label + " uploaded images decoded");
   const dimensions = await evaluate(tab, "({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth })");
   assert(dimensions.scroll <= dimensions.width + 1, `Horizontal overflow ${label}: ${JSON.stringify(dimensions)}`);
   assert(!await evaluate(tab, "document.body.innerText.includes('Chưa tải được dữ liệu') || document.body.innerText.includes('Không tải được dữ liệu')"), `Query error ${label}`);
   await screenshot(tab, label); checks.push(label); console.log(`PASS UI: ${label}`);
 }
-const call = (tab, code) => evaluate(tab, `(async () => { const {api} = await import('/src/lib/api/index.ts'); ${code} })()`);
+const call = (tab, code) => evaluate(tab, `(async () => { const {api} = await import('/src/services/api.ts'); ${code} })()`);
 try {
   const endpoint = await new Promise((resolve, reject) => {
     let output = ""; const timer = setTimeout(() => reject(new Error("Chrome startup timeout")), 20000);
@@ -92,7 +93,9 @@ try {
     await wait(tab, "location.pathname === '/' || location.pathname === '/admin' || location.pathname === '/orders'", "login redirect");
     const cookies = (await tab.send('Network.getAllCookies')).cookies;
     console.log(JSON.stringify({ login: email, cookies: cookies.map(({name,domain,path,secure,expires}) => ({name,domain,path,secure,expires})) }));
-    assert(cookies.some(cookie => cookie.name === 'remarket_refresh'), 'Login must set the refresh cookie');
+    const sessionScope = await evaluate(tab, "import('/src/stores/sessionScope.ts').then(m => m.getSessionScope())");
+    assert.match(sessionScope, /^[a-f0-9-]{36}$/i);
+    assert(cookies.some(cookie => cookie.name === `remarket_refresh_${sessionScope}` && cookie.httpOnly && cookie.path === '/api/v1/auth'), 'Login must set the HttpOnly refresh cookie for this tab');
     return tab;
   }
   if (process.env.SMOKE_EMAIL_ONLY === "true") {
@@ -115,10 +118,10 @@ try {
     await click(admin, "Đồng ý xác minh");
     await wait(admin, "Boolean(document.querySelector('[role=dialog]'))", "email confirmation dialog");
     await screenshot(admin, "email-approve-dialog-mobile");
-    const revisionBefore = await evaluate(user, "import('/src/lib/api/session.ts').then(m => m.getSessionRevision())");
+    const revisionBefore = await evaluate(user, "import('/src/stores/sessionStore.ts').then(m => m.getSessionRevision())");
     await evaluate(admin, "[...document.querySelectorAll('[role=dialog] button')].find(b => b.textContent.trim() === 'Đồng ý xác minh').click()");
     await wait(admin, "!document.querySelector('[role=dialog]') && document.body.innerText.includes('Không có yêu cầu xác minh email')", "email approved queue empty");
-    await wait(user, `import('/src/lib/api/session.ts').then(m => m.getSessionRevision() > ${revisionBefore})`, "verified session refreshed without reload");
+    await wait(user, `import('/src/stores/sessionStore.ts').then(m => m.getSessionRevision() > ${revisionBefore})`, "verified session refreshed without reload");
     const approved = await call(user, "return api.auth.me();");
     assert(approved.email_verified_at);
     assert.equal(await evaluate(user, "location.pathname"), "/");
@@ -133,10 +136,68 @@ try {
     const noticesAfter = await call(user, "return api.notifications.list({page:1});");
     assert.equal(noticesAfter.items.filter(item => item.type === "EMAIL_VERIFIED").length, 1);
     checks.push("email-approval-idempotent");
+  } else if (process.env.SMOKE_CHAT_ONLY === "true") {
+    const buyer = await tabFor("buyer@example.test");
+    const seller = await tabFor("seller@example.test");
+    const admin = await tabFor("admin@example.test");
+    assert.equal(await call(seller, "return api.chat.unreadCount();"), 2);
+    assert.equal(await call(buyer, "return api.chat.unreadCount();"), 1);
+    assert.equal(await call(admin, "return api.chat.unreadCount();"), 0, "Other users' private messages must not count");
+    const firstPage = await call(seller, "return api.chat.conversations(1);");
+    assert.equal(firstPage.meta.total, 22);
+    assert.equal(firstPage.items.reduce((sum, thread) => sum + thread.unread_count, 0), 0);
+    const secondPage = await call(seller, "return api.chat.conversations(2);");
+    const conversationId = "40000000-0000-0000-0000-000000000001";
+    const otherUnread = secondPage.items.find(thread => thread.id !== conversationId && thread.unread_count === 1);
+    assert(otherUnread, "Aggregate must include the unread thread on the second page");
+    const header = "document.querySelector('nav[aria-label=\"Tiện ích\"] a[href=\"/messages\"]')";
+    const bottom = "document.querySelector('nav[aria-label=\"Điều hướng chính\"] a[href=\"/messages\"]')";
+    const badge = (selector, count) => `${selector}?.getAttribute('aria-label') === 'Tin nhắn: ${count} chưa đọc'`;
+    await visit(seller, "/", "Món đồ cũ", "chat-badge-initial-desktop");
+    await wait(seller, badge(header, 2), "aggregate header badge beyond pagination");
+    await screenshot(seller, "chat-badge-initial-desktop");
+    await visit(seller, "/", "Món đồ cũ", "chat-badge-initial-mobile", true);
+    await wait(seller, badge(bottom, 2), "mobile unread badge");
+    await screenshot(seller, "chat-badge-initial-mobile");
+    await visit(buyer, `/messages/${conversationId}`, "Gửi tin nhắn", "chat-badge-sender-mobile", true);
+    await wait(buyer, "!document.body.innerText.includes('Đang kết nối lại')", "sender websocket connected");
+    for (let index = 1; index <= 2; index++) {
+      const content = `Tin mới kiểm thử badge ${index}`;
+      await fill(buyer, "#chat-message", content);
+      await click(buyer, "Gửi tin nhắn");
+      await wait(buyer, `document.body.innerText.includes(${JSON.stringify(content)}) && !document.body.innerText.includes('Đang gửi…')`, "message persisted");
+      await wait(seller, badge(bottom, 2 + index), "unread badge updates outside the inbox without reload");
+    }
+    assert(seller.frames.some(frame => frame.includes("message:created") && frame.includes("Tin mới kiểm thử badge 2")), "Badge update must receive the real WebSocket event");
+    assert.equal(await call(buyer, "return api.chat.unreadCount();"), 1, "Outgoing messages must not increase sender's unread count");
+    await screenshot(seller, "chat-badge-new-messages-mobile"); checks.push("chat-badge-live-websocket");
+    // A screenshot/navigation does not activate a background CDP tab. Actual read
+    // tracking intentionally requires a visible tab, just like a user's inbox.
+    await seller.send("Page.bringToFront");
+    await wait(seller, "document.visibilityState === 'visible'", "seller's inbox tab is visible");
+    await visit(seller, `/messages/${conversationId}`, "Tin mới kiểm thử badge 2", "chat-badge-read-thread-desktop");
+    // ChatShell has its own compact header; the marketplace badge appears on home.
+    await wait(seller, "import('/src/services/api.ts').then(m => m.api.chat.unreadCount()).then(count => count === 1)", "reading one thread leaves other thread unread");
+    await fill(seller, "#chat-message", "Phản hồi kiểm thử badge");
+    await click(seller, "Gửi tin nhắn");
+    await wait(seller, "document.body.innerText.includes('Phản hồi kiểm thử badge') && !document.body.innerText.includes('Đang gửi…')", "seller reply persisted");
+    assert.equal(await call(seller, "return api.chat.unreadCount();"), 1);
+    await visit(seller, "/", "Món đồ cũ", "chat-badge-remaining-desktop");
+    await wait(seller, badge(header, 1), "remaining unread badge after reading another thread");
+    await visit(seller, `/messages/${otherUnread.id}`, "Tin chưa đọc ở trang hai", "chat-badge-last-unread-desktop");
+    await wait(seller, "import('/src/services/api.ts').then(m => m.api.chat.unreadCount()).then(count => count === 0)", "last unread thread is read");
+    assert.equal(await call(seller, "return api.chat.unreadCount();"), 0);
+    await visit(seller, "/", "Món đồ cũ", "chat-badge-cleared-mobile", true);
+    await wait(seller, `${bottom} && !${bottom}.querySelector('span[aria-label]')`, "mobile badge remains cleared after reload");
+    await wait(seller, `${header} && !${header}.querySelector('span[aria-label]')`, "header badge remains cleared after reload");
+    checks.push("chat-badge-read-clear-after-reload");
+    console.log("PASS: aggregate unread messages across pagination, realtime desktop/mobile badges, outgoing/private exclusions and read clearing");
   } else {
   const buyer = await tabFor("buyer@example.test");
   const seller = await tabFor("seller@example.test");
   const admin = await tabFor("admin@example.test");
+  const sellerId = await call(seller, "return (await api.auth.me()).id;");
+  const sellerProfileBefore = await call(buyer, `return api.profiles.publicProfile(${JSON.stringify(sellerId)});`);
   if (process.env.SMOKE_LIFECYCLE_ONLY !== "true") {
   for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Lưu thay đổi", "profile"], ["/favorites", "Sản phẩm yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
     await visit(buyer, route, text, `${label}-desktop`);
@@ -193,15 +254,53 @@ try {
   order = await call(seller, `const order = await api.orders.detail(${JSON.stringify(order.id)}); return api.orders.act(order.id,'ship',{expected_version:order.version,carrier:'Kiểm thử',tracking_code:'TEST123'});`);
   order = await call(buyer, `return api.orders.act(${JSON.stringify(order.id)},'deliver',{expected_version:${order.version}});`);
   await visit(buyer, `/orders/${order.id}`, "Hành động", "buyer-order-mobile", true);
-  order = await call(buyer, `return api.orders.act(${JSON.stringify(order.id)},'complete',{expected_version:${order.version},buyer_confirmed_received:true,buyer_confirmed_paid:true});`);
+  await click(buyer, "Hoàn tất đơn hàng");
+  await click(buyer, "Hoàn tất");
+  await wait(buyer, "Boolean([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Đánh giá người bán' && !b.disabled))", "completed order offers seller review");
+  order = await call(buyer, `return api.orders.detail(${JSON.stringify(order.id)});`);
   assert.equal(order.status, "COMPLETED");
-  await call(buyer, `return api.reviews.create(${JSON.stringify(order.id)},{rating:5,comment:'Giao dịch kiểm thử thành công',expected_version:${order.version}});`);
+  await click(buyer, "Đánh giá người bán");
+  await wait(buyer, "Boolean(document.querySelector('[role=dialog] input[type=radio]'))", "review dialog opens");
+  await wait(buyer, "[...document.querySelectorAll('[role=dialog]')].every(panel => !panel.getAnimations().some(animation => animation.playState === 'running'))", "review dialog animation settled");
+  assert.equal(await evaluate(buyer, "document.querySelectorAll('[role=dialog] input[type=radio]:checked').length"), 0, "Review must not preselect a rating");
+  await screenshot(buyer, "seller-review-mobile"); checks.push("seller-review-mobile");
+  await buyer.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1024, deviceScaleFactor: 1, mobile: false });
+  await screenshot(buyer, "seller-review-desktop"); checks.push("seller-review-desktop");
+  await click(buyer, "Gửi đánh giá");
+  await wait(buyer, "document.body.innerText.includes('Vui lòng chọn số sao đánh giá.')", "rating required before sending");
+  await evaluate(buyer, "document.querySelector('[role=dialog] input[type=radio][value=\"1\"]').focus()");
+  for (let step = 0; step < 4; step++) {
+    await buyer.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+    await buyer.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+  }
+  assert.equal(await evaluate(buyer, "document.querySelector('[role=dialog] input[type=radio]:checked')?.value"), "5", "Native rating must work with arrow keys");
+  await fill(buyer, '[role="dialog"] textarea', "Giao dịch kiểm thử thành công");
+  await click(buyer, "Gửi đánh giá");
+  await wait(buyer, "!document.querySelector('[role=dialog]') && document.body.innerText.includes('Đánh giá đã gửi: 5/5 sao')", "review persisted through UI");
+  assert(requests.some(r => r.path === `/api/v1/orders/${order.id}/reviews` && r.status === 201), "Review UI must create a review on the live API");
+  const reviewedOrder = await call(buyer, `return api.orders.detail(${JSON.stringify(order.id)});`);
+  assert.equal(reviewedOrder.review.existing.rating, 5);
+  assert.equal(reviewedOrder.review.existing.comment, "Giao dịch kiểm thử thành công");
+  assert.equal(reviewedOrder.review.can_review, false);
+  await visit(buyer, `/orders/${order.id}`, "Đánh giá đã gửi: 5/5 sao", "seller-review-after-reload", true);
+  assert(!await evaluate(buyer, "[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Đánh giá người bán')"), "Cannot review twice after reload");
+  await visit(buyer, `/users/${product.seller.id}?tab=reviews`, "Giao dịch kiểm thử thành công", "seller-review-public-profile", true);
+  const sellerProfile = await call(buyer, `return api.profiles.publicProfile(${JSON.stringify(product.seller.id)});`);
+  assert.equal(sellerProfile.seller.rating, 5);
+  assert.equal(sellerProfile.seller.review_count, sellerProfileBefore.seller.review_count + 1);
+  await visit(seller, `/sales/${order.id}`, "Đánh giá từ người mua: 5/5 sao", "seller-order-review-mobile", true);
+  const sellerOrder = await call(seller, `return api.orders.detail(${JSON.stringify(order.id)});`);
+  assert.equal(sellerOrder.review.existing.id, reviewedOrder.review.existing.id);
+  assert.equal(sellerOrder.review.existing.comment, "Giao dịch kiểm thử thành công");
+  assert.equal(sellerOrder.review.can_review, false);
+  assert(!sellerOrder.allowed_actions.includes("review"));
+  assert(!await evaluate(seller, "[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Đánh giá người bán')"), "Seller can only read the buyer's review");
   assert.equal((await call(buyer, `return api.products.detail(${JSON.stringify(product.id)});`)).status, "SOLD");
   console.log("PASS: live adapter upload -> listing -> approval -> favorites/cart -> checkout -> delivery -> completion -> review");
   await call(admin, `const current = await api.products.detail(${JSON.stringify(product.id)}); return api.admin.blockProduct(current.id,current.version,'Kiểm tra ảnh snapshot sau khi tin bị ẩn');`);
   await visit(buyer, `/orders/${order.id}`, "Hành động", "order-hidden-listing-snapshot", true);
   assert(await evaluate(buyer, "Boolean([...document.querySelectorAll('img')].find(img => img.src.includes('/api/v1/uploads/') && img.src.includes('signature=') && img.naturalWidth > 0))"), "Order participant must see the signed snapshot image after the listing is hidden");
-  for (const [route, text] of [["/admin", "Tổng user"], ["/admin/users", "Người dùng"], ["/admin/products", "Tin đăng"], ["/admin/categories", "Danh mục"], ["/admin/reports", "Báo cáo"], ["/admin/reviews", "Đánh giá"], ["/admin/support", "Hỗ trợ"], ["/admin/audit", "Nhật ký"]]) await visit(admin, route, text, route === "/admin" ? "admin-dashboard" : route.replaceAll("/", "-").slice(1));
+  for (const [route, text] of [["/admin", "Tổng người dùng"], ["/admin/users", "Người dùng"], ["/admin/products", "Tin đăng"], ["/admin/categories", "Danh mục"], ["/admin/reports", "Báo cáo"], ["/admin/reviews", "Đánh giá"], ["/admin/support", "Hỗ trợ"], ["/admin/audit", "Nhật ký"]]) await visit(admin, route, text, route === "/admin" ? "admin-dashboard" : route.replaceAll("/", "-").slice(1));
   await visit(admin, "/admin/reviews", "Đánh giá", "admin-reviews-ready");
   await click(admin, "Xem");
   await wait(admin, "document.body.innerText.includes('Chi tiết đánh giá')", "admin review drawer");
@@ -214,11 +313,11 @@ try {
   }
   assert.equal(exceptions.length, 0, `Uncaught browser errors: ${exceptions.join("\n")}`);
   assert.equal(failures.length, 0, `5xx responses: ${JSON.stringify(failures)}`);
-  await writeFile(path.join(artifacts, process.env.SMOKE_EMAIL_ONLY === "true" ? "results-email.json" : process.env.SMOKE_LIFECYCLE_ONLY === "true" ? "results-lifecycle.json" : "results.json"), JSON.stringify({ checks, uncaughtErrors: exceptions, serverFailures: failures }, null, 2));
+  await writeFile(path.join(artifacts, process.env.SMOKE_CHAT_ONLY === "true" ? "results-chat-badge.json" : process.env.SMOKE_EMAIL_ONLY === "true" ? "results-email.json" : process.env.SMOKE_LIFECYCLE_ONLY === "true" ? "results-lifecycle.json" : "results.json"), JSON.stringify({ checks, uncaughtErrors: exceptions, serverFailures: failures }, null, 2));
   console.log(`PASS: ${checks.length} responsive screen checks; no uncaught browser exceptions or 5xx responses`);
 } finally {
   if (browser) await browser.send("Browser.close").catch(() => undefined);
   for (const client of clients) client.close();
   if (chrome.exitCode === null) { chrome.kill(); await new Promise((resolve) => { chrome.once("exit", resolve); setTimeout(resolve, 5000); }); }
-  if (path.dirname(profile) === path.resolve(tmpdir()) && path.basename(profile).startsWith("remarket-member-smoke-")) await rm(profile, { recursive: true, force: true });
+  if (path.dirname(profile) === path.resolve(tmpdir()) && path.basename(profile).startsWith("remarket-member-smoke-")) await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 }

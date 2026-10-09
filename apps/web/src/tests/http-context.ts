@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import type { SessionUser } from "@remarket/shared";
-import { http } from "../lib/api/http";
+import { http } from "../services/http";
 
 export interface RecordedRequest {
   method: string;
@@ -36,6 +36,7 @@ export function httpContext(viewer: SessionUser | null = null) {
   context.on("GET", "/auth/me", () => context.viewer);
   context.reply("GET", "/provinces", [{ code: "VN-01", name: "Hà Nội" }, { code: "VN-52", name: "Hồ Chí Minh" }]);
   context.reply("GET", "/categories", []);
+  context.reply("GET", "/conversations/unread-count", 0);
   vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, options) => {
     const url = new URL(String(input), window.location.origin);
     const request: RecordedRequest = {

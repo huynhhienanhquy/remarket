@@ -51,15 +51,24 @@ extending its lifetime; interrupted navigations cannot lose the session between
 database rotation and receipt of Set-Cookie. Explicit `/auth/refresh` still
 rotates atomically and retains strict 401 and replay-revocation semantics.
 
-Login, verification, reset, logout, bootstrap and refresh use the same browser
-Web Lock and local queue. Late responses are checked again after JSON parsing;
-credential actions invalidate earlier in-flight discoveries and private work.
-BroadcastChannel sends only an opaque sender id and a cookie-change hint (never
-tokens or identity), ignores its own tab, and causes other tabs to discard stale
-memory/cache and discover the current server identity. Focus/online/visibility
-revalidation is the fallback when messaging is unavailable. Web Locks require a
-secure context (HTTPS or localhost); browsers without that API serialize only
-within one tab, so target-browser multi-tab verification is required.
+Each tab stores a non-secret UUID in sessionStorage and sends X-Session-Scope.
+The API selects only remarket_refresh_<scope>, never another scope or the legacy
+cookie. Access tokens stay in memory and refresh tokens remain HttpOnly with the
+existing Secure/SameSite/path settings. Login and legacy verification use a new
+scope; failed login preserves the previous scope and credentials. Deploy API and
+web together. Older clients without the header retain the legacy shared cookie.
+
+Credential changes, bootstrap and refresh use a local queue and a browser Web
+Lock named for that scope, so independent accounts do not share a lock. Late
+responses are checked again after JSON parsing. BroadcastChannel sends only a
+sender id, scope and cookie-change hint, and invalidates only tabs sharing that
+scope. Focus/online/visibility revalidation restores only the current tab's
+account. Storage-disabled browsers retain a scope only for the current page.
+Web Locks require HTTPS or localhost; browsers without that API serialize only
+within one tab when a scope is shared. Test with
+`node apps/api/scripts/verify-isolated.mjs --browser-only --auth-browser`: three
+accounts share one Chrome profile and are checked through reload, simultaneous
+refresh and isolated logout using a temporary PostgreSQL schema.
 
 Login rechecks the password hash and identity under a User lock after bcrypt.
 Logout-all uses User -> Session -> AuthToken, like refresh and password reset.
@@ -157,9 +166,11 @@ Never substitute the application's schema for the isolated namespace.
 Run timing checks sequentially, without a concurrent build or another DB
 benchmark. Optional labels preserve separate browser reports, for example
 `node scripts/smoke-session-recovery.mjs browser-final`. The smoke covers all
-eight admin screens and USER login. Caches may legitimately serve a fresh list
-without a request; its cross-tab recovery probe selects an uncached role filter
-to verify the server rejects the old session before any private work is replayed.
+eight admin screens and simultaneous ADMIN/USER sessions in one Chrome profile.
+Its multi-tab probe verifies distinct cookie scopes, reload persistence, parallel
+access-token recovery and member logout while the admin API remains accessible.
+Set SMOKE_SECOND_USER_EMAIL/PASSWORD to include a third account; the isolated
+harness supplies a seller fixture automatically.
 
 Remote database latency can exceed Prisma's default five-second interactive
 transaction limit. `DATABASE_TRANSACTION_TIMEOUT_MS` defaults to 30000 and

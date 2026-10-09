@@ -45,7 +45,7 @@ export function createApp(): express.Express {
     cors({
       origin: env.corsOrigins,
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id"],
+      allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id", "X-Session-Scope"],
       exposedHeaders: ["X-Request-Id"],
     }),
   );

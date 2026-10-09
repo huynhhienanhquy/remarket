@@ -7,6 +7,10 @@ info:
     strings in VND and timestamps are ISO-8601 UTC strings. Mutating order and
     product operations use optimistic versions. Checkout requires an
     Idempotency-Key header and replays the original result for the same payload.
+    Browser tabs send a non-secret UUID in X-Session-Scope to select a separate
+    HttpOnly refresh cookie named remarket_refresh_<scope>. Scoped requests never
+    fall back to another scope or the legacy cookie. Requests without the header
+    retain the legacy shared-cookie behavior. Access tokens remain bearer JWTs.
 servers:
   - url: /api/v1
 tags:
@@ -27,11 +31,11 @@ x-error-profiles:
 x-operation-error-codes:
   register: *PublicValidationErrors
   login: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
-  bootstrapSession: [FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
-  refreshSession: [UNAUTHORIZED, FORBIDDEN, SESSION_EXPIRED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  bootstrapSession: [VALIDATION_ERROR, FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  refreshSession: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, SESSION_EXPIRED, RETRY_LATER, RATE_LIMITED, INTERNAL]
   getSession: *SessionReadErrors
-  logout: [FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
-  logoutAll: [UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  logout: [VALIDATION_ERROR, FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  logoutAll: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, SESSION_CHANGED, RETRY_LATER, RATE_LIMITED, INTERNAL]
   verifyEmail: [VALIDATION_ERROR, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, RATE_LIMITED, INTERNAL]
   getEmailVerificationRequest: *SessionReadErrors
   requestEmailVerification: *ActiveMutationErrors
@@ -66,6 +70,7 @@ x-operation-error-codes:
   actOnOrder: *ActiveMutationErrors
   createReview: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, REVIEW_NOT_ALLOWED, RETRY_LATER, RATE_LIMITED, INTERNAL]
   listConversations: *ActiveReadErrors
+  unreadMessageCount: *ActiveReadErrors
   getConversation: *ActiveReadErrors
   openConversation: *ActiveMutationErrors
   listMessages: *ActiveReadErrors
@@ -114,18 +119,31 @@ paths:
   /auth/register:
     post: { tags: [Auth], operationId: register, requestBody: { $ref: '#/components/requestBodies/RegisterBody' }, responses: { '201': { $ref: '#/components/responses/RegisterSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
   /auth/login:
+    parameters: &TabSessionScope
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     post: { tags: [Auth], operationId: login, requestBody: { $ref: '#/components/requestBodies/LoginBody' }, responses: { '200': { $ref: '#/components/responses/LoginSuccess' }, '401': { $ref: '#/components/responses/Error' } } }
   /auth/refresh:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: refreshSession, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } } }
   /auth/bootstrap:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: bootstrapSession, responses: { '200': { $ref: '#/components/responses/BootstrapSuccess' }, '403': { $ref: '#/components/responses/Error' } } }
   /auth/me:
     get: { tags: [Auth], operationId: getSession, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' }, '401': { $ref: '#/components/responses/Error' } } }
   /auth/logout:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: logout, description: Trusted-Origin idempotent logout using the refresh cookie or bearer. A mismatched live bearer/cookie session returns 409 without clearing credentials., responses: { '200': { $ref: '#/components/responses/AckSuccess' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
   /auth/logout-all:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: logoutAll, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/AckSuccess' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
   /auth/verify-email:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: verifyEmail, description: Consumes a legacy one-time mailbox token and submits an admin approval request. Opens a session but does NOT mark email verified., requestBody: { $ref: '#/components/requestBodies/TokenBody' }, responses: { '200': { $ref: '#/components/responses/AccessTokenSuccess' }, '422': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' } } }
   /auth/email-verification-request:
     get:
@@ -179,6 +197,7 @@ paths:
   /auth/forgot-password:
     post: { tags: [Auth], operationId: forgotPassword, requestBody: { $ref: '#/components/requestBodies/EmailBody' }, responses: { '200': { $ref: '#/components/responses/AcceptedSuccess' } } }
   /auth/reset-password:
+    parameters: *TabSessionScope
     post: { tags: [Auth], operationId: resetPassword, requestBody: { $ref: '#/components/requestBodies/ResetPasswordBody' }, responses: { '200': { $ref: '#/components/responses/AcceptedSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
   /auth/profile:
     patch: { tags: [Auth], operationId: updateProfile, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/ProfileBody' }, responses: { '200': { $ref: '#/components/responses/SessionUserSuccess' } } }
@@ -288,6 +307,13 @@ paths:
   /conversations:
     get: { tags: [Chat], operationId: listConversations, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/ConversationListSuccess' } } }
     post: { tags: [Chat], operationId: openConversation, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/OpenConversationBody' }, responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '201': { $ref: '#/components/responses/ConversationSuccess' } } }
+  /conversations/unread-count:
+    get:
+      tags: [Chat]
+      operationId: unreadMessageCount
+      description: Total incoming messages with no read timestamp across all conversations where the viewer is buyer or seller, independent of pagination. Requires an active account.
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/CountSuccess' } }
   /conversations/{conversationId}:
     get: { tags: [Chat], operationId: getConversation, security: [{ bearerAuth: [] }], parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
   /conversations/{conversationId}/messages:
@@ -1170,6 +1196,7 @@ components:
         tracking_code: { type: string, nullable: true }
     OrderReviewState:
       type: object
+      description: Review eligibility and the existing review readable by this order's buyer and seller. Only the buyer may submit a review.
       required: [can_review, reason, existing]
       additionalProperties: false
       properties:

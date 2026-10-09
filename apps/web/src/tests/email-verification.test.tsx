@@ -5,12 +5,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { EmailVerificationRequest } from "@remarket/shared";
-import { SessionProvider } from "../app/SessionProvider";
-import { ToastProvider } from "../components/ui";
-import { createQueryClient } from "../lib/queryClient";
-import { VerifyEmailPage } from "../pages/auth/VerifyEmailPage";
-import { AdminEmailVerificationsPage } from "../pages/admin/AdminEmailVerificationsPage";
-import { api } from "../lib/api";
+import { SessionProvider } from "../contexts/SessionContext";
+import { ToastProvider } from "../components/common";
+import { createQueryClient } from "../config/queryClient";
+import { VerifyEmailPage } from "../pages/VerifyEmailPage/VerifyEmailPage";
+import { AdminEmailVerificationsPage } from "../pages/AdminEmailVerificationsPage/AdminEmailVerificationsPage";
+import { api } from "../services/api";
 import { failure, httpContext, page } from "./http-context";
 import { member, timestamp } from "./test-data";
 

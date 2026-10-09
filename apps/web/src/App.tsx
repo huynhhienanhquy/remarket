@@ -1,8 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "./app/SessionProvider";
-import { AppRouter } from "./app/router";
-import { createQueryClient } from "./lib/queryClient";
-import { RealtimeProvider } from "./app/RealtimeProvider";
+import { SessionProvider } from "./contexts/SessionContext";
+import { AppRouter } from "./config/route/router";
+import { createQueryClient } from "./config/queryClient";
+import { RealtimeProvider } from "./contexts/RealtimeContext";
 
 const queryClient = createQueryClient();
 
@@ -10,7 +10,7 @@ const queryClient = createQueryClient();
  * Provider order: one query cache for the session, then the session itself so
  * guards can read it during the initial check, then the router (ui-spec 26).
  * Toast/session-expiry providers live inside the router because they render
- * <Link>; see `RootLayout` in app/router.tsx.
+ * <Link>; see `RootLayout` in layouts/RootLayout/RootLayout.tsx.
  */
 export function App() {
   return (

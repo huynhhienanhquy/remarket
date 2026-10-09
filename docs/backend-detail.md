@@ -10,8 +10,8 @@ Backend phải phục vụ đầy đủ các luồng trong `detail-project.md` v
 
 - `packages/shared/src/dto.ts`
 - `packages/shared/src/enums.ts`
-- `apps/web/src/lib/api/contract.ts`
-- `apps/web/src/lib/api/httpAdapter.ts`
+- `apps/web/src/types/api.ts`
+- `apps/web/src/services/httpAdapter.ts` và `apps/web/src/services/endpoints/`
 - Hành vi UI được kiểm thử qua HTTP adapter trong `apps/web/src/tests/`
 
 Thứ tự ưu tiên khi có khác biệt:
