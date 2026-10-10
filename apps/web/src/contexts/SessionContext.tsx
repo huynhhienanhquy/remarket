@@ -96,28 +96,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let disposed = false;
     let checking = false;
-    const sync = async () => {
+    const sync = async (blockContent = false) => {
       if (checking || !navigator.onLine || document.visibilityState === "hidden") return;
       checking = true;
-      setValidationPending(true);
+      // Returning to the tab should preserve the visible page and its drafts.
+      // Only a known cookie change needs to suspend content during discovery.
+      if (blockContent) setValidationPending(true);
       try {
-        const user = await http.restoreSession();
+        // An unchanged session keeps its token/socket and cached page data.
+        // The transport already refreshes an expired token on a 401 response.
+        const user = !blockContent && http.getAccessToken()
+          ? await http.readSession()
+          : await http.restoreSession();
         if (!disposed) { applyUser(user); setStatus("ready"); setBootstrapError(null); }
       } catch (error) {
-        if (!disposed && !(error instanceof ApiError && error.code === "SESSION_CHANGED")) {
+        if (blockContent && !disposed && !(error instanceof ApiError && error.code === "SESSION_CHANGED")) {
           queryClient.clear(); setBootstrapError(error);
         }
-      } finally { checking = false; if (!disposed) setValidationPending(false); }
+        // A transient background failure should not discard the current page.
+      } finally { checking = false; if (blockContent && !disposed) setValidationPending(false); }
     };
     const resume = () => { if (document.visibilityState !== "hidden") void sync(); };
+    const cookieChanged = () => { void sync(true); };
     const unsubscribe = listenForSessionChanges();
-    window.addEventListener(SESSION_COOKIE_CHANGED_EVENT, resume);
+    window.addEventListener(SESSION_COOKIE_CHANGED_EVENT, cookieChanged);
     window.addEventListener("online", resume);
     window.addEventListener("focus", resume);
     document.addEventListener("visibilitychange", resume);
     return () => {
       disposed = true; unsubscribe();
-      window.removeEventListener(SESSION_COOKIE_CHANGED_EVENT, resume);
+      window.removeEventListener(SESSION_COOKIE_CHANGED_EVENT, cookieChanged);
       window.removeEventListener("online", resume);
       window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
