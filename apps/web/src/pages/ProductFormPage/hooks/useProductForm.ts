@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Condition, DeliveryMethod } from "@remarket/shared";
-import type { ProductAction, ProductDetail, ProductImage } from "@remarket/shared";
+import type { ProductAction, ProductImage } from "@remarket/shared";
 import type { ProductInput } from "@/types/api";
 import { api } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors } from "@/helpers/errors";
 import { useToast } from "@/components/common";
-import { CONDITIONS, DELIVERY_METHODS } from "@remarket/shared";
+import { PRODUCT_LIMITS, validateProductTitle, validateDescription, validatePriceInput, validateUsageMonths, validateCondition, validateDeliveryMethod, validateShippingFee } from "@remarket/shared";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
 type Mode = "create" | "edit";
@@ -50,8 +50,11 @@ export function useProductForm() {
   const [errors, setErrors] = useState<Partial<Record<keyof ProductInput, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [existingProduct, setExistingProduct] = useState<ProductDetail | null>(null);
-  const [loadError, setLoadError] = useState<unknown>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const initializedId = useRef<string | null>(null);
+  const productQuery = useQuery({ queryKey: queryKeys.product(id ?? ""), queryFn: () => api.products.detail(id!), enabled: mode === "edit" && !!id, staleTime: Infinity });
+  const existingProduct = productQuery.data ?? null;
+  const loadError = productQuery.error;
 
   // Load categories for select
   const categoryQuery = useQuery({
@@ -68,19 +71,10 @@ export function useProductForm() {
       : [{ ...root, parentName: "" }],
   ) ?? [];
 
-  // Load existing product when editing
-  useEffect(() => {
-    let active = true;
-    if (mode === "edit" && id) {
-      setExistingProduct(null); setLoadError(null);
-      api.products.detail(id).then((product) => { if (active) setExistingProduct(product); }).catch((error: unknown) => { if (active) setLoadError(error); });
-    }
-    return () => { active = false; };
-  }, [mode, id]);
-
   // Initialize form with existing data
   useEffect(() => {
-    if (existingProduct) {
+    if (existingProduct && initializedId.current !== existingProduct.id) {
+      initializedId.current = existingProduct.id;
       setForm({
         title: existingProduct.title,
         description: existingProduct.description,
@@ -103,15 +97,13 @@ export function useProductForm() {
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof ProductInput, string>> = {};
 
-    if (form.title.trim().length < 5) newErrors.title = "Tên món đồ cần ít nhất 5 ký tự.";
-    if (form.title.trim().length > 150) newErrors.title = "Tên món đồ tối đa 150 ký tự.";
-
-    if (form.description.trim().length < 20) newErrors.description = "Mô tả cần ít nhất 20 ký tự.";
-    if (form.description.trim().length > 5000) newErrors.description = "Mô tả tối đa 5000 ký tự.";
-
-    const priceValid = /^\d+$/.test(form.price) && form.price !== "0";
-    if (!priceValid) newErrors.price = "Giá phải là số nguyên dương.";
-    else if (BigInt(form.price) > 1_000_000_000n) newErrors.price = "Giá tối đa 1.000.000.000 ₫.";
+    const fields = {
+      title: validateProductTitle(form.title), description: validateDescription(form.description),
+      price: validatePriceInput(form.price), usage_months: validateUsageMonths(form.usage_months === null ? "" : String(form.usage_months)),
+      condition: validateCondition(form.condition), delivery_method: validateDeliveryMethod(form.delivery_method),
+      shipping_fee: validateShippingFee(form.shipping_fee, true),
+    };
+    for (const [key, error] of Object.entries(fields)) if (error) newErrors[key as keyof ProductInput] = error;
 
     if (!form.category_id) newErrors.category_id = "Hãy chọn danh mục.";
 
@@ -120,23 +112,12 @@ export function useProductForm() {
 
     if (!form.province_code) newErrors.province_code = "Hãy chọn tỉnh/thành phố.";
 
-    if (!CONDITIONS.includes(form.condition)) newErrors.condition = "Hãy chọn tình trạng.";
-
-    if (form.usage_months !== null && (form.usage_months < 0 || form.usage_months > 1200)) {
-      newErrors.usage_months = "Số tháng sử dụng không hợp lệ.";
-    }
-
-    if (!DELIVERY_METHODS.includes(form.delivery_method)) newErrors.delivery_method = "Hãy chọn hình thức giao nhận.";
-
-    const shippingValid = /^\d+$/.test(form.shipping_fee);
-    if (!shippingValid) newErrors.shipping_fee = "Phí giao hàng phải là số nguyên không âm.";
-    else if (BigInt(form.shipping_fee) > 10_000_000n) newErrors.shipping_fee = "Phí giao hàng tối đa 10.000.000 ₫.";
     if (form.delivery_method === "MEETUP" && form.shipping_fee !== "0") {
       newErrors.shipping_fee = "Gặp trực tiếp thì phí giao hàng phải bằng 0.";
     }
 
     if (form.images.length < 1) newErrors.images = "Cần ít nhất 1 ảnh.";
-    if (form.images.length > 8) newErrors.images = "Tối đa 8 ảnh.";
+    if (form.images.length > PRODUCT_LIMITS.imagesMax) newErrors.images = `Tối đa ${PRODUCT_LIMITS.imagesMax} ảnh.`;
     form.images.forEach((img, idx) => {
       if (!img.url) newErrors.images = `Ảnh ${idx + 1} chưa tải xong.`;
       if (img.sort_order !== idx) newErrors.images = "Thứ tự ảnh không hợp lệ.";
@@ -220,12 +201,17 @@ export function useProductForm() {
     if (action === "submit") await submitAction.mutateAsync(id);
     else if (action === "hide") await hideAction.mutateAsync(id);
     else if (action === "delete") {
-      if (window.confirm("Xóa tin đăng này? Lịch sử giao dịch vẫn được giữ.")) await deleteAction.mutateAsync(id);
+      setDeleteOpen(true);
     } else if (action === "edit") {
       // Already in edit mode
     }
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý tin đăng."); }
   };
+  async function confirmDelete() {
+    if (!id || !online || deleteAction.isPending) return;
+    try { await deleteAction.mutateAsync(id); setDeleteOpen(false); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xóa tin đăng."); }
+  }
   return {
     id,
     mode,
@@ -239,6 +225,10 @@ export function useProductForm() {
     setUploading,
     existingProduct,
     loadError,
+    retryLoad: () => void productQuery.refetch(),
+    deleteOpen,
+    cancelDelete: () => setDeleteOpen(false),
+    confirmDelete,
     categoryQuery,
     provinces,
     flatCategories,

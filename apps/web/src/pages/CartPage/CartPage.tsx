@@ -57,6 +57,11 @@ export function CartPage() {
     <div className="space-y-6">
       <AccountPageHeader title="Giỏ hàng" description="Xem lại những món đồ bạn muốn mua trước khi đặt hàng." />
       <OfflineNotice online={online} />
+      {(cart.data?.total_items ?? 0) > groups.reduce((count, group) => count + group.items.length, 0) && (
+        <InlineAlert tone="warning" title="Giỏ hàng có nhiều hơn 50 món">
+          Đang hiển thị 50 món đầu tiên. Hãy xóa hoặc đặt hàng các món đang hiển thị để xem những món còn lại.
+        </InlineAlert>
+      )}
       {removeItem.isError && <QueryFailure error={removeItem.error} />}
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">

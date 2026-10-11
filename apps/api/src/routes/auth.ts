@@ -1,8 +1,4 @@
-import { Router } from "express";
-import type { NextFunction, Request, Response } from "express";
-import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { z } from "zod";
 import {
   API_ERROR_CODES,
   validateEmail,
@@ -11,23 +7,29 @@ import {
   validatePasswordConfirm,
   validatePhone,
 } from "@remarket/shared";
-import { prisma } from "../utils/prisma.js";
+import bcrypt from "bcryptjs";
+import type { Request, Response } from "express";
+import { Router } from "express";
+import { z } from "zod";
 import { env } from "../config/env.js";
-import { asyncHandler, AppError } from "../middleware/errorHandler.js";
-import { authMiddleware, requireActive } from "../middleware/auth.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import { authMiddleware, requireActive } from "../middleware/auth.js";
+import { AppError, asyncHandler } from "../middleware/errorHandler.js";
+import { emailTokenRateLimit, emailVerificationRateLimit, loginRateLimit } from "../middleware/rate-limit.js";
+import { enqueueOutbox } from "../outbox/outbox.js";
+import { publishRealtimeEvent } from "../realtime/events.js";
+import { clearRefreshCookie, readRefreshCookie, REFRESH_MS, requireTrustedOrigin, setRefreshCookie } from "../services/auth-cookies.js";
+import { consumeEmailToken, createEmailToken, issueEmailToken } from "../services/email-tokens.js";
+import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
+import { RateQuota } from "../services/rate-quota.js";
+import { lockRefreshState } from "../services/refresh-locks.js";
+import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
 import { ok } from "../shared/api-response.js";
 import { sessionProfileSelect, toSessionUser } from "../shared/dto-mappers.js";
-import { accountLocked, forbidden, unauthorized, validationError } from "../shared/errors.js";
-import { newEmailToken, newRefreshToken, sha256, signAccessToken, verifyAccessToken } from "../shared/tokens.js";
-import { emailTokenRateLimit, emailVerificationRateLimit, loginRateLimit } from "../middleware/rate-limit.js";
-import { publishRealtimeEvent } from "../realtime/events.js";
-import { sealEmailToken } from "../services/email.js";
-import { enqueueOutbox } from "../outbox/outbox.js";
+import { accountLocked, unauthorized, validationError } from "../shared/errors.js";
 import { isKnownProvinceCode } from "../shared/geography.js";
-import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
-import { lockRefreshState } from "../services/refresh-locks.js";
-import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
+import { newEmailToken, newRefreshToken, sha256, signAccessToken, verifyAccessToken } from "../shared/tokens.js";
+import { prisma } from "../utils/prisma.js";
 
 /**
  * Authentication endpoints (detail-project 5).
@@ -43,88 +45,13 @@ import { requestEmailVerification, toEmailVerificationRequest } from "../service
  *   delivery through the durable SMTP outbox.
  */
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const REFRESH_MS = env.refreshTtlDays * DAY_MS;
 const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000;
 const RESET_PASSWORD_TTL_MS = 15 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
 /* ------------------------------------------------------------------ *
- * Refresh cookie helpers (no cookie-parser in this build: read manually)
- * ------------------------------------------------------------------ */
-
-const REFRESH_COOKIE_PATH = "/api/v1/auth";
-
-/** The scope selects a cookie, never grants access; the opaque token is still required. */
-function refreshCookieName(req: Request): string {
-  const scope = req.headers["x-session-scope"];
-  if (scope === undefined) return env.refreshCookie;
-  if (typeof scope !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(scope)) {
-    throw validationError("Mã phiên tab không hợp lệ.");
-  }
-  return `${env.refreshCookie}_${scope}`;
-}
-
-function setRefreshCookie(req: Request, res: Response, token: string): void {
-  res.cookie(refreshCookieName(req), token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: env.cookieSecure,
-    path: REFRESH_COOKIE_PATH,
-    maxAge: REFRESH_MS,
-  });
-}
-
-function clearRefreshCookie(req: Request, res: Response): void {
-  res.clearCookie(refreshCookieName(req), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: env.cookieSecure,
-    path: REFRESH_COOKIE_PATH,
-  });
-}
-
-function readRefreshCookie(req: Request): string | null {
-  const cookieName = refreshCookieName(req);
-  const header = req.headers.cookie;
-  if (!header) return null;
-  for (const pair of header.split(";")) {
-    const eq = pair.indexOf("=");
-    if (eq === -1) continue;
-    if (pair.slice(0, eq).trim() !== cookieName) continue;
-    const raw = pair.slice(eq + 1).trim();
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return raw;
-    }
-  }
-  return null;
-}
-
-/* ------------------------------------------------------------------ *
  * Session + email token primitives
  * ------------------------------------------------------------------ */
-
-/** Browser endpoints that create, rotate or clear a cookie require a trusted Origin. */
-function requireTrustedOrigin(req: Request, _res: Response, next: NextFunction): void {
-  // Validate before any DB writes or Set-Cookie side effects.
-  refreshCookieName(req);
-  const value = req.headers.origin;
-  if (!value) {
-    if (env.isProduction) throw forbidden("Nguồn yêu cầu không được phép.");
-    next();
-    return;
-  }
-  let origin: string;
-  try {
-    origin = new URL(value).origin;
-  } catch {
-    throw forbidden("Nguồn yêu cầu không được phép.");
-  }
-  if (value !== origin || !env.corsOrigins.includes(origin)) throw forbidden("Nguồn yêu cầu không được phép.");
-  next();
-}
 
 function sessionExpired(): AppError {
   return new AppError(
@@ -132,85 +59,6 @@ function sessionExpired(): AppError {
     "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     401,
   );
-}
-
-/** One active token per purpose: resending invalidates the previous one. */
-async function createEmailToken(
-  tx: Prisma.TransactionClient,
-  input: {
-    userId: string;
-    recipient: string;
-    purpose: "VERIFY_EMAIL" | "RESET_PASSWORD";
-    ttlMs: number;
-    token: string;
-  },
-): Promise<void> {
-  await tx.authToken.updateMany({
-    where: { userId: input.userId, purpose: input.purpose, consumedAt: null },
-    data: { consumedAt: new Date() },
-  });
-  const created = await tx.authToken.create({
-    data: {
-      userId: input.userId,
-      purpose: input.purpose,
-      tokenHash: sha256(input.token),
-      expiresAt: new Date(Date.now() + input.ttlMs),
-    },
-  });
-  if (env.isProduction) {
-    await enqueueOutbox(tx, "email.auth", input.userId, `email-auth:${created.id}`, {
-      to: input.recipient,
-      purpose: input.purpose,
-      token_id: created.id,
-      sealed_token: sealEmailToken(input.token),
-    });
-  }
-}
-
-async function issueEmailToken(
-  userId: string,
-  recipient: string,
-  purpose: "VERIFY_EMAIL" | "RESET_PASSWORD",
-  ttlMs: number,
-  label: string,
-): Promise<void> {
-  const token = newEmailToken();
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
-    await createEmailToken(tx, { userId, recipient, purpose, ttlMs, token });
-  });
-
-  // Non-production environments also surface the token for manual testing.
-  if (!env.isProduction) {
-    console.log(`[dev] ${label}: ${token}`);
-  }
-}
-
-/** Consumes a one-time token exactly once; returns the owner or null. */
-async function consumeEmailToken(
-  tx: Prisma.TransactionClient,
-  raw: string,
-  purpose: "VERIFY_EMAIL" | "RESET_PASSWORD",
-): Promise<string | null> {
-  const tokenHash = sha256(raw.trim());
-  const candidate = await tx.authToken.findUnique({
-    where: { tokenHash },
-    select: { id: true, userId: true },
-  });
-  if (!candidate) return null;
-  await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${candidate.userId} FOR UPDATE`;
-  await tx.$queryRaw`SELECT "id" FROM "AuthToken" WHERE "id" = ${candidate.id} FOR UPDATE`;
-  const record = await tx.authToken.findUnique({ where: { id: candidate.id } });
-  if (!record || record.purpose !== purpose) return null;
-  if (record.consumedAt !== null) return null;
-  if (record.expiresAt.getTime() <= Date.now()) return null;
-
-  // Conditional update: only one concurrent caller wins the token.
-  const consumed = await tx.authToken.updateMany({
-    where: { id: record.id, consumedAt: null },
-    data: { consumedAt: new Date() },
-  });
-  return consumed.count === 1 ? record.userId : null;
 }
 
 /** Keeps login timing close for unknown emails (no user enumeration). */
@@ -225,26 +73,11 @@ async function compareAgainstDummy(password: string): Promise<void> {
  * known and an unknown address take exactly the same code path.
  * ------------------------------------------------------------------ */
 
-const resendAt = new Map<string, number[]>();
+const resendQuota = new RateQuota(RESEND_COOLDOWN_MS, 1);
 
 function recordResendAttempt(email: string): number | null {
-  const now = Date.now();
-  const recent = (resendAt.get(email) ?? []).filter((at) => now - at < RESEND_COOLDOWN_MS);
-
-  if (recent.length > 0) {
-    resendAt.set(email, recent);
-    const oldest = recent[0] ?? now;
-    return Math.max(1, Math.ceil((oldest + RESEND_COOLDOWN_MS - now) / 1000));
-  }
-
-  recent.push(now);
-  if (resendAt.size > 5000) {
-    for (const [key, stamps] of resendAt) {
-      if (stamps.every((at) => now - at >= RESEND_COOLDOWN_MS)) resendAt.delete(key);
-    }
-  }
-  resendAt.set(email, recent);
-  return null;
+  const result = resendQuota.consume(email);
+  return result.allowed ? null : result.retryAfter;
 }
 
 /* ------------------------------------------------------------------ *
@@ -417,103 +250,103 @@ function unavailableSession(req: Request, res: Response, bootstrap: boolean) {
 // must not lose the session because its Set-Cookie response was never received.
 // Explicit refresh retains atomic rotation and strict replay detection.
 async function refreshSession(req: Request, res: Response, bootstrap = false) {
-    const presented = readRefreshCookie(req);
-    if (!presented) return unavailableSession(req, res, bootstrap);
+  const presented = readRefreshCookie(req);
+  if (!presented) return unavailableSession(req, res, bootstrap);
 
-    const presentedHash = sha256(presented);
-    const candidate = await prisma.authToken.findUnique({ where: { tokenHash: presentedHash } });
-    if (!candidate || candidate.purpose !== "REFRESH" || !candidate.sessionId) {
-      return unavailableSession(req, res, bootstrap);
-    }
-    const candidateSessionId = candidate.sessionId;
+  const presentedHash = sha256(presented);
+  const candidate = await prisma.authToken.findUnique({ where: { tokenHash: presentedHash } });
+  if (!candidate || candidate.purpose !== "REFRESH" || !candidate.sessionId) {
+    return unavailableSession(req, res, bootstrap);
+  }
+  const candidateSessionId = candidate.sessionId;
 
-    const nextToken = newRefreshToken();
-    const nextHash = sha256(nextToken);
-    const result = await prisma.$transaction(async (tx) => {
-      // Global auth lock order: User -> Session -> AuthToken. Account locking,
-      // password reset and refresh rotation use the same order to avoid a
-      // session/token deadlock under concurrent revocation.
-      const locked = await lockRefreshState(tx, { id: candidate.id, userId: candidate.userId, sessionId: candidateSessionId });
-      if (!locked) return { kind: "invalid" as const };
-      const { user, session, token: current } = locked;
-      if (
-        !current ||
-        !session ||
-        current.purpose !== "REFRESH" ||
-        current.sessionId !== session.id ||
-        current.userId !== session.userId
-      ) return { kind: "invalid" as const };
-      if (bootstrap && !user) return { kind: "invalid" as const };
+  const nextToken = newRefreshToken();
+  const nextHash = sha256(nextToken);
+  const result = await prisma.$transaction(async (tx) => {
+    // Global auth lock order: User -> Session -> AuthToken. Account locking,
+    // password reset and refresh rotation use the same order to avoid a
+    // session/token deadlock under concurrent revocation.
+    const locked = await lockRefreshState(tx, { id: candidate.id, userId: candidate.userId, sessionId: candidateSessionId });
+    if (!locked) return { kind: "invalid" as const };
+    const { user, session, token: current } = locked;
+    if (
+      !current ||
+      !session ||
+      current.purpose !== "REFRESH" ||
+      current.sessionId !== session.id ||
+      current.userId !== session.userId
+    ) return { kind: "invalid" as const };
+    if (bootstrap && !user) return { kind: "invalid" as const };
 
-      const now = new Date();
-      // Only a still-valid, already-used credential is evidence of replay.
-      if (current.expiresAt.getTime() <= now.getTime()) return { kind: "invalid" as const };
-      if (current.consumedAt !== null) {
-        await tx.session.updateMany({
-          where: { id: session.id, revokedAt: null },
-          data: { revokedAt: now },
-        });
-        await enqueueOutbox(
-          tx,
-          "session.revoked",
-          session.id,
-          `session-revoked:refresh-reuse:${session.id}`,
-          { session_ids: [session.id] },
-        );
-        return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
-      }
-      if (
-        current.expiresAt.getTime() <= now.getTime() ||
-        session.revokedAt !== null ||
-        session.expiresAt.getTime() <= now.getTime()
-      ) {
-        return { kind: "invalid" as const };
-      }
-      if (session.refreshHash !== presentedHash) {
-        await tx.session.update({ where: { id: session.id }, data: { revokedAt: now } });
-        await enqueueOutbox(
-          tx,
-          "session.revoked",
-          session.id,
-          `session-revoked:refresh-mismatch:${session.id}`,
-          { session_ids: [session.id] },
-        );
-        return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
-      }
-
-      if (bootstrap) return { kind: "discovered" as const, userId: current.userId, sessionId: session.id, user };
-      const expiresAt = new Date(now.getTime() + REFRESH_MS);
-      // Lock order/checks remain above. Combine only the dependent writes so
-      // a token conflict or session-update failure rolls back every change.
-      const rotated = await rotateSessionRecords(tx, {
-        tokenId: current.id, sessionId: session.id, presentedHash, nextHash, now, expiresAt,
+    const now = new Date();
+    // Only a still-valid, already-used credential is evidence of replay.
+    if (current.expiresAt.getTime() <= now.getTime()) return { kind: "invalid" as const };
+    if (current.consumedAt !== null) {
+      await tx.session.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { revokedAt: now },
       });
-      if (rotated !== 1) throw sessionExpired();
-      return {
-        kind: "rotated" as const,
-        userId: current.userId,
-        sessionId: session.id,
-        user,
-      };
+      await enqueueOutbox(
+        tx,
+        "session.revoked",
+        session.id,
+        `session-revoked:refresh-reuse:${session.id}`,
+        { session_ids: [session.id] },
+      );
+      return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
+    }
+    if (
+      current.expiresAt.getTime() <= now.getTime() ||
+      session.revokedAt !== null ||
+      session.expiresAt.getTime() <= now.getTime()
+    ) {
+      return { kind: "invalid" as const };
+    }
+    if (session.refreshHash !== presentedHash) {
+      await tx.session.update({ where: { id: session.id }, data: { revokedAt: now } });
+      await enqueueOutbox(
+        tx,
+        "session.revoked",
+        session.id,
+        `session-revoked:refresh-mismatch:${session.id}`,
+        { session_ids: [session.id] },
+      );
+      return { kind: "reused" as const, sessionId: session.id, userId: session.userId };
+    }
+
+    if (bootstrap) return { kind: "discovered" as const, userId: current.userId, sessionId: session.id, user };
+    const expiresAt = new Date(now.getTime() + REFRESH_MS);
+    // Lock order/checks remain above. Combine only the dependent writes so
+    // a token conflict or session-update failure rolls back every change.
+    const rotated = await rotateSessionRecords(tx, {
+      tokenId: current.id, sessionId: session.id, presentedHash, nextHash, now, expiresAt,
     });
-    if (result.kind === "reused") {
-      publishRealtimeEvent({
-        eventType: "session.revoked",
-        aggregateId: result.sessionId,
-        payload: { session_ids: [result.sessionId] },
-      });
-      return unavailableSession(req, res, bootstrap);
-    }
-    if (result.kind !== "rotated" && result.kind !== "discovered") return unavailableSession(req, res, bootstrap);
+    if (rotated !== 1) throw sessionExpired();
+    return {
+      kind: "rotated" as const,
+      userId: current.userId,
+      sessionId: session.id,
+      user,
+    };
+  });
+  if (result.kind === "reused") {
+    publishRealtimeEvent({
+      eventType: "session.revoked",
+      aggregateId: result.sessionId,
+      payload: { session_ids: [result.sessionId] },
+    });
+    return unavailableSession(req, res, bootstrap);
+  }
+  if (result.kind !== "rotated" && result.kind !== "discovered") return unavailableSession(req, res, bootstrap);
 
-    if (bootstrap) {
-      // Discovery does not extend the session lifetime or issue a new cookie.
-      if (!result.user) return unavailableSession(req, res, true);
-      return ok(res, { user: toSessionUser(result.user), access_token: signAccessToken(result.userId, result.sessionId) });
-    }
+  if (bootstrap) {
+    // Discovery does not extend the session lifetime or issue a new cookie.
+    if (!result.user) return unavailableSession(req, res, true);
+    return ok(res, { user: toSessionUser(result.user), access_token: signAccessToken(result.userId, result.sessionId) });
+  }
 
-    setRefreshCookie(req, res, nextToken);
-    ok(res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
+  setRefreshCookie(req, res, nextToken);
+  ok(res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
 }
 
 // Anonymous/expired discovery is a successful empty session; DB errors still fail.

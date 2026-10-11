@@ -1,7 +1,7 @@
 import { useProductForm } from "./hooks/useProductForm";
 import type { Condition, DeliveryMethod } from "@remarket/shared";
 import type { OwnProduct } from "@remarket/shared";
-import { Button, ApiImage, Input, Select, Textarea, FormRow, Skeleton, Spinner, InlineAlert } from "../../components/common";
+import { ConfirmDialog, Button, ApiImage, Input, Select, Textarea, FormRow, Skeleton, Spinner, InlineAlert } from "../../components/common";
 import { CONDITIONS, DELIVERY_METHODS, conditionLabel, deliveryLabel } from "@remarket/shared";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
 import { ProductImageUpload } from "./sections/ProductImageUpload";
@@ -20,6 +20,10 @@ export function ProductFormPage() {
     setUploading,
     existingProduct,
     loadError,
+    retryLoad,
+    deleteOpen,
+    cancelDelete,
+    confirmDelete,
     categoryQuery,
     provinces,
     flatCategories,
@@ -32,13 +36,15 @@ export function ProductFormPage() {
   } = useProductForm();
 
   if (mode === "edit" && !existingProduct) {
-    if (loadError) return <QueryFailure error={loadError} retry={() => window.location.reload()} />;
+    if (loadError) return <QueryFailure error={loadError} retry={retryLoad} />;
     return <Skeleton className="space-y-4 h-[500px]" />;
   }
   if (existingProduct && !existingProduct.capabilities.can_edit) return <InlineAlert tone="warning" title="Không thể chỉnh sửa tin này">Tin đang được giữ, đã bán hoặc bị hạn chế. <Button onClick={() => navigate("/account/products")}>Quay lại tin đăng</Button></InlineAlert>;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <ConfirmDialog open={deleteOpen} title="Xóa tin đăng?" description="Lịch sử giao dịch vẫn được giữ."
+        confirmLabel="Xóa tin đăng" loading={deleteAction.isPending} onCancel={cancelDelete} onConfirm={() => void confirmDelete()} />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{mode === "create" ? "Đăng tin mới" : "Chỉnh sửa tin đăng"}</h1>
       </div>
@@ -91,7 +97,7 @@ export function ProductFormPage() {
               min={0}
               max={1200}
               value={form.usage_months ?? ""}
-              onChange={(e) => setForm({ ...form, usage_months: e.target.value ? parseInt(e.target.value) : null })}
+              onChange={(e) => setForm({ ...form, usage_months: e.target.value ? Number(e.target.value) : null })}
               placeholder="Để trống nếu không xác định"
             />
           </FormRow>

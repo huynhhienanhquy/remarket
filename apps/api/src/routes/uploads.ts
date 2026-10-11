@@ -1,4 +1,5 @@
-﻿import { Router } from "express";
+import { RateQuota } from "../services/rate-quota.js";
+import { Router } from "express";
 import type { Request } from "express";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -17,12 +18,13 @@ import {
   deleteStorageObject,
   getLocalStoragePath,
   putStorageObject,
+  readDatabaseStorageObject,
   verifyPrivateStorageUrl,
   verifyImageStorageUrl,
   createStorageImageReadUrl,
   decodeStorageResource,
 } from "../services/storage.js";
-import { generateImageVariants, localImageVariant } from "../services/image-variants.js";
+import { databaseImageVariant, generateImageVariants, localImageVariant } from "../services/image-variants.js";
 import { env } from "../config/env.js";
 
 /**
@@ -35,7 +37,7 @@ import { env } from "../config/env.js";
  * per-user rate limit of 20 uploads / hour.
  *
  * Objects use `users/{userId}/{purpose}/{uuid}.{ext}` in either local private
- * disk storage or a private Supabase bucket. Reads always pass the guarded
+ * disk storage, shared database storage or a private Supabase bucket. Reads always pass the guarded
  * `GET /:filename` authorization handler below.
  */
 
@@ -51,30 +53,12 @@ const purposeSchema = z.enum(["product", "avatar"]);
  * Per-user rate limit (in-memory; the process is the only instance here)
  * ------------------------------------------------------------------ */
 
-const uploadStamps = new Map<string, number[]>();
+const uploadQuota = new RateQuota(RATE_WINDOW_MS, RATE_MAX);
 
 function assertUploadRate(userId: string): void {
-  const now = Date.now();
-  const recent = (uploadStamps.get(userId) ?? []).filter((at) => now - at < RATE_WINDOW_MS);
-
-  if (recent.length >= RATE_MAX) {
-    const oldest = recent[0] ?? now;
-    const retryAfter = Math.max(1, Math.ceil((oldest + RATE_WINDOW_MS - now) / 1000));
-    throw new AppError(
-      API_ERROR_CODES.RATE_LIMITED,
-      "Bạn tải lên quá nhanh, vui lòng thử lại sau.",
-      429,
-      { retry_after: retryAfter },
-    );
-  }
-
-  recent.push(now);
-  if (uploadStamps.size > 5000) {
-    for (const [key, stamps] of uploadStamps) {
-      if (stamps.every((at) => now - at >= RATE_WINDOW_MS)) uploadStamps.delete(key);
-    }
-  }
-  uploadStamps.set(userId, recent);
+  const result = uploadQuota.consume(userId);
+  if (!result.allowed) throw new AppError(API_ERROR_CODES.RATE_LIMITED,
+    "Bạn tải lên quá nhanh, vui lòng thử lại sau.", 429, { retry_after: result.retryAfter });
 }
 
 /* ------------------------------------------------------------------ *
@@ -369,6 +353,13 @@ router.get(
       const url = await createStorageImageReadUrl(storagePath, imageVariant, remaining);
       if (url) { res.redirect(302, url); return; }
     }
+    if (env.storage.driver === "database") {
+      const image = await databaseImageVariant(storagePath, imageVariant);
+      if (!image) throw notFound("Không tìm thấy tệp.");
+      res.setHeader("Content-Type", image.mimeType);
+      res.send(image.contents);
+      return;
+    }
     const file = await localImageVariant(storagePath, imageVariant);
     res.setHeader("Content-Type", imageVariant === "original" ? contentTypeOf(filename) : "image/webp");
     res.sendFile(file, (error) => { if (error && !res.headersSent) next(error); });
@@ -462,6 +453,13 @@ router.get(
       return;
     }
 
+    if (env.storage.driver === "database") {
+      const image = await readDatabaseStorageObject(asset.storagePath);
+      if (!image) throw notFound("Không tìm thấy tệp.");
+      res.setHeader("Content-Type", image.mimeType);
+      res.send(image.contents);
+      return;
+    }
     res.setHeader("Content-Type", asset.mimeType);
     res.sendFile(getLocalStoragePath(asset.storagePath), (error) => {
       if (error && !res.headersSent) next(error);

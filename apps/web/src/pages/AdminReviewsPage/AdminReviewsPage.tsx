@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminReviewItem } from "@remarket/shared";
 import { formatDateTime } from "@remarket/shared";
-import { api } from "../../services/api";
-import { queryKeys } from "../../config/queryClient";
-import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/common";
-import type { DataTableColumn } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
+import type { DataTableColumn } from "../../components/common";
+import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
-import { readPage } from "../../utils/adminParams";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readPage } from "../../utils/adminParams";
 
 function Stars({ value }: { value: number }) {
   return <span aria-label={`${value} trên 5 sao`} className="whitespace-nowrap text-accent">{"★".repeat(value)}<span className="text-line">{"★".repeat(5 - value)}</span></span>;
@@ -39,11 +40,10 @@ export function AdminReviewsPage() {
   const mutation = useMutation({
     mutationFn: () => { if (!selected) throw new Error("Chưa chọn đánh giá."); return api.admin.hideReview(selected.id, reason); },
     onSuccess: (review) => {
-      queryClient.setQueriesData<{ items: AdminReviewItem[]; meta: unknown }>({ queryKey: ["admin", "reviews"] }, (current) => current ? { ...current, items: current.items.map((item) => item.id === review.id ? review : item) } : current);
+      patchAdminRows(queryClient, "reviews", review);
       toast.success("Đã ẩn đánh giá"); setConfirmHide(false); setReason("");
-      void queryClient.invalidateQueries({ queryKey: ["admin","reviews"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","audit"] });
-    },
+      void invalidateAdminResources(queryClient, "reviews", "audit");
+      },
     onError: (error) => toast.error("Không thể ẩn đánh giá", { description: errorDescription(error) }),
   });
 

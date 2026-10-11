@@ -1,3 +1,4 @@
+import { PasswordInput } from "@/components/common/Input/PasswordInput";
 import { useRegisterForm } from "./hooks/useRegisterForm";
 import { Link } from "react-router-dom";
 import { Button, FormField, InlineAlert, Input } from "../../components/common";
@@ -15,10 +16,6 @@ export function RegisterPage() {
     passwordError,
     confirmError,
     formError,
-    showPassword,
-    setShowPassword,
-    showConfirm,
-    setShowConfirm,
     pending,
     fullNameRef,
     emailRef,
@@ -105,11 +102,10 @@ export function RegisterPage() {
           helper="Tối thiểu 12 ký tự"
           error={passwordError ?? undefined}
         >
-          <div className="relative">
-            <Input
+          <PasswordInput
               ref={passwordRef}
               id="reg-password"
-              type={showPassword ? "text" : "password"}
+
               autoComplete="new-password"
               placeholder="Tối thiểu 12 ký tự"
               value={password}
@@ -119,16 +115,6 @@ export function RegisterPage() {
               onChange={(event) => changePassword(event.target.value)}
               onBlur={blurPassword}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((visible) => !visible)}
-              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-1 my-auto h-9 rounded-control px-2 t-meta text-brand hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              {showPassword ? "Ẩn" : "Hiện"}
-            </button>
-          </div>
         </FormField>
 
         <FormField
@@ -137,11 +123,10 @@ export function RegisterPage() {
           required
           error={confirmError ?? undefined}
         >
-          <div className="relative">
-            <Input
+          <PasswordInput
               ref={confirmRef}
               id="reg-confirm"
-              type={showConfirm ? "text" : "password"}
+
               autoComplete="new-password"
               placeholder="Nhập lại mật khẩu"
               value={confirm}
@@ -151,16 +136,6 @@ export function RegisterPage() {
               onChange={(event) => changeConfirm(event.target.value)}
               onBlur={blurConfirm}
             />
-            <button
-              type="button"
-              onClick={() => setShowConfirm((visible) => !visible)}
-              aria-label={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              aria-pressed={showConfirm}
-              className="absolute inset-y-0 right-1 my-auto h-9 rounded-control px-2 t-meta text-brand hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              {showConfirm ? "Ẩn" : "Hiện"}
-            </button>
-          </div>
         </FormField>
 
         <Button type="submit" size="lg" fullWidth loading={pending}>

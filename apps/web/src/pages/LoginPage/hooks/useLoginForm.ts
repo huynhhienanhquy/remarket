@@ -25,7 +25,6 @@ export function useLoginForm() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
 
   const emailRef = useRef<HTMLInputElement>(null);
@@ -110,8 +109,6 @@ export function useLoginForm() {
     emailError,
     passwordError,
     formError,
-    showPassword,
-    setShowPassword,
     pending,
     emailRef,
     passwordRef,

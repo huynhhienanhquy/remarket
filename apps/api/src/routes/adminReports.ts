@@ -1,3 +1,4 @@
+import { createNotifications } from "../services/notifications.js";
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -191,7 +192,7 @@ router.post(
           handledAt: now,
         },
       });
-      await tx.notification.createMany({
+      await createNotifications(tx, {
         data: [
           reporterNotification(
             report.id,
@@ -244,7 +245,7 @@ router.post(
           handledAt: new Date(),
         },
       });
-      await tx.notification.createMany({
+      await createNotifications(tx, {
         data: [
           reporterNotification(
             report.id,

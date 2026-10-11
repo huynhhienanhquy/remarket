@@ -1,3 +1,4 @@
+import { createNotifications } from "./notifications.js";
 import { Prisma, type User } from "@prisma/client";
 import type { EmailVerificationRequest } from "@remarket/shared";
 import { accountLocked, forbidden, notFound } from "../shared/errors.js";
@@ -26,7 +27,7 @@ export async function requestEmailVerification(tx: Prisma.TransactionClient, use
     where: { id: userId }, data: { emailVerificationRequestedAt: new Date() },
   });
   const admins = await tx.user.findMany({ where: { role: "ADMIN", status: "ACTIVE" }, select: { id: true } });
-  if (admins.length) await tx.notification.createMany({
+  if (admins.length) await createNotifications(tx, {
     data: admins.map((admin) => ({
       userId: admin.id, type: "EMAIL_VERIFICATION_REQUESTED",
       title: "Yêu cầu xác minh email", content: `${user.fullName} đã gửi yêu cầu xác minh email.`,
@@ -37,9 +38,6 @@ export async function requestEmailVerification(tx: Prisma.TransactionClient, use
   await writeAudit(tx, {
     actorId: userId, actorName: user.fullName, actorType: "USER",
     action: "user.email_verification_requested", entityType: "user", entityId: userId,
-  });
-  await enqueueOutbox(tx, "notification.created", userId, `email-verification:${userId}:requested`, {
-    recipients: admins.map((admin) => admin.id), reference_type: "email_verification", reference_id: userId,
   });
   return toEmailVerificationRequest(updated);
 }
@@ -57,7 +55,7 @@ export async function approveEmailVerification(tx: Prisma.TransactionClient, use
   const now = new Date();
   const updated = await tx.user.update({ where: { id: userId }, data: { emailVerifiedAt: now } });
   await tx.authToken.updateMany({ where: { userId, purpose: "VERIFY_EMAIL", consumedAt: null }, data: { consumedAt: now } });
-  await tx.notification.createMany({ data: [{
+  await createNotifications(tx, { data: [{
     userId, type: "EMAIL_VERIFIED", title: "Email đã được xác minh",
     content: "Admin đã đồng ý xác minh email của bạn.", referenceType: "account", referenceId: userId,
     dedupeKey: `email-verification:${userId}:approved`,

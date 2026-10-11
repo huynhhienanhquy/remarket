@@ -1,8 +1,10 @@
-import type { Prisma } from "@prisma/client";
+import { createNotifications } from "../services/notifications.js";
+import { cancelOrder } from "../services/order-cancellation.js";
 import { backgroundPrisma as prisma } from "../utils/background-prisma.js";
 import { enqueueOutbox, processOutboxBatch } from "../outbox/outbox.js";
 import { deliverAuthEmail } from "../services/email.js";
 import { deleteStorageObject } from "../services/storage.js";
+import { cleanupExpiredRecords } from "./retention.js";
 
 const BATCH_SIZE = 50;
 const CONFIRMED_REMINDER_MS = 72 * 60 * 60 * 1000;
@@ -44,23 +46,6 @@ async function persistWorkerSnapshot(): Promise<void> {
   });
 }
 
-async function categoryActive(tx: Prisma.TransactionClient, categoryId: string): Promise<boolean> {
-  if ((await tx.category.count({ where: { parentId: categoryId } })) > 0) return false;
-  const visited = new Set<string>();
-  let cursor: string | null = categoryId;
-  while (cursor) {
-    if (visited.has(cursor)) return false;
-    visited.add(cursor);
-    const category: { parentId: string | null; status: string } | null = await tx.category.findUnique({
-      where: { id: cursor },
-      select: { parentId: true, status: true },
-    });
-    if (!category || category.status !== "ACTIVE") return false;
-    cursor = category.parentId;
-  }
-  return true;
-}
-
 export async function expirePendingOrders(): Promise<number> {
   const candidates = await prisma.order.findMany({
     where: { status: "PENDING", expiresAt: { lte: new Date() } },
@@ -78,67 +63,11 @@ export async function expirePendingOrders(): Promise<number> {
         return false;
       }
 
-      const products = await tx.product.findMany({
-        where: { reservedOrderId: order.id },
-        include: { seller: { select: { status: true, emailVerifiedAt: true } } },
+      return cancelOrder(tx, order, {
+        reason: "SELLER_TIMEOUT", actor: { type: "SYSTEM", name: "Hệ thống" }, eventKey: `order:${order.id}:expired`,
+        notification: { title: "Đơn hàng đã hết hạn", content: `Đơn ${order.code} đã tự động hủy vì người bán không xác nhận đúng hạn.`,
+          key: (userId) => `order:${order.id}:expired:${userId}` },
       });
-      const now = new Date();
-      const moved = await tx.order.updateMany({
-        where: { id: order.id, status: "PENDING", version: order.version },
-        data: {
-          status: "CANCELLED",
-          cancellationReason: "SELLER_TIMEOUT",
-          cancelledAt: now,
-          version: { increment: 1 },
-        },
-      });
-      if (moved.count !== 1) return false;
-
-      for (const product of products) {
-        const eligible =
-          product.deletedAt === null &&
-          !product.isBlocked &&
-          product.seller.status === "ACTIVE" &&
-          product.seller.emailVerifiedAt !== null &&
-          (await categoryActive(tx, product.categoryId));
-        await tx.product.updateMany({
-          where: { id: product.id, reservedOrderId: order.id, status: "RESERVED" },
-          data: {
-            status: eligible ? "ACTIVE" : "INACTIVE",
-            reservedOrderId: null,
-            version: { increment: 1 },
-          },
-        });
-      }
-
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: order.id,
-          fromStatus: "PENDING",
-          toStatus: "CANCELLED",
-          actorType: "SYSTEM",
-          actorName: "Hệ thống",
-          reason: "SELLER_TIMEOUT",
-        },
-      });
-      await tx.notification.createMany({
-        data: [order.buyerId, order.sellerId].map((userId) => ({
-          userId,
-          type: "ORDER_CANCELLED" as const,
-          title: "Đơn hàng đã hết hạn",
-          content: `Đơn ${order.code} đã tự động hủy vì người bán không xác nhận đúng hạn.`,
-          referenceType: "order",
-          referenceId: order.id,
-          dedupeKey: `order:${order.id}:expired:${userId}`,
-        })),
-        skipDuplicates: true,
-      });
-      await enqueueOutbox(tx, "order.updated", order.id, `order:${order.id}:expired`, {
-        order_id: order.id,
-        status: "CANCELLED",
-        recipients: [order.buyerId, order.sellerId],
-      });
-      return true;
     });
     if (won) expired += 1;
   }
@@ -147,28 +76,29 @@ export async function expirePendingOrders(): Promise<number> {
 
 export async function createOrderReminders(): Promise<number> {
   const cutoff = new Date(Date.now() - CONFIRMED_REMINDER_MS);
-  const orders = await prisma.order.findMany({
-    where: { status: "CONFIRMED", confirmedAt: { lte: cutoff } },
-    select: { id: true, code: true, sellerId: true },
-    take: BATCH_SIZE,
-  });
-  let created = 0;
-  for (const order of orders) {
-    const result = await prisma.notification.createMany({
-      data: [{
-        userId: order.sellerId,
-        type: "ORDER_REMINDER",
-        title: "Nhắc gửi hàng",
-        content: `Đơn ${order.code} đã được xác nhận hơn 72 giờ. Hãy cập nhật tiến độ giao hàng.`,
-        referenceType: "order",
-        referenceId: order.id,
-        dedupeKey: `order:${order.id}:confirmed-72h`,
-      }],
-      skipDuplicates: true,
-    });
-    created += result.count;
-  }
-  return created;
+  const orders = await prisma.$queryRaw<Array<{ id: string; code: string; sellerId: string }>>`
+    SELECT o."id", o."code", o."sellerId" FROM "Order" o
+    WHERE o."status" = 'CONFIRMED' AND o."confirmedAt" <= ${cutoff}
+      AND NOT EXISTS (
+        SELECT 1 FROM "Notification" n
+        WHERE n."userId" = o."sellerId" AND n."dedupeKey" = 'order:' || o."id" || ':confirmed-72h'
+      )
+    ORDER BY o."confirmedAt", o."id" LIMIT ${BATCH_SIZE}
+  `;
+  if (orders.length === 0) return 0;
+  const result = await prisma.$transaction((tx) => createNotifications(tx, {
+    data: orders.map((order) => ({
+      userId: order.sellerId,
+      type: "ORDER_REMINDER",
+      title: "Nhắc gửi hàng",
+      content: `Đơn ${order.code} đã được xác nhận hơn 72 giờ. Hãy cập nhật tiến độ giao hàng.`,
+      referenceType: "order",
+      referenceId: order.id,
+      dedupeKey: `order:${order.id}:confirmed-72h`,
+    })),
+    skipDuplicates: true,
+  }));
+  return result.count;
 }
 
 export async function cleanupOrphanUploads(): Promise<number> {
@@ -231,6 +161,7 @@ export async function runJobsOnce(): Promise<void> {
     await expirePendingOrders();
     await createOrderReminders();
     await cleanupOrphanUploads();
+    await cleanupExpiredRecords();
     await drainOutbox();
     snapshot.last_success_at = new Date().toISOString();
     snapshot.last_error = null;

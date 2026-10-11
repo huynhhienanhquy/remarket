@@ -33,7 +33,7 @@ const schema = z.object({
   PUBLIC_WEB_URL: z.string().url().default("http://localhost:5173"),
   BCRYPT_COST: z.coerce.number().int().min(10).max(14).default(12),
   ORDER_CONFIRM_TIMEOUT_HOURS: z.coerce.number().int().min(1).max(72).default(24),
-  STORAGE_DRIVER: z.enum(["local", "supabase"]).default("local"),
+  STORAGE_DRIVER: z.enum(["local", "database", "supabase"]).default("database"),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1).optional(),
   STORAGE_BUCKET: z.string().trim().min(1).default("remarket-private"),

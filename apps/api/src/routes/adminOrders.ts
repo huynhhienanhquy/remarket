@@ -1,9 +1,9 @@
+import { cancelOrder } from "../services/order-cancellation.js";
 import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { enqueueOutbox } from "../outbox/outbox.js";
 import { ok } from "../shared/api-response.js";
 import { invalidTransition, notFound, validationError, versionConflict } from "../shared/errors.js";
 import { prisma } from "../utils/prisma.js";
@@ -18,22 +18,6 @@ const cancelBody = z.object({
   delivery_outcome: z.enum(["NOT_DELIVERED", "RETURNED"]).optional(),
   payment_resolution: z.string().trim().min(1).max(1000).optional(),
 }).strict();
-
-async function activeCategory(
-  tx: Prisma.TransactionClient,
-  categoryId: string,
-): Promise<boolean> {
-  const leaf = await tx.category.findUnique({
-    where: { id: categoryId },
-    include: { parent: true, _count: { select: { children: true } } },
-  });
-  return Boolean(
-    leaf &&
-      leaf._count.children === 0 &&
-      leaf.status === "ACTIVE" &&
-      (leaf.parent === null || leaf.parent.status === "ACTIVE"),
-  );
-}
 
 router.post(
   "/:id/cancel",
@@ -89,70 +73,14 @@ router.post(
         }
       }
 
-      const now = new Date();
-      const moved = await tx.order.updateMany({
-        where: { id: order.id, status: order.status, version: order.version },
-        data: {
-          status: "CANCELLED",
-          cancellationReason: body.reason,
-          cancelledById: actor.id,
-          cancelledAt: now,
-          expiresAt: null,
-          version: { increment: 1 },
-        },
+      const moved = await cancelOrder(tx, order, {
+        reason: body.reason, expectedVersion: body.expected_version, allowAfterDelivery: afterDelivery,
+        actor: { type: "ADMIN", id: actor.id, name: actor.fullName }, eventKey: `order:${order.id}:admin-cancel`,
+        notification: { title: "Quản trị viên đã hủy đơn", content: `Đơn ${order.code} đã hủy sau khi xử lý hỗ trợ.`,
+          key: (userId) => `order:${order.id}:admin-cancel:${userId}` },
       });
-      if (moved.count !== 1) throw versionConflict();
+      if (!moved) throw versionConflict();
 
-      const products = await tx.product.findMany({
-        where: { id: { in: order.items.map((item) => item.productId) }, reservedOrderId: order.id },
-        include: { seller: true },
-      });
-      for (const product of products) {
-        const sellable =
-          !afterDelivery &&
-          product.deletedAt === null &&
-          !product.isBlocked &&
-          product.seller.status === "ACTIVE" &&
-          product.seller.emailVerifiedAt !== null &&
-          (await activeCategory(tx, product.categoryId));
-        await tx.product.updateMany({
-          where: { id: product.id, reservedOrderId: order.id, status: "RESERVED" },
-          data: {
-            status: sellable ? "ACTIVE" : "INACTIVE",
-            reservedOrderId: null,
-            version: { increment: 1 },
-          },
-        });
-      }
-
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: order.id,
-          fromStatus: order.status,
-          toStatus: "CANCELLED",
-          actorType: "ADMIN",
-          actorId: actor.id,
-          actorName: actor.fullName,
-          reason: body.reason,
-        },
-      });
-      await tx.notification.createMany({
-        data: [order.buyerId, order.sellerId].map((userId) => ({
-          userId,
-          type: "ORDER_CANCELLED" as const,
-          title: "Quản trị viên đã hủy đơn",
-          content: `Đơn ${order.code} đã hủy sau khi xử lý hỗ trợ.`,
-          referenceType: "order",
-          referenceId: order.id,
-          dedupeKey: `order:${order.id}:admin-cancel:${userId}`,
-        })),
-        skipDuplicates: true,
-      });
-      await enqueueOutbox(tx, "order.updated", order.id, `order:${order.id}:admin-cancel`, {
-        order_id: order.id,
-        status: "CANCELLED",
-        recipients: [order.buyerId, order.sellerId],
-      });
       await writeAudit(tx, {
         actorId: actor.id,
         actorName: actor.fullName,

@@ -92,7 +92,7 @@ export interface AuthApi {
   verifyEmail(token: string): Promise<SessionUser>;
   emailVerificationRequest(): Promise<EmailVerificationRequest | null>;
   requestEmailVerification(): Promise<EmailVerificationRequest | null>;
-  resendVerification(email: string): Promise<{ retry_after?: string }>;
+  resendVerification(email: string): Promise<{ retry_after?: number }>;
   forgotPassword(email: string): Promise<{ accepted: true }>;
   resetPassword(token: string, password: string): Promise<{ accepted: true }>;
   updateProfile(

@@ -1,3 +1,4 @@
+import { PasswordInput } from "@/components/common/Input/PasswordInput";
 import { useLoginForm } from "./hooks/useLoginForm";
 import { Link } from "react-router-dom";
 import { Button, FormField, InlineAlert, Input } from "../../components/common";
@@ -9,8 +10,6 @@ export function LoginPage() {
     emailError,
     passwordError,
     formError,
-    showPassword,
-    setShowPassword,
     pending,
     emailRef,
     passwordRef,
@@ -55,11 +54,10 @@ export function LoginPage() {
           required
           error={passwordError ?? undefined}
         >
-          <div className="relative">
-            <Input
+          <PasswordInput
               ref={passwordRef}
               id="login-password"
-              type={showPassword ? "text" : "password"}
+
               autoComplete="current-password"
               placeholder="Ít nhất 12 ký tự"
               value={password}
@@ -69,16 +67,6 @@ export function LoginPage() {
               onChange={(event) => changePassword(event.target.value)}
               onBlur={blurPassword}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((visible) => !visible)}
-              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-1 my-auto h-9 rounded-control px-2 t-meta text-brand hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              {showPassword ? "Ẩn" : "Hiện"}
-            </button>
-          </div>
         </FormField>
 
         <div className="flex justify-end">

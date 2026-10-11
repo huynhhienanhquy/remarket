@@ -10,6 +10,25 @@ export interface RealtimeEvent {
 
 export type OutboxPublisher = (event: RealtimeEvent) => Promise<void> | void;
 
+export interface OutboxEntry {
+  eventType: string;
+  aggregateId: string;
+  dedupeKey: string;
+  payload: Prisma.InputJsonValue;
+}
+
+export async function enqueueOutboxBatch(tx: Prisma.TransactionClient, entries: readonly OutboxEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  const claimed = await tx.outboxDedupeKey.createManyAndReturn({
+    data: entries.map(({ dedupeKey }) => ({ dedupeKey })),
+    skipDuplicates: true,
+    select: { dedupeKey: true },
+  });
+  const keys = new Set(claimed.map((row) => row.dedupeKey));
+  if (keys.size === 0) return;
+  await tx.outboxEvent.createMany({ data: entries.filter((entry) => keys.has(entry.dedupeKey)), skipDuplicates: true });
+}
+
 export async function enqueueOutbox(
   tx: Prisma.TransactionClient,
   eventType: string,
@@ -17,13 +36,7 @@ export async function enqueueOutbox(
   dedupeKey: string,
   payload: Prisma.InputJsonValue,
 ): Promise<void> {
-  // A no-op upsert may perform read/insert/read. Nothing needs returning here:
-  // one INSERT ... ON CONFLICT DO NOTHING preserves the unique dedupe key and
-  // never overwrites the original payload or delivery state on replay.
-  await tx.outboxEvent.createMany({
-    data: [{ eventType, aggregateId, dedupeKey, payload }],
-    skipDuplicates: true,
-  });
+  await enqueueOutboxBatch(tx, [{ eventType, aggregateId, dedupeKey, payload }]);
 }
 
 const MAX_ATTEMPTS = 10;
@@ -73,9 +86,17 @@ export async function processOutboxBatch(
         aggregateId: row.aggregateId,
         payload: row.payload,
       });
-      await client.outboxEvent.updateMany({
-        where: { id: row.id, lockId },
-        data: { processedAt: new Date(), lockedAt: null, lockId: null, lastError: null },
+      await client.$transaction(async (tx) => {
+        // Sequence allocation is serialized THROUGH COMMIT. A bare sequence
+        // does not order commits: another worker could commit a higher value
+        // while this transaction is still invisible to the relay.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':outbox-relay-sequence', 0))`;
+        await tx.$executeRaw`
+          UPDATE "OutboxEvent"
+          SET "processedAt" = NOW(), "relaySequence" = nextval('"OutboxRelaySequence"'),
+              "lockedAt" = NULL, "lockId" = NULL, "lastError" = NULL
+          WHERE "id" = ${row.id} AND "lockId" = ${lockId} AND "processedAt" IS NULL
+        `;
       });
     } catch (error) {
       const attempts = row.attempts + 1;

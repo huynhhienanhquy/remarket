@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { PlusIcon } from "../Icon/Icon";
 import { api } from "../../../services/api";
+import { useToast } from "../Toast/Toast";
 
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -21,6 +22,7 @@ export function ImageUpload({
   isUploading = false,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const toast = useToast();
   const inputId = useId();
 
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,12 +31,12 @@ export function ImageUpload({
     if (!file) return;
 
     if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
-      alert("Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP.");
+      toast.error("Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP.");
       input.value = "";
       return;
     }
     if (file.size > maxSize) {
-      alert(`Ảnh tối đa ${Math.round(maxSize / 1024 / 1024)} MB.`);
+      toast.error(`Ảnh tối đa ${Math.round(maxSize / 1024 / 1024)} MB.`);
       input.value = "";
       return;
     }
@@ -48,7 +50,7 @@ export function ImageUpload({
 
       onUpload({ url: data.url, storage_path: data.storage_path });
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Tải ảnh thất bại. Vui lòng thử lại.");
+      toast.error(error instanceof Error ? error.message : "Tải ảnh thất bại. Vui lòng thử lại.");
     } finally {
       setUploading(false);
       input.value = "";

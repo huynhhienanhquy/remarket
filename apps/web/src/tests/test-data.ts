@@ -1,4 +1,4 @@
-import type { ProductDetail, SessionUser, SellerSummary, SupportTicketDetail } from "@remarket/shared";
+import type { OrderDetail, ProductDetail, SessionUser, SellerSummary, SupportTicketDetail } from "@remarket/shared";
 
 export const timestamp = "2026-10-08T00:00:00.000Z";
 export const member: SessionUser = {
@@ -27,4 +27,15 @@ export const ticket: SupportTicketDetail = {
   status: "OPEN", order_id: null, created_at: timestamp, updated_at: timestamp,
   resolution_note: null, resolved_at: null, closed_at: null, assigned_admin_name: null,
   messages: [], allowed_actions: ["reply", "close"],
+};
+
+export const order: OrderDetail = {
+  id: "order-test", code: "ORDER-TEST", role: "seller", counterparty: seller,
+  status: "PENDING", delivery_method: "COD", items: [], total_amount: "100000",
+  created_at: timestamp, expires_at: null, version: 7, subtotal: "100000", shipping_fee: "0", currency: "VND",
+  delivery: { method: "COD", recipient_name: member.full_name, recipient_phone: member.phone!,
+    delivery_address: member.default_address!, carrier: null, tracking_code: null },
+  status_history: [], allowed_actions: ["confirm", "support"], completion_block_reason: null,
+  cancellation_reason: null, confirmed_at: null, shipped_at: null, delivered_at: null,
+  completed_at: null, cancelled_at: null, review: { can_review: false, reason: null, existing: null }, conversation_id: null,
 };

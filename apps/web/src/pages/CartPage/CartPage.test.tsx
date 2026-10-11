@@ -13,7 +13,7 @@ afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); });
 
 describe("cart selection through the HTTP adapter", () => {
   it("sends only available items to checkout", async () => {
-    const item = { product_id: product.id, title: product.title, price: product.price, image_url: null,
+    const item = {delivery_method: "BOTH", shipping_fee: "0",  product_id: product.id, title: product.title, price: product.price, image_url: null,
       condition: "GOOD", status: "ACTIVE", province_label: "Hà Nội", available: true, unavailable_reason: null };
     context.reply("GET", "/cart", { groups: [{ seller, items: [item, { ...item, product_id: "sold-test", title: "Món đã bán", available: false, unavailable_reason: "Đã bán" }] }], total_items: 2 });
     harness.show(<CartPage />, "/cart");
@@ -22,9 +22,9 @@ describe("cart selection through the HTTP adapter", () => {
   });
 
   it("refreshes the cart after removal and renders its existing empty state", async () => {
-    context.reply("GET", "/cart", { groups: [{ seller, items: [{ product_id: product.id, title: product.title,
-      price: product.price, image_url: null, condition: "GOOD", status: "ACTIVE", available: true, unavailable_reason: null }] }], total_items: 1 });
-    context.on("DELETE", `/cart/items/${product.id}`, () => { context.reply("GET", "/cart", { groups: [], total_items: 0 }); return {}; });
+    context.reply("GET", "/cart", { groups: [{ seller, items: [{delivery_method: "BOTH", shipping_fee: "0",  product_id: product.id, title: product.title,
+      price: product.price, image_url: null, condition: "GOOD", status: "ACTIVE", province_label: null, available: true, unavailable_reason: null }] }], total_items: 1 });
+    context.on("DELETE", `/cart/items/${product.id}`, () => { context.reply("GET", "/cart", { groups: [], total_items: 0 }); return { groups: [], total_items: 0 }; });
     harness.show(<CartPage />, "/cart");
     await userEvent.click(await screen.findByRole("button", { name: `Xóa ${product.title} khỏi giỏ hàng` }));
     expect(await screen.findByText("Giỏ hàng trống")).toBeInTheDocument();

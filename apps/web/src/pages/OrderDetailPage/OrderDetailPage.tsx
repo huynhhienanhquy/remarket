@@ -1,28 +1,28 @@
-import { useOrderDetail } from "./hooks/useOrderDetail";
-import { OrderTimelineSkeleton } from "./sections/OrderTimelineSkeleton";
-import { ReviewDialog } from "./sections/ReviewDialog";
-import { Link } from "react-router-dom";
 import {
-  ORDER_STATUS_LABELS,
   DELIVERY_LABELS,
   formatDateTime,
   formatVnd,
-  primaryOrderAction,
   ORDER_ACTION_LABELS,
+  ORDER_STATUS_LABELS,
+  primaryOrderAction,
 } from "@remarket/shared";
-import { isApiError } from "../../helpers/errors";
-import { OfflineNotice } from "../../components/common/PageFeedback/PageFeedback";
+import { Link } from "react-router-dom";
 import {
   Button,
-  ConfirmDialog,
-  Dialog,
   EmptyState,
   InlineAlert,
   OrderTimeline,
-  MarketplaceImage,
   StatusBadge,
   UserSummary,
+  useToast
 } from "../../components/common";
+import { OfflineNotice } from "../../components/common/PageFeedback/PageFeedback";
+import { isApiError } from "../../helpers/errors";
+import { useOrderDetail } from "./hooks/useOrderDetail";
+import { OrderActionDialogs } from "./sections/OrderActionDialogs";
+import { OrderContents } from "./sections/OrderContents";
+import { OrderTimelineSkeleton } from "./sections/OrderTimelineSkeleton";
+import { ReviewDialog } from "./sections/ReviewDialog";
 
 type Role = "buyer" | "seller";
 
@@ -31,14 +31,10 @@ interface OrderDetailPageProps {
 }
 
 export function OrderDetailPage({ role }: OrderDetailPageProps) {
+  const toast = useToast();
+  const model = useOrderDetail(role);
   const {
     online,
-    confirmOpen,
-    setConfirmOpen,
-    shipFields,
-    setShipFields,
-    deliverChecks,
-    setDeliverChecks,
     actionError,
     pendingAction,
     detail,
@@ -53,14 +49,14 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
     canReview,
     reviewBlockReason,
     reviewOpen,
-    setReviewOpen,
+    openReview,
+    closeReview,
     timelineSteps,
     handleAction,
     openConfirm,
     openShip,
     openDeliver,
-    closeModals,
-  } = useOrderDetail(role);
+  } = model;
 
   if (detail.isPending) {
     return (
@@ -124,7 +120,12 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigator.clipboard.writeText(order.id)}
+              onClick={() => {
+                void (async () => {
+                  try { await navigator.clipboard.writeText(order.id); toast.success("Đã sao chép mã đơn."); }
+                  catch { toast.error("Không thể sao chép mã đơn. Vui lòng sao chép thủ công."); }
+                })();
+              }}
               className="t-label text-brand hover:underline"
             >
               Sao chép mã đơn
@@ -159,72 +160,8 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
             )}
           </section>
 
-          <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="items-heading">
-            <h2 id="items-heading" className="t-h3 text-ink mb-4">Món đồ</h2>
-            <div className="divide-y divide-line">
-              {order.items.map((snap) => (
-                <div key={snap.id} className="py-4 flex gap-4">
-                  {snap.image_url ? (
-                    <MarketplaceImage
-                      variant="card"
-                      src={snap.image_url}
-                      alt=""
-                      className="h-16 w-16 shrink-0 rounded-control object-cover"
-                    />
-                  ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-control bg-surface-subtle" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="t-body text-ink">{snap.title_snapshot}</p>
-                    <p className="t-meta text-muted">
-                      {snap.condition_snapshot === "LIKE_NEW"
-                        ? "Rất tốt"
-                        : snap.condition_snapshot === "GOOD"
-                        ? "Tốt"
-                        : snap.condition_snapshot === "FAIR"
-                        ? "Bình thường"
-                        : "Mới"}
-                    </p>
-                    <p className="t-price-card text-ink">{formatVnd(snap.price)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <OrderContents order={order} />
 
-          <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="delivery-heading">
-            <h2 id="delivery-heading" className="t-h3 text-ink mb-4">Giao nhận</h2>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="t-body text-muted">Phương thức</dt>
-                <dd className="t-body text-ink">{deliveryLabel}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="t-body text-muted">Người nhận</dt>
-                <dd className="t-body text-ink">{order.delivery.recipient_name ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="t-body text-muted">Số điện thoại</dt>
-                <dd className="t-body text-ink">{order.delivery.recipient_phone ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="t-body text-muted">Địa chỉ</dt>
-                <dd className="t-body text-ink">{order.delivery.delivery_address ?? "—"}</dd>
-              </div>
-              {order.delivery.carrier && (
-                <div className="flex justify-between">
-                  <dt className="t-body text-muted">Đơn vị vận chuyển</dt>
-                  <dd className="t-body text-ink">{order.delivery.carrier}</dd>
-                </div>
-              )}
-              {order.delivery.tracking_code && (
-                <div className="flex justify-between">
-                  <dt className="t-body text-muted">Mã vận đơn</dt>
-                  <dd className="t-body text-ink">{order.delivery.tracking_code}</dd>
-                </div>
-              )}
-            </dl>
-          </section>
         </div>
 
         <div className="space-y-6">
@@ -302,7 +239,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
                   variant="secondary"
                   fullWidth
                   disabled={!online}
-                  onClick={() => setReviewOpen(true)}
+                  onClick={openReview}
                 >
                   Đánh giá người bán
                 </Button>
@@ -335,157 +272,10 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
         </div>
       </div>
 
-      {reviewOpen && canReview && <ReviewDialog key={order.id} order={order} onClose={() => setReviewOpen(false)} />}
+      <OrderActionDialogs model={model} />
 
-      {confirmOpen && (
-        <ConfirmDialog
-          open
-          onCancel={closeModals}
-          title={confirmOpen.action === "cancel" ? "Hủy đơn hàng" : "Hoàn tất đơn hàng"}
-          description={
-            confirmOpen.action === "cancel"
-              ? "Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác."
-              : "Xác nhận bạn đã nhận đủ hàng và đã thanh toán? Hành động này không thể hoàn tác."
-          }
-          confirmLabel={confirmOpen.action === "cancel" ? "Hủy đơn" : "Hoàn tất"}
-          cancelLabel="Đóng"
-          tone={confirmOpen.action === "cancel" ? "danger" : "primary"}
-          loading={pendingAction === confirmOpen.action}
-          onConfirm={() => {
-            if (confirmOpen.action === "cancel") {
-              handleAction("cancel", { reason: confirmOpen.reason });
-            } else {
-              handleAction("complete", {
-                buyer_confirmed_received: true,
-                buyer_confirmed_paid: true,
-              });
-            }
-            closeModals();
-          }}
-          reasonField={
-            confirmOpen.action === "cancel"
-              ? {
-                  label: "Lý do hủy",
-                  required: true,
-                  value: confirmOpen.reason,
-                  onChange: (v) => setConfirmOpen({ ...confirmOpen, reason: v }),
-                  placeholder: "Lý do hủy...",
-                }
-              : undefined
-          }
-        />
-      )}
+      {reviewOpen && canReview && <ReviewDialog key={order.id} order={order} onClose={closeReview} />}
 
-      {shipFields && (
-        <Dialog
-          open
-          onClose={closeModals}
-          title="Giao hàng"
-          dismissible={!pendingAction}
-          footer={
-            <>
-              <Button variant="secondary" onClick={closeModals} disabled={pendingAction === "ship"}>
-                Đóng
-              </Button>
-              <Button
-                variant="primary"
-                loading={pendingAction === "ship"}
-                onClick={() => {
-                  handleAction("ship", {
-                    carrier: shipFields.carrier || undefined,
-                    tracking_code: shipFields.tracking || undefined,
-                  });
-                  closeModals();
-                }}
-              >
-                Xác nhận giao hàng
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="ship-carrier" className="t-label text-ink">Đơn vị vận chuyển</label>
-              <input
-                id="ship-carrier"
-                value={shipFields.carrier}
-                onChange={(e) => setShipFields({ ...shipFields, carrier: e.target.value })}
-                placeholder="Ví dụ: GHTK, J&T, Viettel Post..."
-                className="mt-1 w-full rounded-control border border-input-line bg-surface px-3 t-body text-ink focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/30"
-              />
-            </div>
-            <div>
-              <label htmlFor="ship-tracking" className="t-label text-ink">Mã vận đơn</label>
-              <input
-                id="ship-tracking"
-                value={shipFields.tracking}
-                onChange={(e) => setShipFields({ ...shipFields, tracking: e.target.value })}
-                placeholder="Mã theo dõi đơn vị vận chuyển"
-                className="mt-1 w-full rounded-control border border-input-line bg-surface px-3 t-body text-ink focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/30"
-              />
-            </div>
-          </div>
-        </Dialog>
-      )}
-
-      {deliverChecks && (
-        <Dialog
-          open
-          onClose={closeModals}
-          title="Xác nhận giao hàng"
-          dismissible={!pendingAction}
-          footer={
-            <>
-              <Button variant="secondary" onClick={closeModals} disabled={pendingAction === "deliver"}>
-                Đóng
-              </Button>
-              <Button
-                variant="primary"
-                loading={pendingAction === "deliver"}
-                onClick={() => {
-                  handleAction("deliver", {
-                    buyer_confirmed_received: deliverChecks.received,
-                    buyer_confirmed_paid: deliverChecks.paid,
-                  });
-                  closeModals();
-                }}
-              >
-                Xác nhận
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            <p className="t-body text-ink">
-              {order.delivery_method === "MEETUP"
-                ? "Xác nhận bạn đã gặp và nhận hàng từ người bán."
-                : "Xác nhận bạn đã nhận hàng và đã chuyển khoản."}
-            </p>
-            <div className="space-y-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={deliverChecks.received}
-                  onChange={(e) => setDeliverChecks({ ...deliverChecks, received: e.target.checked })}
-                  className="h-4 w-4 rounded border-input-line text-brand focus:ring-focus"
-                />
-                <span className="t-body text-ink">Tôi đã nhận đủ hàng</span>
-              </label>
-              {order.delivery_method !== "MEETUP" && (
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={deliverChecks.paid}
-                    onChange={(e) => setDeliverChecks({ ...deliverChecks, paid: e.target.checked })}
-                    className="h-4 w-4 rounded border-input-line text-brand focus:ring-focus"
-                  />
-                  <span className="t-body text-ink">Tôi đã thanh toán cho người bán</span>
-                </label>
-              )}
-            </div>
-          </div>
-        </Dialog>
-      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { ok, okList } from "../shared/api-response.js";
 import { forbidden, notFound } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 import { toAdminUserItem } from "../shared/dto-mappers.js";
-import { administeredEntityIds, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
+import { moderationAuditFilter, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
 import { lockUser } from "../services/admin-moderation.js";
 
 /**
@@ -39,8 +39,8 @@ router.get(
     const paging = parsePaging(req.query);
 
     const where: Prisma.UserWhereInput = {};
-    const handledIds = await administeredEntityIds("user", query.handled_by);
-    if (handledIds) where.id = { in: handledIds };
+    const auditFilter = moderationAuditFilter(query.handled_by);
+    if (auditFilter) where.moderationAudits = { some: auditFilter };
     if (query.q !== undefined) {
       where.OR = [
         { fullName: { contains: query.q, mode: "insensitive" } },

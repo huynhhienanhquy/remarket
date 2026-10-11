@@ -1,4 +1,5 @@
 import type { ApiSuccess, SessionUser } from "@remarket/shared";
+import { validApiResponse, apiResponseIssue } from "@remarket/shared";
 import { API_BASE_URL } from "../config/environment";
 import { ApiError, networkError } from "../helpers/errors";
 import { getSessionRevision, getSessionUser, updateSessionUser, updateSessionValidation } from "../stores/sessionStore";
@@ -240,17 +241,22 @@ export function resolveApiMediaUrls(value: unknown, key?: string): unknown {
   return value;
 }
 
-async function parseEnvelope<T>(response: Response): Promise<T> {
+async function parseEnvelope<T>(response: Response, path: string, method: string, assertCurrent: () => void): Promise<T> {
   let payload: unknown = null;
   try {
     payload = await response.json();
   } catch {
     payload = null;
   }
+  if (response.ok) assertCurrent();
 
   if (response.ok) {
-    const envelope = payload as ApiSuccess<T> | null;
-    return resolveApiMediaUrls(envelope?.data ?? payload) as T;
+    if (!validApiResponse(path, method, response.status, payload)) {
+      throw new ApiError({ code: path.startsWith("/auth/") ? "INVALID_AUTH_RESPONSE" : "INVALID_API_RESPONSE",
+        message: "Phản hồi máy chủ không hợp lệ. Vui lòng thử lại.", status: 502, details: { contract: apiResponseIssue(path, method, response.status, payload) } });
+    }
+    const envelope = payload as ApiSuccess<T>;
+    return resolveApiMediaUrls(envelope.data) as T;
   }
 
   const errorBody = payload as
@@ -320,7 +326,7 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
   }
 
   if (response.status === 403 && !credentialEndpoint) {
-    const error: unknown = await parseEnvelope<T>(response).catch((caught: unknown) => caught);
+    const error: unknown = await parseEnvelope<T>(response, path, method, assertRequestContext).catch((caught: unknown) => caught);
     assertRequestContext();
     if (error instanceof ApiError && (error.code === "ACCOUNT_LOCKED" || (["FORBIDDEN", "EMAIL_NOT_VERIFIED"].includes(error.code) && (path.startsWith("/admin/") || error.code === "EMAIL_NOT_VERIFIED")))) {
       // One shared identity read, never a retry of the forbidden admin operation.
@@ -329,7 +335,7 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
     throw error;
   }
 
-  const data = await parseEnvelope<T>(response);
+  const data = await parseEnvelope<T>(response, path, method, assertRequestContext);
   assertRequestContext();
   return data;
 }

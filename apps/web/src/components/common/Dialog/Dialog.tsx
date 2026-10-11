@@ -14,6 +14,13 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(", ");
 
+interface ModalEntry {
+  panel: HTMLElement | null;
+  opener: HTMLElement | null;
+}
+const modalStack: ModalEntry[] = [];
+let unlockedOverflow = "";
+
 function getFocusable(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
@@ -52,9 +59,11 @@ export function useDialogBehavior({
     if (!open) return;
 
     const body = document.body;
-    const previousOverflow = body.style.overflow;
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (modalStack.length === 0) unlockedOverflow = body.style.overflow;
+    const entry: ModalEntry = { panel: panelRef.current, opener: previouslyFocused };
+    modalStack.push(entry);
     body.style.overflow = "hidden";
 
     const focusInitial = () => {
@@ -65,6 +74,7 @@ export function useDialogBehavior({
     focusInitial();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== entry || event.defaultPrevented) return;
       if (event.key === "Escape" && dismissibleRef.current) {
         event.preventDefault();
         onCloseRef.current();
@@ -97,8 +107,21 @@ export function useDialogBehavior({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
+      const wasTop = modalStack.at(-1) === entry;
+      const index = modalStack.indexOf(entry);
+      // A child may outlive its opener's modal. Carry the original opener
+      // forward so the last modal can still restore focus to the page.
+      for (const modal of modalStack.slice(index + 1)) {
+        if (entry.panel?.contains(modal.opener)) modal.opener = entry.opener;
+      }
+      modalStack.splice(index, 1);
+      if (modalStack.length === 0) body.style.overflow = unlockedOverflow;
+      if (wasTop) {
+        const top = modalStack.at(-1);
+        const target = entry.opener;
+        if (target?.isConnected && (!top || top.panel?.contains(target))) target.focus();
+        else top?.panel?.focus();
+      }
     };
   }, [open, panelRef, initialFocusRef]);
 }
@@ -251,9 +274,9 @@ export function ConfirmDialog({
       }
     >
       {description !== undefined && (
-        <p id={descriptionId} className="t-body text-muted">
+        <div id={descriptionId} className="t-body text-muted">
           {description}
-        </p>
+        </div>
       )}
       {reasonField !== undefined && (
         <div className="mt-4">

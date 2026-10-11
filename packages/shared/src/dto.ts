@@ -227,6 +227,8 @@ export interface FavoriteListResponse {
 }
 
 export interface CartItemView {
+  delivery_method: DeliveryMethod;
+  shipping_fee: string;
   product_id: string;
   title: string;
   price: MoneyString;
@@ -270,6 +272,11 @@ export interface CheckoutDeliveryInput {
 export interface CheckoutPayload {
   items: CheckoutItemInput[];
   deliveries: CheckoutDeliveryInput[];
+}
+
+export interface CheckoutPriceChangedDetails {
+  items?: Array<{ product_id: string; price: string }>;
+  sellers?: Array<{ seller_id: string; expected_shipping_fee: string; shipping_fee: string }>;
 }
 
 export interface OrderItemSnapshot {

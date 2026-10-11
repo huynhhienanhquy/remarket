@@ -19,7 +19,7 @@ describe("registration validation and verification", () => {
   });
 
   it("submits the existing payload and preserves the return path for email verification", async () => {
-    context.reply("POST", "/auth/register", { pending_verification: true });
+    context.reply("POST", "/auth/register", { email: "new@example.test", pending_verification: true });
     harness.show(<RegisterPage />, "/register?returnTo=%2Ffavorites");
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText(/Họ và tên/), "Người dùng mới");

@@ -7,6 +7,7 @@ const client = vi.hoisted(() => ({
   session: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   user: { findUnique: vi.fn() },
   outboxEvent: { createMany: vi.fn() },
+  outboxDedupeKey: { createManyAndReturn: vi.fn() },
   $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(),
 }));
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
@@ -26,6 +27,7 @@ function lockedRow(record = token) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  client.outboxDedupeKey.createManyAndReturn.mockImplementation(async ({ data }: { data: Array<{ dedupeKey: string }> }) => data);
   client.authToken.findUnique.mockResolvedValue(token);
   client.session.findUnique.mockResolvedValue({ id: "session", userId: user.id, expiresAt, revokedAt: null, refreshHash: sha256("opaque-test-token") });
   client.user.findUnique.mockResolvedValue(user);

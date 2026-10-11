@@ -6,7 +6,8 @@ const client = vi.hoisted(() => ({
   conversation: { findUnique: vi.fn(), update: vi.fn() },
   product: { findUnique: vi.fn() },
   message: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn(), create: vi.fn() },
-  outboxEvent: { createMany: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
+  outboxEvent: { createMany: vi.fn() },
+  outboxDedupeKey: { createManyAndReturn: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
 }));
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
 import { createApp } from "../../src/app.js";
@@ -17,6 +18,7 @@ const id = "00000000-0000-0000-0000-000000000010";
 const user = { id: "buyer", fullName: "Buyer", email: "buyer@example.test", role: "USER" as const, status: "ACTIVE" as const, emailVerifiedAt: new Date() };
 beforeEach(() => {
   vi.resetAllMocks();
+  client.outboxDedupeKey.createManyAndReturn.mockImplementation(async ({ data }: { data: Array<{ dedupeKey: string }> }) => data);
   client.session.findUnique.mockResolvedValue({ userId: user.id, revokedAt: null, expiresAt: new Date(Date.now() + 60000), user });
   client.conversation.findUnique.mockResolvedValue({ buyerId: user.id, sellerId: "seller", productId: "product" });
   client.user.findUnique.mockResolvedValue(user);

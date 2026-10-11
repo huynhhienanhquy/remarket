@@ -1120,9 +1120,11 @@ components:
             allowed_actions: { type: array, items: { type: string, enum: [edit, submit, resubmit, hide, delete, view] } }
     CartItem:
       type: object
-      required: [product_id, title, price, image_url, condition, status, province_label, available, unavailable_reason]
+      required: [product_id, title, price, image_url, condition, status, province_label, available, unavailable_reason, delivery_method, shipping_fee]
       additionalProperties: false
       properties:
+        delivery_method: { $ref: '#/components/schemas/DeliveryMethod' }
+        shipping_fee: { $ref: '#/components/schemas/MoneyString' }
         product_id: { type: string, format: uuid }
         title: { type: string }
         price: { $ref: '#/components/schemas/MoneyString' }

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useDismiss } from "@/hooks/useDismiss";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "@/contexts/SessionContext";
 import { ApiImage, ChevronRightIcon } from "@/components/common";
@@ -21,23 +22,7 @@ export function AccountMenu() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  useDismiss(open, containerRef, () => setOpen(false));
 
   if (!viewer) return null;
 

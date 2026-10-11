@@ -1,3 +1,4 @@
+import { chatQuota } from "../services/rate-quota.js";
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { ZodError, z } from "zod";
@@ -28,32 +29,9 @@ const readSchema = z.object({
   last_message_id: z.string().uuid(),
 }).strict();
 
-const SOCKET_MESSAGE_WINDOW_MS = 60_000;
-const SOCKET_MESSAGE_LIMIT = 30;
-const socketMessageWindows = new Map<string, { startedAt: number; count: number }>();
-
-function assertSocketMessageRateLimit(userId: string): void {
-  const now = Date.now();
-  const current = socketMessageWindows.get(userId);
-  if (!current || now - current.startedAt >= SOCKET_MESSAGE_WINDOW_MS) {
-    socketMessageWindows.set(userId, { startedAt: now, count: 1 });
-    return;
-  }
-  if (current.count >= SOCKET_MESSAGE_LIMIT) {
-    throw new AppError(
-      API_ERROR_CODES.RATE_LIMITED,
-      "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
-      429,
-    );
-  }
-  current.count += 1;
-
-  // Opportunistic cleanup keeps the process-local limiter bounded without a
-  // timer that would retain idle user ids indefinitely.
-  if (socketMessageWindows.size > 10_000) {
-    for (const [id, window] of socketMessageWindows) {
-      if (now - window.startedAt >= SOCKET_MESSAGE_WINDOW_MS) socketMessageWindows.delete(id);
-    }
+export function assertSocketMessageRateLimit(userId: string): void {
+  if (!chatQuota.consume(userId).allowed) {
+    throw new AppError(API_ERROR_CODES.RATE_LIMITED, "Bạn thao tác quá nhanh, vui lòng thử lại sau.", 429);
   }
 }
 

@@ -12,6 +12,7 @@ import { startRealtimeRelay } from "./realtime/relay.js";
 const app = createApp();
 const server = createServer(app);
 const realtime = attachRealtime(server);
+const stopRealtimeRelay = await startRealtimeRelay();
 server.listen(env.port, () => {
   console.log(`ReMarket API listening on http://localhost:${env.port}`);
   console.log(`  health:  http://localhost:${env.port}/health/ready`);
@@ -20,7 +21,6 @@ server.listen(env.port, () => {
 const stopJobs = env.runJobs
   ? startJobRunner(env.workerIntervalMs, env.outboxIntervalMs)
   : () => undefined;
-const stopRealtimeRelay = startRealtimeRelay();
 
 let shuttingDown = false;
 

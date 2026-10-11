@@ -1,3 +1,4 @@
+import { createNotification } from "./notifications.js";
 import { Prisma } from "@prisma/client";
 import type { Message } from "@prisma/client";
 import { CHAT_LIMITS, validateChatMessage } from "@remarket/shared";
@@ -91,7 +92,7 @@ export async function sendChatMessage(input: {
       });
       const recipientId =
         conversation.buyerId === viewer.id ? conversation.sellerId : conversation.buyerId;
-      await tx.notification.create({
+      await createNotification(tx, {
         data: {
           userId: recipientId,
           type: "NEW_MESSAGE",

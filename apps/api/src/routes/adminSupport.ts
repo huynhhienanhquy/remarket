@@ -1,3 +1,4 @@
+import { createNotification } from "../services/notifications.js";
 import type { Prisma, User } from "@prisma/client";
 import type { TicketStatus } from "@remarket/shared";
 import { TICKET_STATUS_LABELS, validateSupportMessage } from "@remarket/shared";
@@ -194,7 +195,7 @@ router.post(
           status: ticket.status === "OPEN" ? "IN_PROGRESS" : ticket.status,
         },
       });
-      await tx.notification.create({
+      await createNotification(tx, {
         data: {
           userId: ticket.userId,
           type: "TICKET_REPLY",

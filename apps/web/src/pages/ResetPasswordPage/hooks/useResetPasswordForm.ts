@@ -34,8 +34,6 @@ export function useResetPasswordForm() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [pending, setPending] = useState(false);
 
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -125,10 +123,6 @@ export function useResetPasswordForm() {
     confirmError,
     formError,
     formSuccess,
-    showPassword,
-    setShowPassword,
-    showConfirm,
-    setShowConfirm,
     pending,
     passwordRef,
     confirmRef,

@@ -6,6 +6,7 @@ const client = vi.hoisted(() => ({
   session: { findUnique: vi.fn(), updateMany: vi.fn() },
   authToken: { findUnique: vi.fn(), updateMany: vi.fn() },
   outboxEvent: { createMany: vi.fn() },
+  outboxDedupeKey: { createManyAndReturn: vi.fn() },
   $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(),
 }));
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
@@ -18,6 +19,7 @@ const cookie = `${env.refreshCookie}=opaque-test-token`;
 const token = { id: "token", userId: user.id, sessionId: "session", purpose: "REFRESH", consumedAt: null, expiresAt: new Date(Date.now() + 60_000) };
 beforeEach(() => {
   vi.resetAllMocks();
+  client.outboxDedupeKey.createManyAndReturn.mockImplementation(async ({ data }: { data: Array<{ dedupeKey: string }> }) => data);
   client.user.findUnique.mockResolvedValue(user);
   client.session.findUnique.mockResolvedValue({ userId: user.id, revokedAt: null, expiresAt: token.expiresAt, user });
   client.authToken.findUnique.mockResolvedValue(token);

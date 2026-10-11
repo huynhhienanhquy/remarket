@@ -5,7 +5,7 @@ import type { Socket } from "node:net";
 import type { TLSSocket } from "node:tls";
 import { env } from "../config/env.js";
 import type { RealtimeEvent } from "../outbox/outbox.js";
-import { prisma } from "../utils/prisma.js";
+import { backgroundPrisma as prisma } from "../utils/background-prisma.js";
 
 type SmtpSocket = Socket | TLSSocket;
 
@@ -48,6 +48,7 @@ function responseReader(socket: SmtpSocket): ResponseReader {
   let buffer = "";
   let lines: string[] = [];
   const queued: SmtpResponse[] = [];
+  let failure: Error | undefined;
   const waiting: Array<{
     resolve: (response: SmtpResponse) => void;
     reject: (error: Error) => void;
@@ -59,6 +60,7 @@ function responseReader(socket: SmtpSocket): ResponseReader {
     else queued.push(response);
   };
   const fail = (error: Error): void => {
+    failure = error;
     for (const waiter of waiting.splice(0)) waiter.reject(error);
   };
   const onData = (chunk: Buffer): void => {
@@ -84,6 +86,7 @@ function responseReader(socket: SmtpSocket): ResponseReader {
 
   return {
     next: () => {
+      if (failure) return Promise.reject(failure);
       const ready = queued.shift();
       if (ready) return Promise.resolve(ready);
       return new Promise<SmtpResponse>((resolve, reject) => waiting.push({ resolve, reject }));
@@ -98,16 +101,27 @@ function responseReader(socket: SmtpSocket): ResponseReader {
 
 function waitForConnect(socket: SmtpSocket, event: "connect" | "secureConnect"): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onReady = (): void => {
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      socket.off(event, onReady);
       socket.off("error", onError);
+      socket.off("close", onClose);
+    };
+    const onReady = (): void => {
+      cleanup();
       resolve();
     };
     const onError = (error: Error): void => {
-      socket.off(event, onReady);
+      cleanup();
       reject(error);
     };
+    const onClose = (): void => onError(new Error("SMTP connection closed during handshake"));
+    const timer = setTimeout(() => {
+      onError(new Error("SMTP connection timed out during handshake"));
+    }, 15_000);
     socket.once(event, onReady);
     socket.once("error", onError);
+    socket.once("close", onClose);
   });
 }
 
@@ -142,18 +156,18 @@ export async function sendEmail(input: {
   const config = env.smtp;
   if (!config) throw new Error("SMTP is not configured");
 
-  let socket: SmtpSocket;
-  if (config.port === 465) {
-    socket = tls.connect({ host: config.host, port: config.port, servername: config.host });
-    await waitForConnect(socket, "secureConnect");
-  } else {
-    socket = net.connect({ host: config.host, port: config.port });
-    await waitForConnect(socket, "connect");
-  }
-  socket.setTimeout(15_000, () => socket.destroy(new Error("SMTP connection timed out")));
-
-  let reader = responseReader(socket);
+  let socket: SmtpSocket | undefined;
+  let reader: ResponseReader | undefined;
+  const deadline = setTimeout(() => socket?.destroy(new Error("SMTP delivery timed out")), 60_000);
   try {
+    socket = config.port === 465
+      ? tls.connect({ host: config.host, port: config.port, servername: config.host })
+      : net.connect({ host: config.host, port: config.port });
+    // Attach the reader before connecting: a fast server can send its banner
+    // before the continuation following the handshake promise runs.
+    reader = responseReader(socket);
+    socket.setTimeout(15_000, () => socket?.destroy(new Error("SMTP connection timed out")));
+    await waitForConnect(socket, config.port === 465 ? "secureConnect" : "connect");
     await expect(reader, [220]);
     command(socket, `EHLO ${new URL(env.publicWebUrl).hostname}`);
     await expect(reader, [250]);
@@ -163,9 +177,9 @@ export async function sendEmail(input: {
       await expect(reader, [220]);
       reader.detach();
       socket = tls.connect({ socket, servername: config.host });
-      await waitForConnect(socket, "secureConnect");
-      socket.setTimeout(15_000, () => socket.destroy(new Error("SMTP connection timed out")));
       reader = responseReader(socket);
+      socket.setTimeout(15_000, () => socket?.destroy(new Error("SMTP connection timed out")));
+      await waitForConnect(socket, "secureConnect");
       command(socket, `EHLO ${new URL(env.publicWebUrl).hostname}`);
       await expect(reader, [250]);
     }
@@ -204,8 +218,9 @@ export async function sendEmail(input: {
     command(socket, "QUIT");
     await expect(reader, [221]);
   } finally {
-    reader.detach();
-    socket.destroy();
+    clearTimeout(deadline);
+    reader?.detach();
+    socket?.destroy();
   }
 }
 

@@ -10,7 +10,7 @@
     "start:worker": "node dist/apps/api/src/worker.js",
     "worker": "tsx src/worker.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src tests scripts",
     "test": "vitest run",
     "test:integration": "vitest run tests/integration",
     "seed": "tsx scripts/seed.ts",
@@ -20,7 +20,10 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:preflight": "tsx scripts/preflight-migration.ts",
     "prisma:studio": "prisma studio",
-    "postman:generate": "node scripts/generate-postman.mjs"
+    "storage:sync": "tsx scripts/sync-local-images.ts",
+    "postman:generate": "node scripts/generate-postman.mjs",
+    "contracts:generate": "node scripts/generate-response-contracts.mjs",
+    "contracts:check": "node scripts/generate-response-contracts.mjs --check"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -29,7 +32,6 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.1",
-    "express-rate-limit": "^7.4.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "sharp": "^0.34.5",
@@ -37,6 +39,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -44,10 +47,13 @@
     "@types/node": "^22.10.2",
     "@types/supertest": "^6.0.3",
     "dotenv": "^18.0.5",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
     "prisma": "5.22.0",
     "supertest": "^7.3.1",
     "tsx": "^4.19.2",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^3.2.7",
     "yaml": "^2.9.1"
   },

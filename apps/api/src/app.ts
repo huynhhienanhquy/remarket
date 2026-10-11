@@ -3,7 +3,6 @@ import express from "express";
 import type { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { API_ERROR_CODES } from "@remarket/shared";
 import { env } from "./config/env.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
@@ -11,8 +10,7 @@ import { errorHandler, asyncHandler, AppError } from "./middleware/errorHandler.
 import { authMiddleware, requireRole } from "./middleware/auth.js";
 import { prisma } from "./utils/prisma.js";
 import { collectWorkerMetrics, workerSnapshot } from "./jobs/runner.js";
-import { envelopeMeta } from "./shared/api-response.js";
-import { normalizeRateLimitIp } from "./middleware/rate-limit.js";
+import { createGlobalRateLimit } from "./middleware/rate-limit.js";
 
 import { authRouter } from "./routes/auth.js";
 import { categoriesRouter } from "./routes/categories.js";
@@ -53,22 +51,7 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: "64kb" }));
   app.use(express.urlencoded({ extended: false, limit: "64kb" }));
 
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 1000,
-      standardHeaders: true,
-      legacyHeaders: false,
-      keyGenerator: (req) => normalizeRateLimitIp(req.ip ?? req.socket.remoteAddress),
-      handler: (_req, res) => {
-        res.status(429).json({
-          success: false,
-          error: { code: API_ERROR_CODES.RATE_LIMITED, message: "Bạn thao tác quá nhanh, vui lòng thử lại sau." },
-          meta: envelopeMeta(res),
-        });
-      },
-    }),
-  );
+  app.use(createGlobalRateLimit());
 
   // Health probes: /health/live never touches the DB (detail-project 18).
   app.get("/health/live", (_req: Request, res: Response) => {

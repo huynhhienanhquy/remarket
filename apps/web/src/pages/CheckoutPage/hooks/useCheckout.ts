@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addVnd, validateShippingFee, validatePhone } from "@remarket/shared";
+import { orderShippingFee, addVnd, validateShippingFee, validatePhone } from "@remarket/shared";
 import { api } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { isApiError } from "@/helpers/errors";
-import type { CheckoutPayload } from "@remarket/shared";
+import type { CheckoutPayload, CheckoutPriceChangedDetails } from "@remarket/shared";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
 function generateIdempotencyKey(): string {
@@ -42,9 +42,7 @@ export function useCheckout() {
   const online = useConnectivity();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, CheckoutDeliveryInput>>({});
-  const [priceChangedAlert, setPriceChangedAlert] = useState<{
-    items: Array<{ product_id: string; current_price: string; cart_price: string }>;
-  } | null>(null);
+  const [priceChangedAlert, setPriceChangedAlert] = useState<CheckoutPriceChangedDetails | null>(null);
 
   const itemsParam = searchParams.get("items");
   const selectedIds = useMemo(
@@ -92,22 +90,19 @@ export function useCheckout() {
     () => Array.from(new Set(availableItems.map((i) => i.seller_id))),
     [availableItems],
   );
-  const productDetails = useQuery({
-    queryKey: ["checkout", "products", availableItems.map((item) => item.product_id)],
-    queryFn: () => Promise.all(availableItems.map((item) => api.products.detail(item.product_id))),
-    enabled: availableItems.length > 0,
-  });
+  const selectedProducts = useMemo(() => groups.flatMap((group) => group.items
+    .filter((item) => availableItems.some((selected) => selected.product_id === item.product_id))
+    .map((item) => ({ ...item, seller_id: group.seller.id }))), [groups, availableItems]);
   function shippingFor(sellerId: string, method: "COD" | "MEETUP"): string {
-    if (method === "MEETUP") return "0";
-    return (productDetails.data ?? []).filter((item) => item.seller.id === sellerId).reduce((max, item) => BigInt(item.shipping_fee) > BigInt(max) ? item.shipping_fee : max, "0");
+    return orderShippingFee(method, selectedProducts.filter((item) => item.seller_id === sellerId).map((item) => item.shipping_fee));
   }
   function methodsFor(sellerId: string): Array<"COD" | "MEETUP"> {
-    const products = (productDetails.data ?? []).filter((item) => item.seller.id === sellerId);
+    const products = selectedProducts.filter((item) => item.seller_id === sellerId);
     return products.length === 0 ? [] : (["COD", "MEETUP"] as const).filter((method) => products.every((item) => item.delivery_method === "BOTH" || item.delivery_method === method));
   }
 
   useEffect(() => {
-    if (!productDetails.data) return;
+    if (!cart.data) return;
     setDraft((previous) => {
       let next = previous;
       for (const sellerId of sellerIds) {
@@ -115,17 +110,17 @@ export function useCheckout() {
         if (next === previous) next = { ...previous };
         next[sellerId] = {
           seller_id: sellerId,
-          method: productDetails.data.filter((item) => item.seller.id === sellerId).every((item) => item.delivery_method !== "MEETUP") ? "COD" : "MEETUP",
+          method: selectedProducts.filter((item) => item.seller_id === sellerId).every((item) => item.delivery_method !== "MEETUP") ? "COD" : "MEETUP",
           recipient_name: viewer?.full_name ?? "",
           recipient_phone: viewer?.phone ?? "",
           delivery_address: viewer?.default_address ?? "",
           province_code: viewer?.province_code ?? "",
-          expected_shipping_fee: productDetails.data.filter((item) => item.seller.id === sellerId).reduce((max, item) => BigInt(item.shipping_fee) > BigInt(max) ? item.shipping_fee : max, "0"),
+          expected_shipping_fee: orderShippingFee("COD", selectedProducts.filter((item) => item.seller_id === sellerId).map((item) => item.shipping_fee)),
         };
       }
       return next;
     });
-  }, [sellerIds, viewer, productDetails.data]);
+  }, [sellerIds, viewer, selectedProducts, cart.data]);
 
   function updateDelivery(sellerId: string, patch: CheckoutDeliveryPatch) {
     setDraft((prev) => ({
@@ -147,15 +142,15 @@ export function useCheckout() {
     onError: (caught) => {
       if (isApiError(caught)) {
         if (caught.code === "PRICE_CHANGED") {
-          const details = caught.details as { items?: Array<{ product_id: string; current_price: string; cart_price: string }> };
-          setPriceChangedAlert({ items: details?.items ?? [] });
+          const details = caught.details as CheckoutPriceChangedDetails;
+          setPriceChangedAlert(details ?? {});
         }
       }
     },
   });
 
   async function handleSubmit() {
-    if (checkout.isPending || !online || !productDetails.data) return;
+    if (checkout.isPending || !online || !cart.data) return;
     setSubmissionError(null);
 
     const deliveries: CheckoutDeliveryInput[] = [];
@@ -198,7 +193,6 @@ export function useCheckout() {
   function handlePriceChangedRefresh() {
     setPriceChangedAlert(null);
     queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-    queryClient.invalidateQueries({ queryKey: ["checkout", "products"] });
   }
   return {
     online,
@@ -210,7 +204,6 @@ export function useCheckout() {
     groups,
     availableItems,
     sellerIds,
-    productDetails,
     shippingFor,
     methodsFor,
     updateDelivery,

@@ -155,6 +155,7 @@ model User {
   supportTickets         SupportTicket[] @relation("SupportTicketUser")
   supportMessages        SupportMessage[]
   auditLogs              AuditLog[]     @relation("AuditLog")
+  moderationAudits       AuditLog[]     @relation("AuditTargetUser")
   authTokens             AuthToken[]
   sessions               Session[]
   handledReports         Report[]       @relation("ReportHandler")
@@ -166,7 +167,6 @@ model User {
   cancelledOrders        Order[]         @relation("OrderCancelledBy")
   hiddenReviews          Review[]        @relation("ReviewHiddenBy")
 
-  @@index([email])
   @@index([status])
   @@index([emailVerifiedAt, emailVerificationRequestedAt])
 }
@@ -222,10 +222,10 @@ model Category {
   slug      String
   status    CategoryStatus @default(ACTIVE)
   products  Product[]
+  moderationAudits AuditLog[] @relation("AuditTargetCategory")
 
   @@unique([slug])
   @@index([parentId])
-  @@index([slug])
   @@index([status])
 }
 
@@ -275,6 +275,7 @@ model Product {
   reports         Report[]
   conversations   Conversation[]
   uploads         UploadAsset[]
+  moderationAudits AuditLog[] @relation("AuditTargetProduct")
 
   @@index([sellerId])
   @@index([categoryId])
@@ -319,6 +320,15 @@ model UploadAsset {
   @@index([userId, purpose])
   @@index([productId])
   @@index([attachedAt, createdAt])
+}
+
+/// Shared development storage. Bytes stay separate from asset metadata so
+/// listing queries never fetch image contents. Reads use the guarded upload API.
+model StorageObject {
+  storagePath String   @id
+  contents    Bytes
+  mimeType    String
+  createdAt   DateTime @default(now())
 }
 
 model CartItem {
@@ -426,7 +436,6 @@ model Order {
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
-  @@index([code])
   @@index([createdAt])
   @@index([buyerId, createdAt, id])
   @@index([sellerId, status, createdAt])
@@ -485,6 +494,7 @@ model OrderDeliveryInfo {
 }
 
 model Review {
+  moderationAudits AuditLog[] @relation("AuditTargetReview")
   id              String   @id @default(uuid())
   orderId         String   @unique
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -610,6 +620,14 @@ model AuditLog {
   action       String
   entityType   String
   entityId     String?
+  targetUserId String?
+  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetProductId String?
+  targetProduct Product? @relation("AuditTargetProduct", fields: [targetProductId], references: [id], onDelete: SetNull)
+  targetCategoryId String?
+  targetCategory Category? @relation("AuditTargetCategory", fields: [targetCategoryId], references: [id], onDelete: SetNull)
+  targetReviewId String?
+  targetReview Review? @relation("AuditTargetReview", fields: [targetReviewId], references: [id], onDelete: SetNull)
   reason       String?
   metadata     Json
   createdAt    DateTime @default(now())
@@ -619,6 +637,10 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@index([entityType, entityId, createdAt])
+  @@index([targetUserId, actorId, createdAt])
+  @@index([targetProductId, actorId, createdAt])
+  @@index([targetCategoryId, actorId, createdAt])
+  @@index([targetReviewId, actorId, createdAt])
 }
 
 model CheckoutRequest {
@@ -646,6 +668,8 @@ model OutboxEvent {
   attempts      Int      @default(0)
   nextAttemptAt DateTime @default(now())
   processedAt   DateTime?
+  /// Allocated under a transaction advisory lock, so committed values are ordered.
+  relaySequence BigInt?  @unique
   lastError     String?
   lockedAt      DateTime?
   lockId        String?
@@ -653,6 +677,12 @@ model OutboxEvent {
 
   @@index([processedAt, nextAttemptAt])
   @@index([lockedAt])
+}
+
+/// Compact permanent tombstones preserve idempotency after payload retention.
+model OutboxDedupeKey {
+  dedupeKey String @id
+  createdAt DateTime @default(now())
 }
 
 /// Shared heartbeat so an API process can observe a separately deployed

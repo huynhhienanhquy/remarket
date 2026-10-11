@@ -42,8 +42,6 @@ export function useRegisterForm() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [pending, setPending] = useState(false);
 
   const fullNameRef = useRef<HTMLInputElement>(null);
@@ -214,10 +212,6 @@ export function useRegisterForm() {
     passwordError,
     confirmError,
     formError,
-    showPassword,
-    setShowPassword,
-    showConfirm,
-    setShowConfirm,
     pending,
     fullNameRef,
     emailRef,

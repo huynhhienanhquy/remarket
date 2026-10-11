@@ -19,7 +19,7 @@ const admin: SessionUser = {
   joined_at: "2026-10-01T00:00:00Z", email_verified_at: "2026-10-01T00:00:00Z",
 };
 const member: SessionUser = { ...admin, id: "member-account", role: "USER" };
-const ok = (data: unknown) => new Response(JSON.stringify({ success: true, data }), { status: 200 });
+const ok = (data: unknown) => new Response(JSON.stringify({meta: { request_id: "test-request" },  success: true, data }), { status: 200 });
 const denied = (status: number, code: string) => new Response(JSON.stringify({ success: false, error: { code, message: code } }), { status });
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 let client: QueryClient;

@@ -1,3 +1,4 @@
+import { loadCategoryEligibility } from "../services/category-policy.js";
 import type { User } from "@prisma/client";
 import { Router } from "express";
 import type { Response } from "express";
@@ -28,6 +29,7 @@ import { usableImageUrl } from "../shared/image-url.js";
 
 const NOT_FOUND_MESSAGE = "Không tìm thấy tin đăng này.";
 const OWN_LISTING_MESSAGE = "Không thể mua món đồ của chính mình.";
+const MAX_CART_ITEMS = 50;
 
 const addCartItemSchema = z
   .object({
@@ -40,33 +42,6 @@ const addCartItemSchema = z
 function viewerIdOf(req: AuthRequest): string {
   if (!req.user) throw unauthorized("Bạn cần đăng nhập để tiếp tục.");
   return req.user.id;
-}
-
-/** A purchasable category is a leaf with an all-ACTIVE ancestor chain. */
-async function loadCategoryValidator(): Promise<(categoryId: string) => boolean> {
-  const rows = await prisma.category.findMany({
-    select: { id: true, parentId: true, status: true },
-  });
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const withChildren = new Set<string>();
-  for (const row of rows) {
-    if (row.parentId !== null) withChildren.add(row.parentId);
-  }
-
-  return (categoryId: string): boolean => {
-    const category = byId.get(categoryId);
-    if (!category || category.status !== "ACTIVE" || withChildren.has(categoryId)) return false;
-    const guard = new Set<string>([categoryId]);
-    let cursor = category.parentId;
-    while (cursor !== null) {
-      if (guard.has(cursor)) return false;
-      guard.add(cursor);
-      const parent = byId.get(cursor);
-      if (!parent || parent.status !== "ACTIVE") return false;
-      cursor = parent.parentId;
-    }
-    return true;
-  };
 }
 
 /** Why one listing cannot be checked out right now; null when it is buyable. */
@@ -93,15 +68,17 @@ async function buildCartView(
   viewerId: string,
   isValidCategory?: (categoryId: string) => boolean,
 ): Promise<CartView> {
-  const [validCategory, entries] = await Promise.all([
-    isValidCategory ? Promise.resolve(isValidCategory) : loadCategoryValidator(),
+  const [validCategory, entries, totalItems] = await Promise.all([
+    isValidCategory ? Promise.resolve(isValidCategory) : loadCategoryEligibility(prisma).then((ids) => (id: string) => ids.has(id)),
     prisma.cartItem.findMany({
       where: { userId: viewerId },
       orderBy: { createdAt: "desc" },
+      take: MAX_CART_ITEMS,
       include: {
         product: { include: { images: { orderBy: { sortOrder: "asc" } }, seller: true } },
       },
     }),
+    prisma.cartItem.count({ where: { userId: viewerId } }),
   ]);
 
   const sellers = new Map<string, User>();
@@ -118,6 +95,8 @@ async function buildCartView(
       && product.seller.status === "ACTIVE" && product.seller.emailVerifiedAt !== null
       && validCategory(product.categoryId);
     const item: CartItemView = {
+      delivery_method: product.deliveryMethod,
+      shipping_fee: hidden ? "0" : product.shippingFee.toString(),
       product_id: product.id,
       title: hidden ? "" : product.title,
       price: hidden ? "0" : product.price.toString(),
@@ -143,7 +122,7 @@ async function buildCartView(
     // Sellers are ordered by name so the checkout summary is stable.
     .sort((a, b) => a.seller.name.localeCompare(b.seller.name, "vi"));
 
-  return { groups, total_items: entries.length };
+  return { groups, total_items: totalItems };
 }
 
 export const cartRouter = Router();
@@ -173,7 +152,7 @@ cartRouter.post(
         where: { id: productId },
         include: { images: { orderBy: { sortOrder: "asc" } }, seller: true },
       }),
-      loadCategoryValidator(),
+      loadCategoryEligibility(prisma).then((ids) => (id: string) => ids.has(id)),
     ]);
     if (!product || product.deletedAt !== null) throw notFound(NOT_FOUND_MESSAGE);
 
@@ -184,10 +163,14 @@ cartRouter.post(
     if (reason !== null) throw productNotAvailable(reason);
 
     // Quantity is fixed at 1: adding twice must not duplicate or increment.
-    await prisma.cartItem.upsert({
-      where: { userId_productId: { userId: viewerId, productId } },
-      create: { userId: viewerId, productId },
-      update: {},
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${viewerId} FOR UPDATE`;
+      const existing = await tx.cartItem.findUnique({ where: { userId_productId: { userId: viewerId, productId } } });
+      if (existing) return;
+      if (await tx.cartItem.count({ where: { userId: viewerId } }) >= MAX_CART_ITEMS) {
+        throw validationError(`Giỏ hàng tối đa ${MAX_CART_ITEMS} món. Hãy bỏ bớt món trước khi thêm.`, { product_id: "Giỏ hàng đã đầy." });
+      }
+      await tx.cartItem.create({ data: { userId: viewerId, productId } });
     });
 
     return ok(res, await buildCartView(viewerId, validCategory));

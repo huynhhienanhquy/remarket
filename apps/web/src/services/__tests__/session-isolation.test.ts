@@ -5,7 +5,7 @@ const storageKey = "remarket:session-scope";
 const admin: SessionUser = { id: "admin", role: "ADMIN", status: "ACTIVE", full_name: "Admin", email: "admin@example.test", avatar_url: null, email_verified_at: "2026-01-01", phone: null, province_code: null, default_address: null, joined_at: "2026-01-01" };
 const buyer: SessionUser = { ...admin, id: "buyer", role: "USER", full_name: "Buyer", email: "buyer@example.test" };
 const seller: SessionUser = { ...buyer, id: "seller", full_name: "Seller", email: "seller@example.test" };
-const ok = (data: unknown) => new Response(JSON.stringify({ success: true, data }));
+const ok = (data: unknown) => new Response(JSON.stringify({meta: { request_id: "test-request" },  success: true, data }));
 const denied = () => new Response(JSON.stringify({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized" } }), { status: 401 });
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 let cookies: Map<string, { user: SessionUser; access_token: string }>;

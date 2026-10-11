@@ -1,4 +1,6 @@
-import type { Prisma } from "@prisma/client";
+import { cancelOrder } from "./order-cancellation.js";
+import { createNotifications } from "./notifications.js";
+import { Prisma } from "@prisma/client";
 import { enqueueOutbox } from "../outbox/outbox.js";
 import type { AdminActor } from "../shared/admin-helpers.js";
 import { writeAudit } from "../shared/admin-helpers.js";
@@ -16,6 +18,16 @@ export async function blockProduct(
     auditMetadata?: AuditMetadata;
   },
 ) {
+  const initial = await tx.product.findUnique({ where: { id: input.productId } });
+  if (!initial || initial.deletedAt !== null) throw notFound("Không tìm thấy tin đăng để chặn.");
+  // Checkout also locks seller before creating orders. Acquire every affected
+  // Order before Product, so buyer cancellation cannot invert these locks.
+  await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${initial.sellerId} FOR UPDATE`;
+  await tx.$queryRaw(Prisma.sql`
+    SELECT "id" FROM "Order" WHERE "id" IN (
+      SELECT "orderId" FROM "OrderItem" WHERE "productId" = ${input.productId}
+    ) ORDER BY "id" FOR UPDATE
+  `);
   await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" = ${input.productId} FOR UPDATE`;
   const product = await tx.product.findUnique({ where: { id: input.productId } });
   if (product === null || product.deletedAt !== null) {
@@ -61,83 +73,16 @@ export async function blockProduct(
       continue;
     }
 
-    const moved = await tx.order.updateMany({
-      where: { id: order.id, status: order.status, version: order.version },
-      data: {
-        status: "CANCELLED",
-        cancellationReason: "PRODUCT_BLOCKED",
-        cancelledById: input.actor.id,
-        cancelledAt: new Date(),
-        expiresAt: null,
-        version: { increment: 1 },
-      },
+    const won = await cancelOrder(tx, order, {
+      reason: "PRODUCT_BLOCKED", actor: { type: "ADMIN", id: input.actor.id, name: input.actor.fullName },
+      eventKey: `order:${order.id}:product-blocked:${product.id}`,
+      notification: { title: "Đơn hàng đã bị hủy", content: `Đơn ${order.code} đã hủy vì một sản phẩm bị chặn.`,
+        key: (userId) => `order:${order.id}:product-blocked:${product.id}:${userId}` },
     });
-    if (moved.count !== 1) continue;
-    cancelledOrders += 1;
-
-    const reserved = await tx.product.findMany({
-      where: { reservedOrderId: order.id },
-      include: {
-        seller: true,
-        category: { include: { parent: true, _count: { select: { children: true } } } },
-      },
-    });
-    for (const item of reserved) {
-      const sellable =
-        item.id !== product.id &&
-        item.deletedAt === null &&
-        !item.isBlocked &&
-        item.seller.status === "ACTIVE" &&
-        item.seller.emailVerifiedAt !== null &&
-        item.category._count.children === 0 &&
-        item.category.status === "ACTIVE" &&
-        (item.category.parent === null || item.category.parent.status === "ACTIVE");
-      await tx.product.updateMany({
-        where: { id: item.id, status: "RESERVED", reservedOrderId: order.id },
-        data: {
-          status: sellable ? "ACTIVE" : "INACTIVE",
-          reservedOrderId: null,
-          version: { increment: 1 },
-        },
-      });
-    }
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        fromStatus: order.status,
-        toStatus: "CANCELLED",
-        actorType: "ADMIN",
-        actorId: input.actor.id,
-        actorName: input.actor.fullName,
-        reason: "PRODUCT_BLOCKED",
-      },
-    });
-    await tx.notification.createMany({
-      data: [order.buyerId, order.sellerId].map((userId) => ({
-        userId,
-        type: "ORDER_CANCELLED" as const,
-        title: "Đơn hàng đã bị hủy",
-        content: `Đơn ${order.code} đã hủy vì một sản phẩm bị chặn.`,
-        referenceType: "order",
-        referenceId: order.id,
-        dedupeKey: `order:${order.id}:product-blocked:${product.id}:${userId}`,
-      })),
-      skipDuplicates: true,
-    });
-    await enqueueOutbox(
-      tx,
-      "order.updated",
-      order.id,
-      `order:${order.id}:product-blocked:${product.id}`,
-      {
-        order_id: order.id,
-        status: "CANCELLED",
-        recipients: [order.buyerId, order.sellerId],
-      },
-    );
+    if (won) cancelledOrders += 1;
   }
 
-  await tx.notification.createMany({
+  await createNotifications(tx, {
     data: [{
       userId: product.sellerId,
       type: "PRODUCT_BLOCKED",
@@ -207,7 +152,7 @@ export async function lockUser(
       OR: [{ buyerId: target.id }, { sellerId: target.id }],
       status: { in: ["PENDING", "CONFIRMED", "SHIPPING", "DELIVERED"] },
     },
-    include: { items: { select: { productId: true } } },
+    orderBy: { id: "asc" },
   });
   let cancelledOrders = 0;
   let escalatedOrders = 0;
@@ -236,81 +181,14 @@ export async function lockUser(
       continue;
     }
 
-    const moved = await tx.order.updateMany({
-      where: { id: order.id, status: order.status, version: order.version },
-      data: {
-        status: "CANCELLED",
-        cancellationReason: "ACCOUNT_LOCKED",
-        cancelledById: input.actor.id,
-        cancelledAt: lockedAt,
-        expiresAt: null,
-        version: { increment: 1 },
-      },
+    const won = await cancelOrder(tx, order, {
+      reason: "ACCOUNT_LOCKED", historyReason: `ACCOUNT_LOCKED:${target.id}`, at: lockedAt,
+      actor: { type: "ADMIN", id: input.actor.id, name: input.actor.fullName },
+      eventKey: `order:${order.id}:account-locked:${target.id}`,
+      notification: { title: "Đơn hàng đã bị hủy", content: `Đơn ${order.code} đã hủy do một tài khoản tham gia bị khóa.`,
+        key: (userId) => `order:${order.id}:account-locked:${target.id}:${userId}` },
     });
-    if (moved.count !== 1) continue;
-    cancelledOrders += 1;
-
-    const productIds = order.items.map((item) => item.productId);
-    const products = await tx.product.findMany({
-      where: { id: { in: productIds }, reservedOrderId: order.id },
-      include: {
-        seller: true,
-        category: { include: { parent: true, _count: { select: { children: true } } } },
-      },
-    });
-    for (const product of products) {
-      const sellable =
-        product.sellerId !== target.id &&
-        product.deletedAt === null &&
-        !product.isBlocked &&
-        product.seller.status === "ACTIVE" &&
-        product.seller.emailVerifiedAt !== null &&
-        product.category._count.children === 0 &&
-        product.category.status === "ACTIVE" &&
-        (product.category.parent === null || product.category.parent.status === "ACTIVE");
-      await tx.product.updateMany({
-        where: { id: product.id, reservedOrderId: order.id, status: "RESERVED" },
-        data: {
-          status: sellable ? "ACTIVE" : "INACTIVE",
-          reservedOrderId: null,
-          version: { increment: 1 },
-        },
-      });
-    }
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        fromStatus: order.status,
-        toStatus: "CANCELLED",
-        actorType: "ADMIN",
-        actorId: input.actor.id,
-        actorName: input.actor.fullName,
-        reason: `ACCOUNT_LOCKED:${target.id}`,
-      },
-    });
-    await tx.notification.createMany({
-      data: [order.buyerId, order.sellerId].map((userId) => ({
-        userId,
-        type: "ORDER_CANCELLED" as const,
-        title: "Đơn hàng đã bị hủy",
-        content: `Đơn ${order.code} đã hủy do một tài khoản tham gia bị khóa.`,
-        referenceType: "order",
-        referenceId: order.id,
-        dedupeKey: `order:${order.id}:account-locked:${target.id}:${userId}`,
-      })),
-      skipDuplicates: true,
-    });
-    await enqueueOutbox(
-      tx,
-      "order.updated",
-      order.id,
-      `order:${order.id}:account-locked:${target.id}`,
-      {
-        order_id: order.id,
-        status: "CANCELLED",
-        recipients: [order.buyerId, order.sellerId],
-      },
-    );
+    if (won) cancelledOrders += 1;
   }
 
   const hiddenProducts = await tx.product.updateMany({

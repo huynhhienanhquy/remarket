@@ -14,7 +14,7 @@ afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); });
 
 describe("member workflows through the HTTP adapter", () => {
 it("buys only the viewed product, not every existing item in the cart", async () => {
-    context.reply("POST", "/cart/items", {});
+    context.reply("POST", "/cart/items", { groups: [], total_items: 0 });
     show(<ProductDetailPage />, "/products/" + product.id, "/products/:id");
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Mua ngay" })[0]).not.toBeDisabled());
     await userEvent.click(screen.getAllByRole("button", { name: "Mua ngay" })[0]!);

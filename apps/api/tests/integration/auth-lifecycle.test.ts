@@ -26,7 +26,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("PostgreSQL auth lifecycle", () 
   async function login(email: string, supplied = password) {
     return request(app).post("/api/v1/auth/login").set("Origin", "http://localhost:5173").send({ email, password: supplied });
   }
-  function cookie(response: { headers: Record<string, any> }) { return String(response.headers["set-cookie"][0]).split(";", 1)[0]!; }
+  function cookie(response: { headers: Record<string, unknown> }) { return String((response.headers["set-cookie"] as string[])[0]).split(";", 1)[0]!; }
 
   it("logout revokes its cookie session without a live JWT and remains idempotent", async () => {
     const user = await account(); const issued = await login(user.email);

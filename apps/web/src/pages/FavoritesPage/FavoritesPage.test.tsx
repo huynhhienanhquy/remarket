@@ -16,7 +16,7 @@ describe("member workflows through the HTTP adapter", () => {
 it("removes a hidden saved item without revealing its title", async () => {
     context.reply("GET", "/favorites", page([{ ...product, title: "", price: "0", images: [], is_hidden: true, is_favorited: true }]));
     context.on("DELETE", "/favorites/" + product.id, () => {
-      context.reply("GET", "/favorites", page([])); return {};
+      context.reply("GET", "/favorites", page([])); return { is_favorited: false };
     });
     show(<FavoritesPage />, "/favorites");
     await screen.findByText("Tin đăng không còn khả dụng");

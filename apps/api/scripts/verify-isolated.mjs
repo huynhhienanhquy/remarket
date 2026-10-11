@@ -43,9 +43,9 @@ const childEnv = {
 childEnv.SMOKE_ADMIN_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
 childEnv.SMOKE_USER_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
 childEnv.SMOKE_SECOND_USER_PASSWORD = childEnv.TEST_ACCOUNT_PASSWORD;
-async function run(moduleName, args, cwd = apiDir) {
+async function run(moduleName, args, cwd = apiDir, extraEnv = {}) {
   const child = spawn(process.execPath, [require.resolve(moduleName), ...args], {
-    cwd, env: childEnv, stdio: "inherit", windowsHide: true,
+    cwd, env: { ...childEnv, ...extraEnv }, stdio: "inherit", windowsHide: true,
   });
   const code = await new Promise((resolve, reject) => {
     child.once("error", reject); child.once("exit", resolve);
@@ -72,8 +72,13 @@ try {
   const current = await isolated.$queryRaw`SELECT current_schema() AS name`;
   assert.equal(current[0].name, schema, "Database did not select the isolated schema");
   console.log(`Isolated test schema: ${schema}`);
-  await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"]);
-  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  // This unique schema has one owner and one migrator. A session advisory lock
+  // shared across unrelated schemas is unsuitable through transaction poolers.
+  // Disable it only for this child, after verifying ownership and search_path;
+  // normal prisma:deploy keeps its deployment lock.
+  await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"], apiDir, { PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" });
+  if (process.argv.includes("--query-plans")) await run("tsx/cli", ["scripts/verify-query-plans.ts"]);
+  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--storage-only") ? "tests/integration/shared-storage.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
   if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only") || process.argv.includes("--auth-browser")) {
     await run("tsx/cli", ["tests/fixtures/browser-seed.ts"]);
   }

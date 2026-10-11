@@ -1,5 +1,4 @@
-﻿import type { Prisma } from "@prisma/client";
-import type { AdminDashboard } from "@remarket/shared";
+﻿import type { AdminDashboard } from "@remarket/shared";
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/errorHandler.js";
@@ -25,8 +24,6 @@ import { adminEmailVerificationsRouter } from "./adminEmailVerifications.js";
  * sub-routers, serves the dashboard and owns the shared audit helper every
  * admin mutation writes through.
  */
-
-
 
 const router = Router();
 

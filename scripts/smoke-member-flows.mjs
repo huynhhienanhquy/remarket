@@ -13,7 +13,7 @@ const web = process.env.SMOKE_WEB_URL ?? "http://127.0.0.1:5321";
 const profile = await mkdtemp(path.join(tmpdir(), "remarket-member-smoke-"));
 const artifacts = path.resolve(".artifacts/member-smoke");
 await mkdir(artifacts, { recursive: true });
-const chrome = spawn(process.env.CHROME_BIN ?? "C:/Program Files/Google/Chrome/Application/chrome.exe", ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "about:blank"], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn(process.env.CHROME_BIN ?? "C:/Program Files/Google/Chrome/Application/chrome.exe", ["--headless=new", "--disable-dev-shm-usage", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "about:blank"], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
 const clients = [], exceptions = [], failures = [], checks = [], requests = [];
 let browser;
 function connect(url) {
@@ -199,7 +199,7 @@ try {
   const sellerId = await call(seller, "return (await api.auth.me()).id;");
   const sellerProfileBefore = await call(buyer, `return api.profiles.publicProfile(${JSON.stringify(sellerId)});`);
   if (process.env.SMOKE_LIFECYCLE_ONLY !== "true") {
-  for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Lưu thay đổi", "profile"], ["/favorites", "Sản phẩm yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
+  for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Lưu thay đổi", "profile"], ["/favorites", "Yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
     await visit(buyer, route, text, `${label}-desktop`);
     await visit(buyer, route, text, `${label}-mobile`, true);
   }

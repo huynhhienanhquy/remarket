@@ -4,10 +4,11 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentType } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminDashboard, CategoryNode } from "@remarket/shared";
+import type { AdminDashboard, CategoryNode, AdminProductItem } from "@remarket/shared";
 import { ToastProvider } from "../components/common";
 import { createQueryClient } from "../config/queryClient";
 import { httpContext, page } from "./http-context";
+import { product, timestamp } from "./test-data";
 import { AdminAuditPage } from "../pages/AdminAuditPage/AdminAuditPage";
 import { AdminCategoriesPage } from "../pages/AdminCategoriesPage/AdminCategoriesPage";
 import { AdminDashboardPage } from "../pages/AdminDashboardPage/AdminDashboardPage";
@@ -40,6 +41,21 @@ beforeEach(() => {
 });
 afterEach(() => { for (const client of clients.splice(0)) client.clear(); vi.unstubAllGlobals(); });
 describe("admin routes through the HTTP adapter", () => {
+  it("keeps page 3 selected when opening a row and dismissing its confirmation", async () => {
+    const pending: AdminProductItem = { ...product, status: "PENDING", category_name: "Danh mục kiểm thử", updated_at: timestamp };
+    context.reply("GET", "/admin/products", { items: [pending], meta: { page: 3, page_size: 20, total: 41, total_pages: 3 } });
+    renderAdmin(AdminProductsPage, "/admin/products?page=3&status=PENDING");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Xem xét" }));
+    await screen.findByRole("dialog", { name: "Xem xét tin đăng" });
+    expect(context.requests("GET", "/admin/products").every((request) => request.url.searchParams.get("page") === "3")).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Duyệt tin" }));
+    await screen.findByRole("dialog", { name: "Duyệt tin đăng?" });
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Duyệt tin đăng?" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Xem xét tin đăng" })).toBeInTheDocument();
+    expect(context.requests("GET", "/admin/products").every((request) => request.url.searchParams.get("page") === "3")).toBe(true);
+  });
   it.each([
     ["Tổng quan", AdminDashboardPage, "/admin", "/admin/dashboard"],
     ["Người dùng", AdminUsersPage, "/admin/users", "/admin/users"],

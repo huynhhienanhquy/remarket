@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { AuthRequest } from "../middleware/auth.js";
 import { unauthorized, validationError } from "./errors.js";
-import { prisma } from "../utils/prisma.js";
 
 export interface AdminActor {
   id: string;
@@ -28,6 +27,10 @@ export async function writeAudit(tx: Prisma.TransactionClient, entry: AuditEntry
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId,
+      ...(entry.entityType === "user" ? { targetUserId: entry.entityId } : {}),
+      ...(entry.entityType === "product" ? { targetProductId: entry.entityId } : {}),
+      ...(entry.entityType === "category" ? { targetCategoryId: entry.entityId } : {}),
+      ...(entry.entityType === "review" ? { targetReviewId: entry.entityId } : {}),
       reason: entry.reason ?? null,
       metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
     },
@@ -40,31 +43,18 @@ export function adminActor(req: AuthRequest): AdminActor {
   return { id: user.id, fullName: user.fullName };
 }
 
-export function textQuery(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
 /** Moderation actor filters include block/unblock as well as approve/reject. */
-export async function administeredEntityIds(
-  entityType: "user" | "product" | "review" | "category",
+export function moderationAuditFilter(
   actorId?: string,
   from?: string,
   to?: string,
-): Promise<string[] | undefined> {
+): Prisma.AuditLogWhereInput | undefined {
   if (!actorId && !from && !to) return undefined;
-  const entries = await prisma.auditLog.findMany({
-    where: {
-      entityType,
+  return {
       actorType: "ADMIN",
       ...(actorId ? { actorId } : {}),
       createdAt: adminDateRange(from, to),
-    },
-    select: { entityId: true },
-    distinct: ["entityId"],
-  });
-  return entries.flatMap((entry) => entry.entityId ? [entry.entityId] : []);
+  };
 }
 
 /** Inclusive local-date bounds accepted by every paginated admin list. */

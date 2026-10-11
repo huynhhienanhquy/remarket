@@ -1,19 +1,20 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminSupportTicketDetail, AdminSupportTicketItem, TicketStatus, TicketType } from "@remarket/shared";
 import { ORDER_STATUS_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
-import { api } from "../../services/api";
-import { queryKeys } from "../../config/queryClient";
-import { Button, ConfirmDialog, Dialog, Drawer, EmptyState, FormField, Input, OrderTimeline, Pagination, SectionCard, Select, StatusBadge, Textarea, useToast } from "../../components/common";
-import type { DataTableColumn } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
+import type { DataTableColumn } from "../../components/common";
+import { Button, ConfirmDialog, Dialog, Drawer, EmptyState, FormField, Input, OrderTimeline, Pagination, SectionCard, Select, StatusBadge, Textarea, useToast } from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription, fieldError } from "../../helpers/adminErrors";
-import { readEnumParam, readPage } from "../../utils/adminParams";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readEnumParam, readPage } from "../../utils/adminParams";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const TYPES = ["ACCOUNT", "ORDER_PROBLEM", "PRODUCT", "OTHER"] as const;
@@ -39,9 +40,8 @@ export function AdminSupportPage() {
 
   function syncTicket(ticket: AdminSupportTicketDetail) {
     queryClient.setQueryData(queryKeys.adminTicket(ticket.id), ticket);
-    void queryClient.invalidateQueries({ queryKey: ["admin","tickets","list"] });
-    void queryClient.invalidateQueries({ queryKey: ["admin","audit"] });
-    queryClient.setQueriesData<{ items: AdminSupportTicketItem[]; meta: unknown }>({ queryKey: ["admin", "tickets", "list"] }, (current) => current ? { ...current, items: current.items.map((item) => item.id === ticket.id ? { ...item, ...ticket } : item) } : current);
+    void invalidateAdminResources(queryClient, "tickets", "audit");
+      patchAdminRows(queryClient, "tickets", ticket);
   }
 
   const replyMutation = useMutation({
@@ -52,7 +52,8 @@ export function AdminSupportPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (input: { status?: TicketStatus; assign?: boolean; resolution_note?: string }) => { if (!selectedId) throw new Error("Chưa chọn ticket."); return api.admin.updateTicket(selectedId, input); },
-    onSuccess: (ticket) => { syncTicket(ticket); void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }); toast.success("Đã cập nhật yêu cầu hỗ trợ"); setDecision(null); setNote(""); },
+    onSuccess: (ticket) => { syncTicket(ticket); void invalidateAdminResources(queryClient, "dashboard");
+      toast.success("Đã cập nhật yêu cầu hỗ trợ"); setDecision(null); setNote(""); },
     onError: (error) => toast.error("Không thể cập nhật yêu cầu", { description: errorDescription(error) }),
   });
 
@@ -80,8 +81,7 @@ export function AdminSupportPage() {
     },
     onSuccess: async () => {
       await detail.refetch();
-      void queryClient.invalidateQueries({ queryKey: ["admin", "tickets", "list"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "audit"] });
+      void invalidateAdminResources(queryClient, "tickets", "audit");
       setCancelOpen(false);
       setCancelReason("");
       setPaymentResolution("");

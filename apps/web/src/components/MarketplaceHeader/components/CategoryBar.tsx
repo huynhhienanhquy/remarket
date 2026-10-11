@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useDismiss } from "@/hooks/useDismiss";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
 import { ChevronRightIcon } from "@/components/common";
@@ -12,23 +13,7 @@ export function CategoryBar({ categories }: { categories: CategoryNode[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const roots = categories.filter((entry) => entry.status === "ACTIVE");
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  useDismiss(open, containerRef, () => setOpen(false));
 
   function go(categoryId?: string) {
     setOpen(false);

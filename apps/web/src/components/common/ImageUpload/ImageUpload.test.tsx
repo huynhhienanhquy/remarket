@@ -1,3 +1,4 @@
+import { ToastProvider } from "../Toast/Toast";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ImageUpload } from "./ImageUpload";
@@ -12,7 +13,7 @@ describe("ImageUpload", () => {
   });
 
   it("does not cancel the native file-input click that opens the picker", () => {
-    render(<ImageUpload onUpload={vi.fn()} />);
+    render(<ToastProvider><ImageUpload onUpload={vi.fn()} /></ToastProvider>);
     const input = screen.getByLabelText("Thêm ảnh");
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
 
@@ -35,7 +36,7 @@ describe("ImageUpload", () => {
       ),
     );
     const onUpload = vi.fn();
-    render(<ImageUpload onUpload={onUpload} />);
+    render(<ToastProvider><ImageUpload onUpload={onUpload} /></ToastProvider>);
 
     const file = new File(["image bytes"], "photo.jpg", { type: "image/jpeg" });
     fireEvent.change(screen.getByLabelText("Thêm ảnh"), { target: { files: [file] } });
@@ -55,18 +56,15 @@ describe("ImageUpload", () => {
   });
 
   it("rejects unsupported image formats before calling the adapter", () => {
-    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
     const fetch = vi.spyOn(globalThis, "fetch");
     const onUpload = vi.fn();
-    render(<ImageUpload onUpload={onUpload} />);
+    render(<ToastProvider><ImageUpload onUpload={onUpload} /></ToastProvider>);
 
     const file = new File(["image bytes"], "photo.gif", { type: "image/gif" });
     fireEvent.change(screen.getByLabelText("Thêm ảnh"), { target: { files: [file] } });
 
     expect(onUpload).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(alert).toHaveBeenCalledWith(
-      "Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP.",
-    );
+    expect(screen.getByText("Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP.")).toBeInTheDocument();
   });
 });

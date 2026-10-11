@@ -1,33 +1,35 @@
-import { useProductDetail } from "./hooks/useProductDetail";
-import { Link } from "react-router-dom";
 import {
   CONDITION_LABELS,
   DELIVERY_LABELS,
   PRODUCT_STATUS_LABELS,
-  formatRelative,
   formatDateTime,
+  formatRelative,
   formatVnd,
 } from "@remarket/shared";
-import { isApiError } from "../../helpers/errors";
-import { Button, CartIcon, ChatIcon, EmptyState, HeartIcon, ImageViewer, MarketplaceImage, InlineAlert, SectionCard, Skeleton, StatusBadge, UserSummary } from "../../components/common";
-import { ReportDialog } from "../../components/ReportDialog/ReportDialog";
+import { Link } from "react-router-dom";
+import { Button, CartIcon, ChatIcon, EmptyState, HeartIcon, ImageViewer, InlineAlert, SectionCard, Skeleton, StatusBadge, UserSummary } from "../../components/common";
 import { OfflineNotice } from "../../components/common/PageFeedback/PageFeedback";
+import { ReportDialog } from "../../components/ReportDialog/ReportDialog";
+import { isApiError } from "../../helpers/errors";
+import { useProductDetail } from "./hooks/useProductDetail";
+import { ProductGallery } from "./sections/ProductGallery";
 
 export function ProductDetailPage() {
   const {
     viewer,
     online,
     activeImage,
-    setActiveImage,
+    selectImage,
     viewerOpen,
-    setViewerOpen,
+    openViewer,
+    closeViewer,
     reportOpen,
-    setReportOpen,
+    openReport,
+    closeReport,
     detail,
     product,
-    toggleFavorite,
+    toggleSaved,
     addToCart,
-    requireLogin,
     chat,
     purchase,
     actionBusy,
@@ -136,61 +138,7 @@ export function ProductDetailPage() {
       )}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-12">
-        {/* Gallery */}
-        <div className="lg:col-span-7">
-          {hidden ? (
-            <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-card bg-surface-subtle">
-              <p className="t-h3 text-muted">Tin đăng không còn khả dụng</p>
-            </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => images.length > 0 && setViewerOpen(true)}
-                className="block w-full"
-                aria-label="Xem ảnh lớn"
-              >
-                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-card bg-surface-subtle">
-                  {mainImage ? (
-                    <MarketplaceImage
-                      src={mainImage.url}
-                      variant="detail"
-                      alt={`${product.title} — ảnh ${activeImage + 1}`}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <span className="t-body text-muted">Chưa có ảnh</span>
-                  )}
-                </div>
-              </button>
-              {images.length > 1 && (
-                <div className="scrollbar-thin mt-3 flex gap-2 overflow-x-auto pb-1">
-                  {images.map((image, index) => (
-                    <button
-                      key={image.id}
-                      type="button"
-                      onClick={() => setActiveImage(index)}
-                      aria-label={`Ảnh ${index + 1}`}
-                      aria-current={index === activeImage}
-                      className={[
-                        "h-16 w-16 shrink-0 overflow-hidden rounded-control border-2 bg-surface-subtle",
-                        index === activeImage ? "border-brand" : "border-transparent",
-                      ].join(" ")}
-                    >
-                      <MarketplaceImage
-                        src={image.url}
-                        variant="card"
-                        loading="lazy"
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <ProductGallery {...{ product, hidden, images, mainImage, activeImage, openViewer, selectImage }} />
 
         {/* Summary */}
         <div className="lg:col-span-5">
@@ -266,7 +214,7 @@ export function ProductDetailPage() {
               <button
                 type="button"
                 disabled={!product.capabilities.can_favorite || actionBusy}
-                onClick={() => requireLogin() && toggleFavorite.mutate(!product.is_favorited)}
+                onClick={toggleSaved}
                 className="flex items-center gap-2 t-label text-ink hover:text-danger disabled:opacity-50"
               >
                 <HeartIcon
@@ -277,7 +225,7 @@ export function ProductDetailPage() {
               <button
                 type="button"
                 disabled={!product.capabilities.can_report || isOwner || actionBusy}
-                onClick={() => requireLogin() && setReportOpen(true)}
+                onClick={openReport}
                 className="t-label text-muted hover:text-ink disabled:opacity-50"
               >
                 Báo cáo tin đăng
@@ -360,7 +308,7 @@ export function ProductDetailPage() {
         <ImageViewer
           images={images}
           startIndex={activeImage}
-          onClose={() => setViewerOpen(false)}
+          onClose={closeViewer}
           alt={product.title}
         />
       )}
@@ -368,7 +316,7 @@ export function ProductDetailPage() {
       {reportOpen && (
         <ReportDialog
           open
-          onClose={() => setReportOpen(false)}
+          onClose={closeReport}
           target={{ target_type: "product", product_id: product.id }}
           targetLabel={product.title}
         />

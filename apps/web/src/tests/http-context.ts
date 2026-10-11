@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type { SessionUser } from "@remarket/shared";
+import { apiSuccessStatus, apiResponseIssue } from "@remarket/shared";
 import { http } from "../services/http";
 
 export interface RecordedRequest {
@@ -11,9 +12,9 @@ export interface RecordedRequest {
 }
 type Handler = (request: RecordedRequest) => unknown | Promise<unknown>;
 
-export function envelope(data: unknown): Response {
+export function envelope(data: unknown, status = 200): Response {
   return new Response(JSON.stringify({ success: true, data, meta: { request_id: "test-request" } }), {
-    status: 200, headers: { "Content-Type": "application/json" },
+    status, headers: { "Content-Type": "application/json" },
   });
 }
 export function failure(status: number, code: string): Response {
@@ -49,10 +50,15 @@ export function httpContext(viewer: SessionUser | null = null) {
     const handler = handlers.get(request.method + " " + request.path);
     if (!handler) throw new Error("Unexpected test request: " + request.method + " " + request.path);
     const result = await handler(request);
-    return result instanceof Response ? result : envelope(result);
+    if (result instanceof Response) return result;
+    const status = apiSuccessStatus(request.path, request.method) ?? 200;
+    const response = envelope(result, status);
+    const issue = apiResponseIssue(request.path, request.method, status, await response.clone().json());
+    if (issue) console.error(`Invalid test fixture ${request.method} ${request.path}: ${issue}`);
+    return response;
   }));
   return context;
 }
 export function page<T>(items: T[]) {
-  return { items, meta: { page: 1, page_size: 20, total: items.length, total_pages: items.length ? 1 : 0 } };
+  return { items, meta: { page: 1, page_size: 20, total: items.length, total_pages: 1 } };
 }

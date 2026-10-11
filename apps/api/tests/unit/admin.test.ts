@@ -7,7 +7,9 @@ const client = vi.hoisted(() => ({
   user: { count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
   session: { findUnique: vi.fn() },
   product: { count: vi.fn(), groupBy: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
-  notification: { createMany: vi.fn() },
+  notification: { createManyAndReturn: vi.fn() },
+  outboxEvent: { createMany: vi.fn() },
+  outboxDedupeKey: { createManyAndReturn: vi.fn() },
   order: { count: vi.fn(), aggregate: vi.fn() },
   report: { count: vi.fn() },
   supportTicket: { count: vi.fn(), findMany: vi.fn() },
@@ -29,10 +31,12 @@ const bootstrapInput = { email: " NEW@example.com ", full_name: " Admin First ",
 
 beforeEach(() => {
   vi.resetAllMocks();
+  client.outboxDedupeKey.createManyAndReturn.mockImplementation(async ({ data }: { data: Array<{ dedupeKey: string }> }) => data);
   client.user.findUnique.mockResolvedValue(admin);
   client.session.findUnique.mockImplementation(async () => ({ userId: admin.id, revokedAt: null, expiresAt: new Date(Date.now() + 60_000), user: await client.user.findUnique() }));
   client.$transaction.mockImplementation((fn: (tx: typeof client) => Promise<unknown>) => fn(client));
   client.$queryRaw.mockResolvedValue([]);
+  client.notification.createManyAndReturn.mockResolvedValue([{ id: "notification", userId: "seller", referenceType: "product", referenceId: "listing" }]);
 });
 
 describe("admin date bounds", () => {
@@ -60,9 +64,10 @@ describe("admin HTTP contracts with isolated persistence", () => {
     client.product.findUnique.mockResolvedValueOnce(pending).mockResolvedValueOnce(pending).mockResolvedValueOnce({ ...pending, version: 2, status: "ACTIVE" });
     client.product.updateMany.mockResolvedValue({ count: 1 });
     client.category.findUnique.mockResolvedValue(leaf);
+    client.$queryRaw.mockResolvedValue([{ id: "leaf", parentId: null, status: "ACTIVE", isLeaf: true }]);
     const response = await request(createApp()).post("/api/v1/admin/products/listing/approve").set("Authorization", authorization()).send({ expected_version: 1 }).expect(200);
     expect(response.body.data).toMatchObject({ status: "ACTIVE", version: 2 });
-    expect(client.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: "PRODUCT_APPROVED", userId: "seller" })] }));
+    expect(client.notification.createManyAndReturn).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: "PRODUCT_APPROVED", userId: "seller" })] }));
     expect(client.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "product.approve", entityId: "listing" }) }));
   });
   it("returns VERSION_CONFLICT when a listing has already been approved, without replaying writes", async () => {
@@ -70,7 +75,7 @@ describe("admin HTTP contracts with isolated persistence", () => {
     const response = await request(createApp()).post("/api/v1/admin/products/listing/approve").set("Authorization", authorization()).send({ expected_version: 1 }).expect(409);
     expect(response.body.error.code).toBe("VERSION_CONFLICT");
     expect(client.product.updateMany).not.toHaveBeenCalled();
-    expect(client.notification.createMany).not.toHaveBeenCalled();
+    expect(client.notification.createManyAndReturn).not.toHaveBeenCalled();
   });
   it("rejects approving a blocked listing even when the version is current", async () => {
     client.product.findUnique.mockResolvedValue({ ...pending, isBlocked: true });
@@ -103,13 +108,13 @@ describe("admin HTTP contracts with isolated persistence", () => {
   it("pages inactive category groups using action date and actor filters", async () => {
     client.category.findMany.mockResolvedValue([category]);
     client.category.count.mockResolvedValue(21);
-    client.auditLog.findMany.mockResolvedValue([{ entityId: "root" }]);
+    const moderationAudits = { some: { actorType: "ADMIN", actorId: "operator", createdAt: adminDateRange("2026-10-07", "2026-10-07") } };
     const response = await request(createApp()).get("/api/v1/admin/categories?status=INACTIVE&handled_by=operator&from=2026-10-07&to=2026-10-07&page=2&page_size=10").set("Authorization", authorization()).expect(200);
     expect(response.body.data).toMatchObject({ items: [{ id: "root", status: "INACTIVE" }], meta: { page: 2, page_size: 10, total: 21, total_pages: 3 } });
     expect(client.category.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      skip: 10, take: 10, where: { parentId: null, OR: [{ status: "INACTIVE", id: { in: ["root"] } }, { children: { some: { status: "INACTIVE", id: { in: ["root"] } } } }] },
+      skip: 10, take: 10, where: { parentId: null, OR: [{ status: "INACTIVE", moderationAudits }, { children: { some: { status: "INACTIVE", moderationAudits } } }] },
     }));
-    expect(client.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { entityType: "category", actorType: "ADMIN", actorId: "operator", createdAt: adminDateRange("2026-10-07", "2026-10-07") } }));
+    expect(client.auditLog.findMany).not.toHaveBeenCalled();
   });
   it("provides the complete editor tree without an ACTIVE-only restriction", async () => {
     client.category.findMany.mockResolvedValue([category]);

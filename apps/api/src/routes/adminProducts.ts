@@ -1,3 +1,5 @@
+import { loadCategoryEligibility } from "../services/category-policy.js";
+import { createNotifications } from "../services/notifications.js";
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -8,7 +10,7 @@ import { ok, okList } from "../shared/api-response.js";
 import { invalidTransition, notFound, versionConflict } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 import { toAdminProductItem } from "../shared/dto-mappers.js";
-import { administeredEntityIds, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
+import { moderationAuditFilter, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
 import { blockProduct } from "../services/admin-moderation.js";
 
 /**
@@ -65,8 +67,8 @@ router.get(
     const paging = parsePaging(req.query);
 
     const where: Prisma.ProductWhereInput = { deletedAt: null };
-    const handledIds = await administeredEntityIds("product", query.handled_by);
-    if (handledIds) where.id = { in: handledIds };
+    const auditFilter = moderationAuditFilter(query.handled_by);
+    if (auditFilter) where.moderationAudits = { some: auditFilter };
     if (query.status === "BLOCKED") {
       where.isBlocked = true;
     } else if (query.status !== undefined && query.status !== "ALL") {
@@ -135,25 +137,7 @@ router.post(
       if (current.seller.status !== "ACTIVE" || current.seller.emailVerifiedAt === null) {
         throw invalidTransition("Tài khoản người bán chưa đủ điều kiện để công khai tin.");
       }
-      await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${current.categoryId} FOR UPDATE`;
-      let category = await tx.category.findUnique({
-        where: { id: current.categoryId },
-        include: { parent: true, _count: { select: { children: true } } },
-      });
-      if (!category) throw invalidTransition("Danh mục của tin đăng không còn tồn tại.");
-      if (category.parentId) {
-        await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${category.parentId} FOR UPDATE`;
-        category = await tx.category.findUnique({
-          where: { id: current.categoryId },
-          include: { parent: true, _count: { select: { children: true } } },
-        });
-      }
-      if (
-        !category ||
-        category.status !== "ACTIVE" ||
-        category._count.children > 0 ||
-        (category.parent !== null && category.parent.status !== "ACTIVE")
-      ) {
+      if (!(await loadCategoryEligibility(tx, [current.categoryId], true)).has(current.categoryId)) {
         throw invalidTransition("Danh mục cấp cuối của tin đăng không còn hoạt động.");
       }
 
@@ -173,7 +157,7 @@ router.post(
       if (updated.count === 0) {
         throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại và xem xét bản mới nhất.");
       }
-      await tx.notification.createMany({
+      await createNotifications(tx, {
         data: [
           {
             userId: current.sellerId,
@@ -233,7 +217,7 @@ router.post(
       if (updated.count === 0) {
         throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại và xem xét bản mới nhất.");
       }
-      await tx.notification.createMany({
+      await createNotifications(tx, {
         data: [
           {
             userId: product.sellerId,

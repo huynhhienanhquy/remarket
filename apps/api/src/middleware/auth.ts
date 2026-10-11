@@ -1,5 +1,4 @@
 ﻿import type { NextFunction, Request, Response } from "express";
-import type { User } from "@prisma/client";
 import { API_ERROR_CODES } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
 import { env } from "../config/env.js";
@@ -174,14 +173,6 @@ export function requireVerified(req: AuthRequest, res: Response, next: NextFunct
     );
   }
   next();
-}
-
-export function viewerOf(req: AuthRequest): {
-  id: string;
-  status: "ACTIVE" | "LOCKED";
-} | null {
-  if (!req.user) return null;
-  return { id: req.user.id, status: req.user.status };
 }
 
 export { env };

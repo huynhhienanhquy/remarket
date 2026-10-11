@@ -65,8 +65,3 @@ export function pageMeta(paging: PageParams, total: number): PageMeta {
 export function offsetOf(paging: PageParams): number {
   return (paging.page - 1) * paging.page_size;
 }
-
-/** Single-element `empty` list used when a caller only needs `total`. */
-export function emptyMeta(paging: PageParams, total: number): PageMeta {
-  return pageMeta(paging, total);
-}

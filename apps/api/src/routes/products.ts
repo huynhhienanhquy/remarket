@@ -1,29 +1,23 @@
 import { Prisma, type Product } from "@prisma/client";
-import { Router } from "express";
-import type { Response } from "express";
-import { z } from "zod";
-import type { Condition, DeliveryMethod } from "@remarket/shared";
 import {
   CONDITIONS,
   DELIVERY_METHODS,
-  PRODUCT_LIMITS,
   PRODUCT_STATUSES,
   SORT_OPTIONS,
-  normalizePriceFilter,
-  normalizeVndInput,
-  validateCondition,
-  validateDeliveryMethod,
-  validateDescription,
-  validatePriceInput,
-  validateProductTitle,
-  validateShippingFeeFor,
-  validateUsageMonths,
+  normalizePriceFilter
 } from "@remarket/shared";
-import { prisma } from "../utils/prisma.js";
-import { asyncHandler } from "../middleware/errorHandler.js";
-import { authMiddleware, optionalAuth, requireActive, requireVerified } from "../middleware/auth.js";
+import type { Response } from "express";
+import { Router } from "express";
 import type { AuthRequest } from "../middleware/auth.js";
+import { authMiddleware, optionalAuth, requireActive, requireVerified } from "../middleware/auth.js";
+import { asyncHandler } from "../middleware/errorHandler.js";
+import { eligibleCategoryIds, loadCategoryEligibility } from "../services/category-policy.js";
+import { claimUploads, detachUnusedUploads, lockEligibleUploads } from "../services/product-assets.js";
+import type { CreatePayload, PatchPayload } from "../services/product-input.js";
+import { assertEnumValue, createSchema, ownListQuerySchema, patchSchema, searchQuerySchema, validateAndNormalize } from "../services/product-input.js";
 import { ok, okList } from "../shared/api-response.js";
+import type { ProductRow } from "../shared/dto-mappers.js";
+import { isOwnerOrAdmin, toOwnProduct, toProductDetail } from "../shared/dto-mappers.js";
 import {
   accountLocked,
   emailNotVerified,
@@ -35,11 +29,9 @@ import {
   versionConflict,
 } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
-import { isOwnerOrAdmin, toOwnProduct, toProductDetail } from "../shared/dto-mappers.js";
-import type { ProductRow } from "../shared/dto-mappers.js";
-import { buildProductContext, loadCategoryChain, viewerFrom } from "../shared/viewer.js";
 import { searchPublicProducts } from "../shared/product-search.js";
-import { isKnownProvinceCode } from "../shared/geography.js";
+import { buildProductContext, loadCategoryChain, viewerFrom } from "../shared/viewer.js";
+import { prisma } from "../utils/prisma.js";
 
 /**
  * Product routes (detail-project 9): public search and detail, owner-only
@@ -70,205 +62,9 @@ function activeViewerIdOf(req: AuthRequest): string {
   return viewerId;
 }
 
-function assertEnumValue<T extends string>(
-  value: string,
-  allowed: readonly T[],
-  field: string,
-  message: string,
-): T {
-  if (!allowed.includes(value as T)) {
-    throw validationError(message, { [field]: message });
-  }
-  return value as T;
-}
-
 /* ------------------------------------------------------------------ *
  * Input schemas (zod strict, no mass assignment)
  * ------------------------------------------------------------------ */
-
-const imageSchema = z
-  .object({
-    url: z.string({ required_error: "Ảnh không hợp lệ.", invalid_type_error: "Ảnh không hợp lệ." }),
-    sort_order: z.number({
-      required_error: "Thứ tự ảnh là bắt buộc.",
-      invalid_type_error: "Thứ tự ảnh phải là số.",
-    }),
-    storage_path: z.string().optional(),
-  })
-  .strict();
-
-const productFields = z.object({
-  title: z.string({ required_error: "Tên món đồ là bắt buộc.", invalid_type_error: "Tên món đồ không hợp lệ." }),
-  description: z.string({
-    required_error: "Mô tả là bắt buộc.",
-    invalid_type_error: "Mô tả không hợp lệ.",
-  }),
-  category_id: z.string({ required_error: "Hãy chọn danh mục.", invalid_type_error: "Danh mục không hợp lệ." }),
-  price: z.string({ required_error: "Giá không được để trống.", invalid_type_error: "Giá không hợp lệ." }),
-  condition: z.string({
-    required_error: "Hãy chọn tình trạng món đồ.",
-    invalid_type_error: "Tình trạng món đồ không hợp lệ.",
-  }),
-  usage_months: z
-    .number({ invalid_type_error: "Số tháng sử dụng không hợp lệ." })
-    .nullable()
-    .optional(),
-  province_code: z.string({
-    required_error: "Hãy chọn khu vực.",
-    invalid_type_error: "Khu vực không hợp lệ.",
-  }),
-  delivery_method: z.string({
-    required_error: "Hãy chọn hình thức giao nhận.",
-    invalid_type_error: "Hình thức giao nhận không hợp lệ.",
-  }),
-  shipping_fee: z.string({
-    required_error: "Phí giao hàng không được để trống.",
-    invalid_type_error: "Phí giao hàng không hợp lệ.",
-  }),
-});
-
-const imagesField = z.array(imageSchema);
-const createSchema = productFields.extend({ images: imagesField }).strict();
-const patchSchema = productFields
-  .extend({
-    images: imagesField.optional(),
-    expected_version: z
-      .number({
-        required_error: "Thiếu phiên bản tin đăng.",
-        invalid_type_error: "Phiên bản tin đăng không hợp lệ.",
-      })
-      .int("Phiên bản tin đăng phải là số nguyên."),
-  })
-  .strict();
-
-type ImagePayload = z.infer<typeof imageSchema>;
-type ProductFields = z.infer<typeof productFields>;
-type CreatePayload = z.infer<typeof createSchema>;
-type PatchPayload = z.infer<typeof patchSchema>;
-
-interface NormalizedProduct {
-  title: string;
-  description: string;
-  categoryId: string;
-  price: string;
-  condition: Condition;
-  usageMonths: number | null;
-  provinceCode: string;
-  deliveryMethod: DeliveryMethod;
-  shippingFee: string;
-  images: { url: string; storagePath: string; sortOrder: number }[];
-}
-
-/** 1-8 images, contiguous `sort_order` from 0, every URL present. */
-function assertImages(images: readonly ImagePayload[]): void {
-  if (images.length < 1 || images.length > PRODUCT_LIMITS.imagesMax) {
-    throw validationError("Số lượng ảnh không hợp lệ.", {
-      images: `Cần từ 1 đến ${PRODUCT_LIMITS.imagesMax} ảnh.`,
-    });
-  }
-  images.forEach((image, index) => {
-    if (image.sort_order !== index) {
-      throw validationError("Thứ tự ảnh không hợp lệ.", { images: "sort_order phải liên tục từ 0." });
-    }
-    if (image.url.trim() === "") {
-      throw validationError("Ảnh chưa được tải lên.", { images: `Ảnh ${index + 1} chưa tải xong.` });
-    }
-    if (!image.storage_path?.trim()) {
-      throw validationError("Ảnh chưa được tải lên.", {
-        images: `Ảnh ${index + 1} thiếu đường dẫn lưu trữ hợp lệ.`,
-      });
-    }
-  });
-}
-
-/**
- * Collects every field error first (one `VALIDATION_ERROR` with all messages),
- * then normalizes the payload for the database.
- */
-async function validateAndNormalize(
-  fields: ProductFields,
-  images: readonly ImagePayload[] | undefined,
-): Promise<NormalizedProduct> {
-  const errors: Record<string, string> = {};
-
-  const titleError = validateProductTitle(fields.title);
-  if (titleError) errors.title = titleError;
-  const descriptionError = validateDescription(fields.description);
-  if (descriptionError) errors.description = descriptionError;
-  const priceError = validatePriceInput(fields.price);
-  if (priceError) errors.price = priceError;
-
-  const usageError = validateUsageMonths(
-    fields.usage_months === undefined || fields.usage_months === null
-      ? ""
-      : String(fields.usage_months),
-  );
-  if (usageError) errors.usage_months = usageError;
-
-  const conditionError = validateCondition(fields.condition);
-  if (conditionError) errors.condition = conditionError;
-
-  const deliveryError = validateDeliveryMethod(fields.delivery_method);
-  if (deliveryError) {
-    errors.delivery_method = deliveryError;
-  } else if (fields.delivery_method === "MEETUP") {
-    // Gặp trực tiếp: phí giao hàng bắt buộc bằng 0 (detail-project 7.2).
-    if (normalizeVndInput(fields.shipping_fee) !== "0") {
-      errors.shipping_fee = "Gặp trực tiếp thì phí giao hàng phải bằng 0.";
-    }
-  } else {
-    const shippingError = validateShippingFeeFor(
-      fields.shipping_fee,
-      fields.delivery_method as DeliveryMethod,
-    );
-    if (shippingError) errors.shipping_fee = shippingError;
-  }
-
-  const provinceCode = fields.province_code.trim();
-  if (provinceCode === "") {
-    errors.province_code = "Hãy chọn khu vực.";
-  } else if (!isKnownProvinceCode(provinceCode)) {
-    errors.province_code = "Tỉnh/thành phố không hợp lệ.";
-  }
-
-  const category = await prisma.category.findUnique({ where: { id: fields.category_id } });
-  if (!category) {
-    errors.category_id = "Danh mục không tồn tại.";
-  } else {
-    const chain = await loadCategoryChain(fields.category_id);
-    if (!chain.exists || !chain.isLeaf || !chain.active) {
-      errors.category_id = "Chỉ chọn danh mục cấp cuối còn hoạt động.";
-    }
-  }
-
-  if (Object.keys(errors).length > 0) {
-    throw validationError("Thông tin món đồ chưa hợp lệ.", errors);
-  }
-
-  if (images) assertImages(images);
-
-  // `validateCondition` / `validateDeliveryMethod` above already rejected every
-  // value outside these unions; the casts only narrow for the compiler.
-  const priceDigits = normalizeVndInput(fields.price);
-  const shippingFee = normalizeVndInput(fields.shipping_fee);
-
-  return {
-    title: fields.title.trim(),
-    description: fields.description.trim(),
-    categoryId: fields.category_id,
-    price: priceDigits ?? "0",
-    condition: fields.condition as Condition,
-    usageMonths: fields.usage_months ?? null,
-    provinceCode,
-    deliveryMethod: fields.delivery_method as DeliveryMethod,
-    shippingFee: fields.delivery_method === "MEETUP" ? "0" : shippingFee ?? "0",
-    images: (images ?? []).map((image) => ({
-      url: `/api/v1/uploads/${image.storage_path!.trim().split("/").at(-1)}`,
-      storagePath: image.storage_path!.trim(),
-      sortOrder: image.sort_order,
-    })),
-  };
-}
 
 function imageCreateMany(images: readonly { url: string; storagePath: string; sortOrder: number }[]) {
   return images.map((image) => ({
@@ -278,38 +74,9 @@ function imageCreateMany(images: readonly { url: string; storagePath: string; so
   }));
 }
 
-async function assertCategoryEligibleInTransaction(
-  tx: Prisma.TransactionClient,
-  categoryId: string,
-): Promise<void> {
-  await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${categoryId} FOR SHARE`;
-  let category = await tx.category.findUnique({
-    where: { id: categoryId },
-    include: {
-      parent: { select: { id: true, parentId: true, status: true } },
-      _count: { select: { children: true } },
-    },
-  });
-  if (category?.parentId) {
-    await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${category.parentId} FOR SHARE`;
-    category = await tx.category.findUnique({
-      where: { id: categoryId },
-      include: {
-        parent: { select: { id: true, parentId: true, status: true } },
-        _count: { select: { children: true } },
-      },
-    });
-  }
-  if (
-    !category ||
-    category.status !== "ACTIVE" ||
-    category._count.children > 0 ||
-    (category.parent !== null &&
-      (category.parent.status !== "ACTIVE" || category.parent.parentId !== null))
-  ) {
-    throw validationError("Thông tin món đồ chưa hợp lệ.", {
-      category_id: "Chỉ chọn danh mục cấp cuối còn hoạt động.",
-    });
+async function assertCategoryEligibleInTransaction(tx: Prisma.TransactionClient, categoryId: string): Promise<void> {
+  if (!(await loadCategoryEligibility(tx, [categoryId], true)).has(categoryId)) {
+    throw validationError("Thông tin món đồ chưa hợp lệ.", { category_id: "Chỉ chọn danh mục cấp cuối còn hoạt động." });
   }
 }
 
@@ -327,85 +94,6 @@ async function assertSellerEligibleInTransaction(
   if (requireEmailVerification && seller.emailVerifiedAt === null) {
     throw emailNotVerified("Vui lòng xác minh email để đăng tin.");
   }
-}
-
-async function lockEligibleUploads(
-  tx: Prisma.TransactionClient,
-  userId: string,
-  productId: string,
-  images: readonly { storagePath: string }[],
-): Promise<string[]> {
-  const paths = images.map((image) => image.storagePath);
-  if (new Set(paths).size !== paths.length) {
-    throw validationError("Ảnh bị trùng lặp.", { images: "Mỗi ảnh chỉ được dùng một lần." });
-  }
-  const sortedPaths = [...paths].sort();
-  await tx.$queryRaw(
-    Prisma.sql`SELECT "id" FROM "UploadAsset" WHERE "storagePath" IN (${Prisma.join(sortedPaths)}) ORDER BY "storagePath" FOR UPDATE`,
-  );
-  const assets = await tx.uploadAsset.findMany({ where: { storagePath: { in: paths } } });
-  const byPath = new Map(assets.map((asset) => [asset.storagePath, asset]));
-  for (const storagePath of paths) {
-    const asset = byPath.get(storagePath);
-    if (
-      !asset ||
-      asset.userId !== userId ||
-      asset.purpose !== "product" ||
-      (asset.attachedAt !== null && asset.productId !== productId)
-    ) {
-      throw validationError("Ảnh không thuộc tin đăng này.", {
-        images: "Hãy tải lại ảnh bằng chính tài khoản đang đăng tin.",
-      });
-    }
-  }
-  return assets.map((asset) => asset.id);
-}
-
-async function claimUploads(tx: Prisma.TransactionClient, userId: string, productId: string, images: readonly { storagePath: string }[]): Promise<void> {
-  const ids = await lockEligibleUploads(tx, userId, productId, images);
-  await tx.uploadAsset.updateMany({
-    where: { id: { in: ids } },
-    data: { productId, attachedAt: new Date() },
-  });
-}
-
-async function detachUnusedUploads(
-  tx: Prisma.TransactionClient,
-  productId: string,
-  storagePaths: string[],
-): Promise<void> {
-  if (storagePaths.length === 0) return;
-  const urlToPath = new Map(
-    storagePaths.map((storagePath) => [
-      `/api/v1/uploads/${storagePath.split("/").at(-1)}`,
-      storagePath,
-    ]),
-  );
-  const snapshots = await tx.orderItem.findMany({
-    where: {
-      OR: [
-        { imagePathSnapshot: { in: storagePaths } },
-        { imageUrl: { in: [...urlToPath.keys()] } },
-      ],
-    },
-    select: { imagePathSnapshot: true, imageUrl: true },
-  });
-  const retained = new Set<string>();
-  for (const item of snapshots) {
-    if (item.imagePathSnapshot && storagePaths.includes(item.imagePathSnapshot)) {
-      retained.add(item.imagePathSnapshot);
-    }
-    if (item.imageUrl) {
-      const path = urlToPath.get(item.imageUrl);
-      if (path) retained.add(path);
-    }
-  }
-  const detachable = storagePaths.filter((storagePath) => !retained.has(storagePath));
-  if (detachable.length === 0) return;
-  await tx.uploadAsset.updateMany({
-    where: { productId, storagePath: { in: detachable } },
-    data: { productId: null, attachedAt: null },
-  });
 }
 
 const PRODUCT_INCLUDE = {
@@ -470,20 +158,9 @@ async function loadCategoryIndex(): Promise<{
     return names;
   };
 
-  const active = (categoryId: string): boolean => {
-    const first = byId.get(categoryId);
-    if (!first || first.status !== "ACTIVE") return false;
-    const guard = new Set<string>([categoryId]);
-    let cursor = first.parentId;
-    while (cursor !== null) {
-      if (guard.has(cursor)) return false;
-      guard.add(cursor);
-      const parent = byId.get(cursor);
-      if (!parent || parent.status !== "ACTIVE") return false;
-      cursor = parent.parentId;
-    }
-    return true;
-  };
+  const parents = new Set(rows.flatMap((row) => row.parentId ? [row.parentId] : []));
+  const eligible = eligibleCategoryIds(rows.map((row) => ({ ...row, isLeaf: !parents.has(row.id) })));
+  const active = (categoryId: string) => eligible.has(categoryId);
 
   return { path, active };
 }
@@ -491,24 +168,6 @@ async function loadCategoryIndex(): Promise<{
 /* ------------------------------------------------------------------ *
  * GET /products — public search (detail-project 9.2)
  * ------------------------------------------------------------------ */
-
-const searchQuerySchema = z
-  .object({
-    q: z
-      .string({ invalid_type_error: "Từ khóa không hợp lệ." })
-      .max(100, "Từ khóa tối đa 100 ký tự.")
-      .optional(),
-    category_id: z.string({ invalid_type_error: "Danh mục không hợp lệ." }).optional(),
-    min_price: z.string({ invalid_type_error: "Giá từ không hợp lệ." }).optional(),
-    max_price: z.string({ invalid_type_error: "Giá đến không hợp lệ." }).optional(),
-    condition: z.string({ invalid_type_error: "Tình trạng món đồ không hợp lệ." }).optional(),
-    province_code: z.string({ invalid_type_error: "Khu vực không hợp lệ." }).optional(),
-    delivery_method: z.string({ invalid_type_error: "Hình thức giao nhận không hợp lệ." }).optional(),
-    sort: z.string({ invalid_type_error: "Sắp xếp không hợp lệ." }).optional(),
-    page: z.unknown().optional(),
-    page_size: z.unknown().optional(),
-  })
-  .strict();
 
 async function searchProducts(req: AuthRequest, res: Response): Promise<Response> {
   const parsed = searchQuerySchema.parse(req.query);
@@ -521,20 +180,20 @@ async function searchProducts(req: AuthRequest, res: Response): Promise<Response
   const condition =
     parsed.condition !== undefined
       ? assertEnumValue(
-          parsed.condition,
-          CONDITIONS,
-          "condition",
-          "Tình trạng món đồ không hợp lệ.",
-        )
+        parsed.condition,
+        CONDITIONS,
+        "condition",
+        "Tình trạng món đồ không hợp lệ.",
+      )
       : undefined;
   const deliveryMethod =
     parsed.delivery_method !== undefined
       ? assertEnumValue(
-          parsed.delivery_method,
-          DELIVERY_METHODS,
-          "delivery_method",
-          "Hình thức giao nhận không hợp lệ.",
-        )
+        parsed.delivery_method,
+        DELIVERY_METHODS,
+        "delivery_method",
+        "Hình thức giao nhận không hợp lệ.",
+      )
       : undefined;
 
   const priceRange = normalizePriceFilter(parsed.min_price ?? "", parsed.max_price ?? "");
@@ -596,20 +255,20 @@ async function createProduct(req: AuthRequest, res: Response): Promise<Response>
     // before claiming uploads, within the same rollback-safe transaction.
     const product = await tx.product.create({
       data: {
-      id: productId,
-      title: normalized.title,
-      description: normalized.description,
-      price: normalized.price,
-      condition: normalized.condition,
-      usageMonths: normalized.usageMonths,
-      categoryId: normalized.categoryId,
-      provinceCode: normalized.provinceCode,
-      deliveryMethod: normalized.deliveryMethod,
-      shippingFee: normalized.shippingFee,
-      sellerId: viewerId,
-      status: "PENDING",
-      version: 1,
-      images: { create: imageCreateMany(normalized.images) },
+        id: productId,
+        title: normalized.title,
+        description: normalized.description,
+        price: normalized.price,
+        condition: normalized.condition,
+        usageMonths: normalized.usageMonths,
+        categoryId: normalized.categoryId,
+        provinceCode: normalized.provinceCode,
+        deliveryMethod: normalized.deliveryMethod,
+        shippingFee: normalized.shippingFee,
+        sellerId: viewerId,
+        status: "PENDING",
+        version: 1,
+        images: { create: imageCreateMany(normalized.images) },
       },
       include: PRODUCT_INCLUDE,
     });
@@ -665,19 +324,19 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
     const result = await tx.product.updateMany({
       where: { id: current.id, version: current.version },
       data: {
-      title: normalized.title,
-      description: normalized.description,
-      price: normalized.price,
-      condition: normalized.condition,
-      usageMonths: normalized.usageMonths,
-      categoryId: normalized.categoryId,
-      provinceCode: normalized.provinceCode,
-      deliveryMethod: normalized.deliveryMethod,
-      shippingFee: normalized.shippingFee,
-      // Editing an ACTIVE listing sends it back to moderation; publishedAt
-      // stays unchanged so the first publication time survives.
-      status: current.status === "ACTIVE" ? "PENDING" : current.status,
-      version: { increment: 1 },
+        title: normalized.title,
+        description: normalized.description,
+        price: normalized.price,
+        condition: normalized.condition,
+        usageMonths: normalized.usageMonths,
+        categoryId: normalized.categoryId,
+        provinceCode: normalized.provinceCode,
+        deliveryMethod: normalized.deliveryMethod,
+        shippingFee: normalized.shippingFee,
+        // Editing an ACTIVE listing sends it back to moderation; publishedAt
+        // stays unchanged so the first publication time survives.
+        status: current.status === "ACTIVE" ? "PENDING" : current.status,
+        version: { increment: 1 },
       },
     });
     if (result.count !== 1) {
@@ -812,14 +471,6 @@ async function deleteProduct(req: AuthRequest, res: Response): Promise<Response>
  * GET /account/products — every own listing, newest first
  * ------------------------------------------------------------------ */
 
-const ownListQuerySchema = z
-  .object({
-    status: z.string({ invalid_type_error: "Trạng thái tin đăng không hợp lệ." }).optional(),
-    page: z.unknown().optional(),
-    page_size: z.unknown().optional(),
-  })
-  .strict();
-
 async function listOwnProducts(req: AuthRequest, res: Response): Promise<Response> {
   const viewerId = activeViewerIdOf(req);
   const parsed = ownListQuerySchema.parse(req.query);
@@ -828,11 +479,11 @@ async function listOwnProducts(req: AuthRequest, res: Response): Promise<Respons
   const status =
     parsed.status !== undefined
       ? assertEnumValue(
-          parsed.status,
-          PRODUCT_STATUSES,
-          "status",
-          "Trạng thái tin đăng không hợp lệ.",
-        )
+        parsed.status,
+        PRODUCT_STATUSES,
+        "status",
+        "Trạng thái tin đăng không hợp lệ.",
+      )
       : undefined;
 
   const where: Prisma.ProductWhereInput = { sellerId: viewerId };
@@ -887,4 +538,4 @@ productsRouter.post("/:id/hide", authMiddleware, requireActive, asyncHandler(hid
 productsRouter.delete("/:id", authMiddleware, requireActive, asyncHandler(deleteProduct));
 
 export const accountProductsRouter = Router();
-accountProductsRouter.get("/", optionalAuth, rootListHandler);
+accountProductsRouter.get("/", rootListHandler);

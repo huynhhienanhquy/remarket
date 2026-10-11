@@ -99,3 +99,8 @@ export function addVnd(...amounts: readonly string[]): string {
     .toString();
 }
 
+export function compareVnd(a: string, b: string): number {
+  const x = BigInt(a);
+  const y = BigInt(b);
+  return x < y ? -1 : x > y ? 1 : 0;
+}

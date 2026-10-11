@@ -1,3 +1,4 @@
+import { eligibleCategoryIds, loadCategoryEligibility } from "../services/category-policy.js";
 import type { Category, Product } from "@prisma/client";
 import { prisma } from "../utils/prisma.js";
 import type { AuthRequest } from "../middleware/auth.js";
@@ -67,7 +68,7 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
       JOIN chain ON c.id = chain."parentId"
     )
     SELECT id, "parentId", name, status,
-      NOT EXISTS (SELECT 1 FROM "Category" child WHERE child."parentId" = ${categoryId}) AS "isLeaf"
+      NOT EXISTS (SELECT 1 FROM "Category" child WHERE child."parentId" = chain.id) AS "isLeaf"
     FROM chain
     ORDER BY name
   `;
@@ -92,37 +93,9 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
   return {
     path: ordered.map((row) => row.name),
     exists: true,
-    active: cursor === undefined && ordered[0]?.parentId === null && ordered.every((row) => row.status === "ACTIVE"),
+    active: eligibleCategoryIds(rows.map((row) => ({ ...row, isLeaf: row.id === categoryId }))).has(categoryId),
     isLeaf: leaf.isLeaf,
   };
 }
 
-/** Active leaf ids whose complete ancestor chain is ACTIVE. */
-export async function activeCategoryIds(): Promise<Set<string>> {
-  const all = await prisma.category.findMany({ select: { id: true, parentId: true, status: true } });
-  const byId = new Map(all.map((row) => [row.id, row]));
-  const withChildren = new Set(all.flatMap((row) => row.parentId ? [row.parentId] : []));
-  const active = new Set<string>();
-
-  for (const row of all) {
-    if (row.status !== "ACTIVE" || withChildren.has(row.id)) continue;
-    let cursor = row.parentId;
-    let ok = true;
-    const guard = new Set<string>([row.id]);
-    while (cursor) {
-      if (guard.has(cursor)) {
-        ok = false;
-        break;
-      }
-      guard.add(cursor);
-      const parent = byId.get(cursor);
-      if (!parent || parent.status !== "ACTIVE") {
-        ok = false;
-        break;
-      }
-      cursor = parent.parentId;
-    }
-    if (ok) active.add(row.id);
-  }
-  return active;
-}
+export function activeCategoryIds(): Promise<Set<string>> { return loadCategoryEligibility(prisma); }

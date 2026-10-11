@@ -1,5 +1,26 @@
 # ReMarket backend runbook
 
+## Reliability and cleanup release — 10 October 2026
+
+Apply the three `20261010*` migrations before running the updated API/worker.
+Stop the previous API and worker release first: old workers do not assign the
+new relaySequence and old producers do not consult retained dedupe keys.
+Run `pnpm --filter @remarket/api prisma:deploy`, generate/build the new release,
+then start API and worker together. Do not reset or seed the application database.
+See [the remediation report](project-remediation-2026-10-10.md) for changes and verification.
+
+Processed outbox payloads expire after 30 days in batches of 500; permanent
+OutboxDedupeKey rows preserve replay suppression. Pending/dead-letter events,
+CheckoutRequest, audit and notifications remain. Auth tokens and sessions expire
+after a 7-day grace, while sessions with retained tokens are protected.
+SMTP has a 15-second idle/handshake and 60-second total delivery deadline.
+The relay starts before server listen and reads the commit-ordered sequence.
+
+Cart additions are capped at 50 under a user-row lock; existing larger carts are
+retained and expose the first 50 items. Checkout uses cart delivery metadata.
+Chat REST and sockets share one process-local quota; multiple API replicas need
+a shared quota store for a cluster-wide limit.
+
 ## Admin email verification
 
 User submits their own email from `/verify-email` and returns home; only an
@@ -30,7 +51,17 @@ against private test ports, then removes only its test schema/profile/uploads.
 - Node.js 22, pnpm 11.9, PostgreSQL 16.
 - API: `apps/api`; web: `apps/web`; shared contracts: `packages/shared`.
 - Copy `.env.example` to `.env` and replace every sample secret. Production boot fails until the JWT key, web origins/public URL, SMTP settings and Supabase Storage settings are complete.
-- Development defaults to `STORAGE_DRIVER=local`. Production requires `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, a server-only service-role key and a private `STORAGE_BUCKET`.
+- Development defaults to `STORAGE_DRIVER=database`: image bytes and WebP derivatives are shared through the same PostgreSQL database even when each machine runs its own API. `local` is opt-in for one API host only. Production requires `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, a server-only service-role key and a private `STORAGE_BUCKET`.
+
+For multiple development machines, apply `20261010120000_shared_image_storage`
+with `prisma:deploy`, run `prisma:generate`, then restart each updated API with
+`STORAGE_DRIVER=database`. Run `pnpm --filter @remarket/api storage:sync` on each
+machine holding older files in `apps/api/uploads`. This copies originals and
+derivatives without overwriting shared objects or deleting local files. Missing
+files must be recovered from the machine that uploaded them; metadata alone
+cannot reconstruct image bytes. Authorized image reads also backfill available
+local files lazily. Database storage increases database size and read traffic;
+use the existing private Supabase driver for production object storage.
 
 The Prisma datasource uses `DATABASE_URL` for application traffic and `DIRECT_URL` for migration traffic by default. A persistent API may explicitly set `DATABASE_USE_DIRECT_URL=true` to reuse its verified direct/session-pooler connection; `DIRECT_URL` must point to the same database. `DATABASE_CONNECTION_LIMIT` defaults to 5 for the HTTP pool (an explicit URL `connection_limit` takes precedence). Jobs/outbox/realtime use a separate client with `BACKGROUND_DATABASE_CONNECTION_LIMIT=1`; this overrides the inherited URL's limit. Optional `BACKGROUND_DATABASE_URL` must point to the same logical database/schema, otherwise it defaults to the selected API URL. Budget the sum of HTTP and background limits across API instances and any dedicated worker against the provider's limit. The current local HTTP limit stays 2, so the API's combined budget is 3. Keep the default transaction-pooler connection for serverless deployments. Use separate test, staging and production databases. Never run a reset against staging or production.
 

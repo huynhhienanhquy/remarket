@@ -1,19 +1,20 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminReportItem, ReportReason, ReportStatus } from "@remarket/shared";
 import { REPORT_REASON_LABELS, REPORT_STATUS_LABELS, formatDateTime } from "@remarket/shared";
-import { api } from "../../services/api";
-import { queryKeys } from "../../config/queryClient";
-import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/common";
-import type { DataTableColumn } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
+import type { DataTableColumn } from "../../components/common";
+import { Button, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
-import { readPage } from "../../utils/adminParams";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readPage } from "../../utils/adminParams";
 
 const REPORT_TABS = [
   { value: "PENDING", label: "Chờ xử lý" },
@@ -43,13 +44,8 @@ export function AdminReportsPage() {
       return decision === "resolve" ? api.admin.resolveReport(selected.id, { resolution_note: note, action: resolutionAction }) : api.admin.rejectReport(selected.id, { resolution_note: note });
     },
     onSuccess: (report) => {
-      queryClient.setQueriesData<{ items: AdminReportItem[]; meta: unknown }>({ queryKey: ["admin", "reports"] }, (current) => current ? { ...current, items: current.items.map((item) => item.id === report.id ? report : item) } : current);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","reports"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","products"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","users","list"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","tickets"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","audit"] });
+      patchAdminRows(queryClient, "reports", report);
+      void invalidateAdminResources(queryClient, "dashboard", "reports", "products", "users", "tickets", "audit");
       toast.success(decision === "resolve" ? "Đã xử lý báo cáo" : "Đã không chấp nhận báo cáo");
       setDecision(null); setNote(""); setResolutionAction("none");
     },

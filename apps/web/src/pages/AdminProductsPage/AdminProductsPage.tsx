@@ -1,20 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminProductItem, CategoryNode, ProductStatus } from "@remarket/shared";
 import { CONDITION_LABELS, DELIVERY_LABELS, PRODUCT_STATUS_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
-import { api } from "../../services/api";
-import { isApiError } from "../../helpers/errors";
-import { queryKeys } from "../../config/queryClient";
-import { ApiImage, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/common";
-import type { DataTableColumn } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
+import type { DataTableColumn } from "../../components/common";
+import { ApiImage, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription, isVersionConflict } from "../../helpers/adminErrors";
-import { readPage } from "../../utils/adminParams";
+import { isApiError } from "../../helpers/errors";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readPage } from "../../utils/adminParams";
 
 const TABS = [
   { value: "PENDING", label: "Chờ duyệt" },
@@ -72,11 +73,8 @@ export function AdminProductsPage() {
       return api.admin.unblockProduct(selected.id, selected.version);
     },
     onSuccess: (product) => {
-      queryClient.setQueriesData<{ items: AdminProductItem[]; meta: unknown }>({ queryKey: ["admin", "products"] }, (current) => current ? { ...current, items: current.items.map((item) => item.id === product.id ? product : item) } : current);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","products"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","tickets"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","audit"] });
+      patchAdminRows(queryClient, "products", product);
+      void invalidateAdminResources(queryClient, "dashboard", "products", "tickets", "audit");
       toast.success(action === "approve" ? "Đã duyệt tin" : action === "reject" ? "Đã từ chối tin" : action === "block" ? "Đã hạn chế tin" : "Đã gỡ hạn chế");
       setAction(null); setReason("");
     },

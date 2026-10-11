@@ -1,6 +1,7 @@
+import { PasswordInput } from "@/components/common/Input/PasswordInput";
 import { useResetPasswordForm } from "./hooks/useResetPasswordForm";
 import { Link } from "react-router-dom";
-import { Button, FormField, InlineAlert, Input } from "../../components/common";
+import { Button, FormField, InlineAlert } from "../../components/common";
 
 export function ResetPasswordPage() {
   const {
@@ -12,10 +13,6 @@ export function ResetPasswordPage() {
     confirmError,
     formError,
     formSuccess,
-    showPassword,
-    setShowPassword,
-    showConfirm,
-    setShowConfirm,
     pending,
     passwordRef,
     confirmRef,
@@ -65,11 +62,10 @@ export function ResetPasswordPage() {
           helper="Tối thiểu 12 ký tự"
           error={passwordError ?? undefined}
         >
-          <div className="relative">
-            <Input
+          <PasswordInput
               ref={passwordRef}
               id="reset-password"
-              type={showPassword ? "text" : "password"}
+
               autoComplete="new-password"
               placeholder="Tối thiểu 12 ký tự"
               value={password}
@@ -79,16 +75,6 @@ export function ResetPasswordPage() {
               onChange={(event) => changePassword(event.target.value)}
               onBlur={blurPassword}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((visible) => !visible)}
-              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              aria-pressed={showPassword}
-              className="absolute inset-y-0 right-1 my-auto h-9 rounded-control px-2 t-meta text-brand hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              {showPassword ? "Ẩn" : "Hiện"}
-            </button>
-          </div>
         </FormField>
 
         <FormField
@@ -97,11 +83,10 @@ export function ResetPasswordPage() {
           required
           error={confirmError ?? undefined}
         >
-          <div className="relative">
-            <Input
+          <PasswordInput
               ref={confirmRef}
               id="reset-confirm"
-              type={showConfirm ? "text" : "password"}
+
               autoComplete="new-password"
               placeholder="Nhập lại mật khẩu mới"
               value={confirm}
@@ -111,16 +96,6 @@ export function ResetPasswordPage() {
               onChange={(event) => changeConfirm(event.target.value)}
               onBlur={blurConfirm}
             />
-            <button
-              type="button"
-              onClick={() => setShowConfirm((visible) => !visible)}
-              aria-label={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-              aria-pressed={showConfirm}
-              className="absolute inset-y-0 right-1 my-auto h-9 rounded-control px-2 t-meta text-brand hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              {showConfirm ? "Ẩn" : "Hiện"}
-            </button>
-          </div>
         </FormField>
 
         <Button type="submit" size="lg" fullWidth loading={pending} variant="primary">

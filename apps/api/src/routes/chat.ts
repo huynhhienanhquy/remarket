@@ -17,7 +17,7 @@ import {
   validationError,
 } from "../shared/errors.js";
 import { toConversationListItem, toMessage } from "../shared/dto-mappers.js";
-import { markConversationRead, sendChatMessage } from "../services/chat-service.js";
+import { assertConversationParticipant, markConversationRead, sendChatMessage } from "../services/chat-service.js";
 import { chatRateLimit } from "../middleware/rate-limit.js";
 
 /**
@@ -111,24 +111,6 @@ function parseId(raw: string | undefined): string {
   const parsed = z.string().uuid().safeParse(raw ?? "");
   if (!parsed.success) throw notFound("Không tìm thấy cuộc hội thoại này.");
   return parsed.data;
-}
-
-/** Only the two participants see a thread; everyone else gets 404 (17). */
-async function mustParticipate(
-  conversationId: string,
-  viewerId: string,
-): Promise<{ buyerId: string; sellerId: string }> {
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { buyerId: true, sellerId: true },
-  });
-  if (
-    !conversation ||
-    (conversation.buyerId !== viewerId && conversation.sellerId !== viewerId)
-  ) {
-    throw notFound("Không tìm thấy cuộc hội thoại này.");
-  }
-  return conversation;
 }
 
 function mapConversation(row: ConversationRow, viewerId: string): ConversationListItem {
@@ -391,7 +373,7 @@ router.post(
 router.get("/:conversationId", asyncHandler(async (req: AuthRequest, res) => {
   const viewer = viewerOf(req);
   const id = parseId(req.params.conversationId);
-  await mustParticipate(id, viewer.id);
+  await assertConversationParticipant(id, viewer.id);
   ok(res, await conversationItem(id, viewer.id));
 }));
 
@@ -400,7 +382,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res) => {
     const viewer = viewerOf(req);
     const conversationId = parseId(req.params.conversationId);
-    await mustParticipate(conversationId, viewer.id);
+    await assertConversationParticipant(conversationId, viewer.id);
 
     const query = messagePageQuerySchema.parse(req.query);
     const limit = query.page_size ?? DEFAULT_MESSAGE_PAGE_SIZE;

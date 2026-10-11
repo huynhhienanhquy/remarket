@@ -22,7 +22,6 @@ export function CheckoutPage() {
     groups,
     availableItems,
     sellerIds,
-    productDetails,
     shippingFor,
     methodsFor,
     updateDelivery,
@@ -32,7 +31,7 @@ export function CheckoutPage() {
     handlePriceChangedRefresh,
   } = useCheckout();
 
-  if (cart.isPending || provinces.isPending || (availableItems.length > 0 && productDetails.isPending)) {
+  if (cart.isPending || provinces.isPending || (availableItems.length > 0 && cart.isPending)) {
     return (
       <div className="rm-container py-6 lg:py-8">
         <h1 className="t-h1 text-ink mb-6">Đặt hàng</h1>
@@ -85,7 +84,6 @@ export function CheckoutPage() {
       {submissionError && <InlineAlert tone="danger" title="Kiểm tra thông tin giao nhận">{submissionError}</InlineAlert>}
       {checkout.isError && <QueryFailure error={checkout.error} />}
       {provinces.isError && <QueryFailure error={provinces.error} retry={() => void provinces.refetch()} />}
-      {productDetails.isError && <QueryFailure error={productDetails.error} retry={() => void productDetails.refetch()} />}
       {priceChangedAlert && (
         <InlineAlert
           tone="warning"
@@ -113,7 +111,7 @@ export function CheckoutPage() {
 
             return (
               <section key={sellerId} className="space-y-4 border-t border-line pt-4 first:border-t-0 first:pt-0">
-                {methodsFor(sellerId).length === 0 && <InlineAlert tone="warning" title={productDetails.isPending ? "Đang tải hình thức giao nhận…" : "Các món này không có phương thức giao nhận chung"}>Hãy đặt riêng từng món nếu các phương thức không tương thích.</InlineAlert>}
+                {methodsFor(sellerId).length === 0 && <InlineAlert tone="warning" title={cart.isPending ? "Đang tải hình thức giao nhận…" : "Các món này không có phương thức giao nhận chung"}>Hãy đặt riêng từng món nếu các phương thức không tương thích.</InlineAlert>}
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="t-label text-ink">{sellerGroup.seller.name}</p>
@@ -229,7 +227,7 @@ export function CheckoutPage() {
           </div>
         </div>
 
-        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} disabled={!online || !productDetails.data || sellerIds.some((sellerId) => methodsFor(sellerId).length === 0)} onClick={handleSubmit}>
+        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} disabled={!online || !cart.data || sellerIds.some((sellerId) => methodsFor(sellerId).length === 0)} onClick={handleSubmit}>
           {checkout.isPending ? "Đang xử lý..." : "Đặt hàng"}
         </Button>
       </div>

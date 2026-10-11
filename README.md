@@ -32,6 +32,25 @@ không tạo người dùng, sản phẩm hay giao dịch. Tạo admin bằng `a
 Schema/migrations nằm trong `apps/api/prisma`. Chạy các lệnh Prisma qua
 `pnpm --filter @remarket/api` để dùng đúng schema và phiên bản của API.
 
+## Ảnh dùng chung giữa nhiều máy
+
+Khi mỗi máy chạy API riêng và dùng chung database, dùng `STORAGE_DRIVER=database`
+trong `apps/api/.env` (mặc định mới). Ảnh gốc và WebP được lưu trong PostgreSQL,
+nên máy khác đọc được qua API của chính máy đó. `STORAGE_DRIVER=local` chỉ phù hợp
+khi mọi người cùng truy cập một API có chung thư mục upload.
+
+Cập nhật code trên mọi máy, chạy `prisma:deploy` một lần trên database chung,
+chạy `prisma:generate` và khởi động lại API trên mỗi máy. Để chia sẻ ảnh cũ,
+chạy lệnh sau **trên từng máy đã upload ảnh**:
+
+```sh
+pnpm --filter @remarket/api storage:sync
+```
+
+Lệnh giữ nguyên file local, bỏ qua ảnh đã đồng bộ và báo số ảnh chưa có trên máy.
+Ảnh chỉ còn trên máy khác cần được đồng bộ từ máy đó hoặc upload lại. Production
+tiếp tục dùng Supabase Storage private theo [backend runbook](docs/backend-runbook.md).
+
 ## Đăng nhập nhiều tài khoản trên cùng trình duyệt
 
 Mỗi tab có phiên riêng: mở các tab mới và đăng nhập admin, người mua hoặc

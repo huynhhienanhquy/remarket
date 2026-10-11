@@ -1,31 +1,32 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminUserItem, UserStatus } from "@remarket/shared";
 import { USER_STATUS_LABELS, formatDate, formatDateTime } from "@remarket/shared";
-import { api } from "../../services/api";
-import { queryKeys } from "../../config/queryClient";
-import {
-  ConfirmDialog,
-  ApiImage,
-  Drawer,
-  EmptyState,
-  Input,
-  Pagination,
-  SearchInput,
-  SectionCard,
-  Select,
-  StatusBadge,
-  useToast,
-} from "../../components/common";
-import type { DataTableColumn } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
+import type { DataTableColumn } from "../../components/common";
+import {
+    ApiImage,
+    ConfirmDialog,
+    Drawer,
+    EmptyState,
+    Input,
+    Pagination,
+    SearchInput,
+    SectionCard,
+    Select,
+    StatusBadge,
+    useToast,
+} from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
-import { readEnumParam, readPage } from "../../utils/adminParams";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readEnumParam, readPage } from "../../utils/adminParams";
 
 const USER_STATUSES = ["ACTIVE", "LOCKED"] as const;
 
@@ -81,15 +82,9 @@ export function AdminUsersPage() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(queryKeys.adminUser(user.id), user);
-      queryClient.setQueriesData<{ items: AdminUserItem[]; meta: unknown }>({ queryKey: ["admin", "users", "list"] }, (current) =>
-        current ? { ...current, items: current.items.map((item) => item.id === user.id ? user : item) } : current,
-      );
+      patchAdminRows(queryClient, "users", user);
       toast.success(action === "lock" ? "Đã khóa tài khoản" : "Đã mở khóa tài khoản");
-      void queryClient.invalidateQueries({ queryKey: ["admin","users","list"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","products"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","tickets"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin","audit"] });
+      void invalidateAdminResources(queryClient, "users", "products", "tickets", "dashboard", "audit");
       setAction(null);
       setReason("");
     },

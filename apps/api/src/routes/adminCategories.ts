@@ -7,7 +7,7 @@ import type { AuthRequest } from "../middleware/auth.js";
 import { ok, okList } from "../shared/api-response.js";
 import { notFound, validationError } from "../shared/errors.js";
 import { toCategoryNode } from "../shared/dto-mappers.js";
-import { administeredEntityIds, adminActor, writeAudit } from "../shared/admin-helpers.js";
+import { moderationAuditFilter, adminActor, writeAudit } from "../shared/admin-helpers.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 
 /**
@@ -45,8 +45,8 @@ router.get("/", asyncHandler(async (req, res) => {
   const match: Prisma.CategoryWhereInput = {};
   if (query.q) match.name = { contains: query.q, mode: "insensitive" };
   if (query.status) match.status = query.status;
-  const handledIds = await administeredEntityIds("category", query.handled_by, query.from, query.to);
-  if (handledIds) match.id = { in: handledIds };
+  const auditFilter = moderationAuditFilter(query.handled_by, query.from, query.to);
+  if (auditFilter) match.moderationAudits = { some: auditFilter };
   const where: Prisma.CategoryWhereInput = {
     parentId: null,
     ...(Object.keys(match).length > 0 ? { OR: [match, { children: { some: match } }] } : {}),

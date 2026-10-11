@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionUser } from "@remarket/shared";
 
 const user: SessionUser = { id: "user-1", role: "ADMIN", status: "ACTIVE", full_name: "Admin", email: "admin@example.test", avatar_url: null, email_verified_at: null, phone: null, province_code: null, default_address: null, joined_at: "2026-01-01" };
-const envelope = (data: unknown, status = 200) => new Response(JSON.stringify({ success: true, data }), { status });
+const envelope = (data: unknown, status = 200) => new Response(JSON.stringify({meta: { request_id: "test-request" },  success: true, data }), { status });
 const failure = (status: number, code: string) => new Response(JSON.stringify({ success: false, error: { code, message: code } }), { status });
 let transport: typeof import("../http");
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
@@ -49,15 +49,15 @@ describe("shared session restoration", () => {
     fetchMock.mockImplementation(async (url, options) => {
       if (String(url).endsWith("/auth/refresh")) return envelope({ user, access_token: "new-token" });
       if ((options?.headers as Record<string, string>).Authorization === "Bearer old-token") return failure(401, "SESSION_EXPIRED");
-      return envelope({ ok: true });
+      return envelope({ items: [], meta: { page: 1, page_size: 20, total: 0, total_pages: 1, unread: 0 } });
     });
-    await expect(Promise.all([transport.http.get("/orders"), transport.http.get("/notifications")])).resolves.toEqual([{ ok: true }, { ok: true }]);
+    await expect(Promise.all([transport.http.get("/orders"), transport.http.get("/notifications")])).resolves.toEqual(Array.from({ length: 2 }, () => ({ items: [], meta: { page: 1, page_size: 20, total: 0, total_pages: 1, unread: 0 } })));
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/auth/refresh"))).toHaveLength(1);
   });
   it("does not rotate again for a delayed 401 belonging to the previous token", async () => {
     transport.setAccessToken("old-token");
     let deliver: ((response: Response) => void) | undefined;
-    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { deliver = resolve; })).mockResolvedValue(envelope({ ok: true }));
+    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { deliver = resolve; })).mockResolvedValue(envelope({ items: [], meta: { page: 1, page_size: 20, total: 0, total_pages: 1 } }));
     const pending = transport.http.get("/orders");
     transport.setAccessToken("new-token");
     deliver!(failure(401, "SESSION_EXPIRED"));
@@ -129,7 +129,7 @@ describe("shared session restoration", () => {
     const pending = transport.http.get("/orders");
     await vi.waitFor(() => expect(body).toBeTypeOf("function"));
     session.updateSessionUser(user);
-    body({ success: true, data: { private: "previous-user" } });
+    body({meta: { request_id: "test-request" },  success: true, data: { private: "previous-user" } });
     await expect(pending).rejects.toMatchObject({ code: "SESSION_CHANGED" });
   });
 

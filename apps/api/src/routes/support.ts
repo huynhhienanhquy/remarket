@@ -1,3 +1,4 @@
+import { createNotification } from "../services/notifications.js";
 import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -280,7 +281,7 @@ router.post(
         data: { ticketId: ticket.id, senderId: user.id, role: "USER", message },
       });
       if (ticket.assignedAdminId) {
-        await tx.notification.create({
+        await createNotification(tx, {
           data: {
             userId: ticket.assignedAdminId,
             type: "TICKET_REPLY",

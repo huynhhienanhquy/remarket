@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../config/queryClient";
 import { httpContext, page } from "../../tests/http-context";
-import { member } from "../../tests/test-data";
+import { member, seller } from "../../tests/test-data";
 import { AppRouter } from "../../config/route/router";
 import { SessionProvider } from "../../contexts/SessionContext";
 
@@ -81,8 +81,8 @@ describe("account navigation through the application router", () => {
   });
 
   it("shows the number of available cart items in the checkout action", async () => {
-    const item = { product_id: "available-item", title: "Món đồ kiểm thử", price: "100000", image_url: null, condition: "GOOD", province_label: "Hà Nội", available: true, unavailable_reason: null };
-    context.reply("GET", "/cart", { total_items: 2, groups: [{ seller: { id: "seller-test", name: "Người bán" }, items: [item, { ...item, product_id: "unavailable-item", available: false, unavailable_reason: "Đã bán" }] }] });
+    const item = {delivery_method: "BOTH", shipping_fee: "0",  product_id: "available-item", title: "Món đồ kiểm thử", price: "100000", image_url: null, condition: "GOOD", status: "ACTIVE", province_label: "Hà Nội", available: true, unavailable_reason: null };
+    context.reply("GET", "/cart", { total_items: 2, groups: [{ seller, items: [item, { ...item, product_id: "unavailable-item", available: false, unavailable_reason: "Đã bán" }] }] });
     show("/cart");
     expect(await screen.findByRole("button", { name: "Tiến hành đặt hàng (1)" })).toBeEnabled();
     expect(screen.getByText("Tạm tính (1 món)")).toBeInTheDocument();

@@ -1,5 +1,5 @@
-import rateLimit from "express-rate-limit";
-import type { Request } from "express";
+import { RateQuota, chatQuota } from "../services/rate-quota.js";
+import type { RequestHandler } from "express";
 import { isIP } from "node:net";
 import { API_ERROR_CODES } from "@remarket/shared";
 import type { AuthRequest } from "./auth.js";
@@ -32,39 +32,30 @@ export function normalizeRateLimitIp(input: string | undefined): string {
   return `${full.slice(0, 4).map((part) => part.padStart(4, "0")).join(":")}::/64`;
 }
 
-function limited(windowMs: number, limit: number, keyMode: KeyMode) {
-  return rateLimit({
-    windowMs,
-    limit,
-    standardHeaders: true,
-    legacyHeaders: false,
-    ...(keyMode !== "ip"
-      ? {
-          keyGenerator: (req: Request) => {
-            if (keyMode === "user") {
-              return (req as AuthRequest).user?.id ?? normalizeRateLimitIp(req.ip ?? req.socket.remoteAddress);
-            }
-            const email =
-              typeof (req.body as { email?: unknown } | undefined)?.email === "string"
-                ? String((req.body as { email: string }).email).trim().toLowerCase()
-                : "unknown";
-            return `${normalizeRateLimitIp(req.ip ?? req.socket.remoteAddress)}:${email}`;
-          },
-        }
-      : {}),
-    handler: (_req, res) => {
-      res.status(429).json({
-        success: false,
-        error: { code: API_ERROR_CODES.RATE_LIMITED, message: "Bạn thao tác quá nhanh, vui lòng thử lại sau." },
-        meta: envelopeMeta(res),
-      });
-    },
-  });
+function limited(windowMs: number, limit: number, keyMode: KeyMode, quota = new RateQuota(windowMs, limit)): RequestHandler {
+  return (req, res, next) => {
+    const ip = normalizeRateLimitIp(req.ip ?? req.socket.remoteAddress);
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "unknown";
+    const key = keyMode === "user" ? (req as AuthRequest).user?.id ?? ip
+      : keyMode === "ip-email" ? ip + ":" + email : ip;
+    const result = quota.consume(key);
+    res.setHeader("RateLimit-Limit", limit);
+    res.setHeader("RateLimit-Remaining", result.remaining);
+    res.setHeader("RateLimit-Reset", result.retryAfter);
+    if (result.allowed) { next(); return; }
+    res.setHeader("Retry-After", result.retryAfter);
+    res.status(429).json({
+      success: false,
+      error: { code: API_ERROR_CODES.RATE_LIMITED, message: "Bạn thao tác quá nhanh, vui lòng thử lại sau." },
+      meta: envelopeMeta(res),
+    });
+  };
 }
 
 export const loginRateLimit = limited(15 * 60 * 1000, 10, "ip-email");
 export const emailTokenRateLimit = limited(60 * 60 * 1000, 3, "ip-email");
 export const emailVerificationRateLimit = limited(60 * 60 * 1000, 3, "user");
-export const chatRateLimit = limited(60 * 1000, 30, "user");
+export const chatRateLimit = limited(60 * 1000, 30, "user", chatQuota);
+export function createGlobalRateLimit(): RequestHandler { return limited(15 * 60 * 1000, 1000, "ip"); }
 export const reportRateLimit = limited(60 * 60 * 1000, 5, "user");
 export const checkoutRateLimit = limited(10 * 60 * 1000, 10, "user");

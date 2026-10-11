@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CategoryNode } from "@remarket/shared";
-import { api } from "../../services/api";
-import { queryKeys } from "../../config/queryClient";
-import { Button, ConfirmDialog, EmptyState, FormField, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/common";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
+import { Button, ConfirmDialog, EmptyState, FormField, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, useToast } from "../../components/common";
+import { queryKeys } from "../../config/queryClient";
+import { invalidateAdminResources } from "../../helpers/adminCache";
 import { errorDescription, fieldError } from "../../helpers/adminErrors";
-import { readEnumParam, readPage } from "../../utils/adminParams";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { api } from "../../services/api";
+import { readEnumParam, readPage } from "../../utils/adminParams";
 
 function slugify(value: string): string {
   return value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -64,8 +65,7 @@ export function AdminCategoriesPage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.categories });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "audit"] });
+      void invalidateAdminResources(queryClient, "categories", "audit");
       toast.success(creating ? "Đã tạo danh mục" : "Đã cập nhật danh mục");
       apply({ new: null, selected: null }, { replace: true });
     },
@@ -77,7 +77,8 @@ export function AdminCategoriesPage() {
       if (!selected) throw new Error("Chưa chọn danh mục.");
       return api.admin.updateCategory(selected.id, { status: selected.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" });
     },
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.categories }); void queryClient.invalidateQueries({ queryKey: ["admin", "categories"] }); void queryClient.invalidateQueries({ queryKey: ["admin", "audit"] }); toast.success(selected?.status === "ACTIVE" ? "Đã vô hiệu danh mục" : "Đã kích hoạt danh mục"); setConfirmDisable(false); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.categories }); void invalidateAdminResources(queryClient, "categories", "audit");
+      toast.success(selected?.status === "ACTIVE" ? "Đã vô hiệu danh mục" : "Đã kích hoạt danh mục"); setConfirmDisable(false); },
     onError: (error) => toast.error("Không thể đổi trạng thái danh mục", { description: errorDescription(error) }),
   });
 

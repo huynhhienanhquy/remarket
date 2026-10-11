@@ -15,12 +15,14 @@ afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); });
 describe("member workflows through the HTTP adapter", () => {
 it("submits canonical checkout fields and preserves the idempotency key on network retry", async () => {
     context.reply("GET", "/cart", { groups: [{ seller, items: [{
+      delivery_method: product.delivery_method, shipping_fee: product.shipping_fee,
       product_id: product.id, title: product.title, price: product.price, image_url: null,
       condition: "GOOD", status: "ACTIVE", province_label: "Hà Nội", available: true, unavailable_reason: null,
     }] }], total_items: 1 });
     context.on("POST", "/checkout", () => {
       if (context.requests("POST", "/checkout").length === 1) throw new Error("Network unavailable");
-      return { checkout_request_id: "checkout-test", orders: [{ id: "order-test" }] };
+      return { checkout_request_id: "checkout-test", orders: [{ id: "order-test", code: "RM-TEST", role: "buyer", counterparty: seller,
+        status: "PENDING", delivery_method: "COD", items: [], total_amount: "130000", created_at: "2026-10-10T00:00:00.000Z", expires_at: null }] };
     });
     show(<CheckoutPage />, "/checkout?items=" + product.id, "/checkout");
     await waitFor(() => expect(screen.getByLabelText("Phí giao hàng")).toHaveValue("30000"));

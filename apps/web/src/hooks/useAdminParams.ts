@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 export interface AdminParams {
   params: URLSearchParams;
-  /** Writes a patch; any change that is not `page` resets the page to 1. */
+  /** Filter changes reset pagination; drawer state preserves the current page. */
   apply: (patch: Record<string, string | null>, options?: { replace?: boolean }) => void;
 }
 
@@ -14,11 +14,15 @@ export function useAdminParams(): AdminParams {
   const apply = useCallback<AdminParams["apply"]>(
     (patch, options) => {
       const next = new URLSearchParams(searchParams);
+      let filterChanged = false;
       for (const [key, value] of Object.entries(patch)) {
+        if (!["page", "selected", "new"].includes(key) && next.get(key) !== (value || null)) {
+          filterChanged = true;
+        }
         if (value === null || value === "") next.delete(key);
         else next.set(key, value);
       }
-      if (!("page" in patch)) next.delete("page");
+      if (filterChanged && !("page" in patch)) next.delete("page");
       setSearchParams(next, { replace: options?.replace ?? false });
     },
     [searchParams, setSearchParams],

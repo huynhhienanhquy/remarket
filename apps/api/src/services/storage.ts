@@ -1,10 +1,15 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../config/env.js";
 
-const LOCAL_UPLOAD_ROOT = fileURLToPath(new URL("../../uploads/", import.meta.url));
+// The compiled API lives in dist/apps/api/src; both builds must find the same
+// legacy uploads when moving existing files into shared storage.
+const LOCAL_UPLOAD_ROOT = fileURLToPath(new URL(
+  import.meta.url.includes("/dist/apps/api/src/") ? "../../../../../uploads/" : "../../uploads/",
+  import.meta.url,
+));
 const resourceKey = createHash("sha256").update(`image-resource:${env.jwtSecret}`).digest();
 const resourceTokens = new Map<string, { token: string; expiresAt: number }>();
 
@@ -158,6 +163,14 @@ export async function putStorageObject(
   contents: Buffer,
   contentType: string,
 ): Promise<void> {
+  if (env.storage.driver === "database") {
+    const { prisma } = await import("../utils/prisma.js");
+    await prisma.storageObject.create({
+      data: { storagePath: normalizedStoragePath(storagePath), contents, mimeType: contentType },
+      select: { storagePath: true },
+    });
+    return;
+  }
   if (env.storage.driver === "local") {
     const target = localAbsolutePath(storagePath);
     await mkdir(path.dirname(target), { recursive: true });
@@ -180,7 +193,12 @@ export async function putStorageObject(
 
 export async function deleteStorageObject(storagePath: string): Promise<void> {
   const paths = [storagePath, imageVariantPath(storagePath, "card"), imageVariantPath(storagePath, "detail")];
-  if (env.storage.driver === "local") {
+  if (env.storage.driver === "database") {
+    const { prisma } = await import("../utils/prisma.js");
+    await prisma.storageObject.deleteMany({ where: { storagePath: { in: paths.map(normalizedStoragePath) } } });
+    // Remove any legacy copies too, so a later read cannot re-import a deletion.
+  }
+  if (env.storage.driver === "local" || env.storage.driver === "database") {
     await Promise.all(paths.map(async (objectPath) => {
       try { await unlink(localAbsolutePath(objectPath)); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -206,7 +224,7 @@ const signedReads = new Map<string, { expiresAt: number; promise: Promise<string
 
 /** Reuse a provider capability only for the same path/deadline; never extend grants. */
 export async function createStorageReadUrl(storagePath: string, ttlSeconds = env.storage.signedUrlTtlSeconds): Promise<string | null> {
-  if (env.storage.driver === "local") return null;
+  if (env.storage.driver !== "supabase") return null;
   const ttl = Math.max(1, Math.min(ttlSeconds, env.storage.signedUrlTtlSeconds));
   const expiresAt = Math.floor(Date.now() / 1000) + ttl;
   const key = `${normalizedStoragePath(storagePath)}:${expiresAt}`;
@@ -242,6 +260,53 @@ export function getLocalStoragePath(storagePath: string): string {
   return localAbsolutePath(storagePath);
 }
 
+/** Only for migrating old local files; never expose this path in API responses. */
+export function getLegacyLocalStoragePath(storagePath: string): string {
+  return localAbsolutePath(storagePath);
+}
+
+export interface StorageImage {
+  contents: Buffer;
+  mimeType: string;
+}
+
+/** Read bytes only after the upload route has authorized the image. */
+export async function readDatabaseStorageObject(storagePath: string): Promise<StorageImage | null> {
+  if (env.storage.driver !== "database") throw new Error("Database storage is not active.");
+  const { prisma } = await import("../utils/prisma.js");
+  const normalized = normalizedStoragePath(storagePath);
+  const object = await prisma.storageObject.findUnique({
+    where: { storagePath: normalized }, select: { contents: true, mimeType: true },
+  });
+  if (object) return { contents: Buffer.from(object.contents), mimeType: object.mimeType };
+
+  // Gradually share legacy files when their original machine reads them.
+  return importLocalStorageObject(normalized);
+}
+
+/** Idempotent backfill: retain local files and never overwrite shared objects. */
+export async function importLocalStorageObject(storagePath: string): Promise<StorageImage | null> {
+  if (env.storage.driver !== "database") throw new Error("Database storage is not active.");
+  const { prisma } = await import("../utils/prisma.js");
+  const normalized = normalizedStoragePath(storagePath);
+  let contents: Buffer;
+  try { contents = await readFile(localAbsolutePath(normalized)); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+  if (contents.length === 0 || contents.length > 5 * 1024 * 1024) throw new Error("Invalid legacy image size.");
+  const extension = path.extname(normalized).toLowerCase();
+  const mimeType = extension === ".webp" ? "image/webp" : extension === ".png" ? "image/png"
+    : extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : null;
+  if (!mimeType) throw new Error("Unsupported legacy image type.");
+  await prisma.storageObject.createMany({ data: [{ storagePath: normalized, contents, mimeType }], skipDuplicates: true });
+  const object = await prisma.storageObject.findUniqueOrThrow({
+    where: { storagePath: normalized }, select: { contents: true, mimeType: true },
+  });
+  return { contents: Buffer.from(object.contents), mimeType: object.mimeType };
+}
+
 export type ImageVariant = "original" | "card" | "detail";
 export function imageVariantPath(storagePath: string, variant: ImageVariant): string {
   return variant === "original" ? storagePath : `${storagePath}.${variant}.webp`;
@@ -249,7 +314,7 @@ export function imageVariantPath(storagePath: string, variant: ImageVariant): st
 
 /** Legacy Supabase objects may not have derivatives yet: fall back to the original. */
 export async function createStorageImageReadUrl(storagePath: string, variant: ImageVariant, ttlSeconds: number): Promise<string | null> {
-  if (variant === "original" || env.storage.driver === "local") return createStorageReadUrl(storagePath, ttlSeconds);
+  if (variant === "original" || env.storage.driver !== "supabase") return createStorageReadUrl(storagePath, ttlSeconds);
   try { return await createStorageReadUrl(imageVariantPath(storagePath, variant), ttlSeconds); }
   catch { return createStorageReadUrl(storagePath, ttlSeconds); }
 }
