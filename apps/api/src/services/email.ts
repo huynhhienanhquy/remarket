@@ -225,6 +225,8 @@ export async function sendEmail(input: {
 }
 
 export async function deliverAuthEmail(event: RealtimeEvent): Promise<void> {
+  // Demo deployments explicitly discard queued mail without decrypting/logging tokens.
+  if (env.emailEnabled === false) return;
   const payload = event.payload as Record<string, unknown>;
   const to = payload.to;
   const purpose = payload.purpose;

@@ -133,6 +133,10 @@ const avatarSchema = z.object({ storage_path: z.string().min(1).max(300) }).stri
  * ------------------------------------------------------------------ */
 
 const router = Router();
+const requireEmailDelivery = (_req: Request, _res: Response, next: () => void): void => {
+  if (!env.emailEnabled) throw new AppError("EMAIL_DISABLED", "Bản demo không hỗ trợ gửi email đặt lại mật khẩu hoặc liên kết xác minh. Bạn vẫn có thể yêu cầu admin xác minh email.", 503);
+  next();
+};
 // Identity and credentials must never be reused from a browser/proxy cache.
 router.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
@@ -501,6 +505,7 @@ router.post(
 // the mailbox exists (detail 5.3): never reveal account existence.
 router.post(
   "/resend-verification",
+  requireEmailDelivery,
   emailTokenRateLimit,
   asyncHandler(async (req, res) => {
     const data = resendSchema.parse(req.body);
@@ -530,6 +535,7 @@ router.post(
 // the address is registered (detail 5.3).
 router.post(
   "/forgot-password",
+  requireEmailDelivery,
   emailTokenRateLimit,
   asyncHandler(async (req, res) => {
     const data = emailSchema.parse(req.body);

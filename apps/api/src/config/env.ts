@@ -8,6 +8,8 @@ import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  SERVE_WEB: z.enum(["true", "false"]).default("false"),
+  WEB_DIST_PATH: z.string().min(1).default("../web/dist"),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).optional(),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DIRECT_URL: z.string().optional(),
@@ -38,6 +40,7 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1).optional(),
   STORAGE_BUCKET: z.string().trim().min(1).default("remarket-private"),
   STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(300),
+  EMAIL_ENABLED: z.enum(["true", "false"]).default("true"),
   SMTP_HOST: z.string().trim().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
   SMTP_USER: z.string().optional(),
@@ -73,7 +76,10 @@ const schema = z.object({
     }
   }
   if (value.NODE_ENV === "production") {
-    for (const field of ["WEB_ORIGINS", "SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"] as const) {
+    const requiredFields = value.EMAIL_ENABLED === "true"
+      ? ["WEB_ORIGINS", "SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM"] as const
+      : ["WEB_ORIGINS"] as const;
+    for (const field of requiredFields) {
       if (!value[field]) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -106,7 +112,14 @@ const schema = z.object({
   }
 });
 
-const parsed = schema.safeParse(process.env);
+// Render supplies the public URL. Only a combined web/API deployment uses it
+// as the default trusted origin; explicit operator configuration wins.
+const deployedWebUrl = process.env.SERVE_WEB === "true" ? process.env.RENDER_EXTERNAL_URL : undefined;
+const parsed = schema.safeParse({
+  ...process.env,
+  WEB_ORIGINS: process.env.WEB_ORIGINS ?? deployedWebUrl,
+  PUBLIC_WEB_URL: process.env.PUBLIC_WEB_URL ?? deployedWebUrl,
+});
 
 if (!parsed.success) {
   const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
@@ -119,6 +132,9 @@ export const env = {
   nodeEnv: raw.NODE_ENV,
   isProduction: raw.NODE_ENV === "production",
   port: raw.PORT,
+  serveWeb: raw.SERVE_WEB === "true",
+  webDistPath: raw.WEB_DIST_PATH,
+  emailEnabled: raw.EMAIL_ENABLED === "true",
   trustProxyHops: raw.TRUST_PROXY_HOPS ?? (raw.NODE_ENV === "production" ? 1 : 0),
   databaseUrl: raw.DATABASE_URL,
   databaseRuntimeUrl: raw.DATABASE_USE_DIRECT_URL === "true" ? raw.DIRECT_URL! : raw.DATABASE_URL,

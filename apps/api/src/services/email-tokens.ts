@@ -16,6 +16,7 @@ export async function createEmailToken(
     token: string;
   },
 ): Promise<void> {
+  if (!env.emailEnabled) return;
   await tx.authToken.updateMany({
     where: { userId: input.userId, purpose: input.purpose, consumedAt: null },
     data: { consumedAt: new Date() },

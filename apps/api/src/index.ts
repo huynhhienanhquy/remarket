@@ -13,7 +13,7 @@ const app = createApp();
 const server = createServer(app);
 const realtime = attachRealtime(server);
 const stopRealtimeRelay = await startRealtimeRelay();
-server.listen(env.port, () => {
+server.listen(env.port, "0.0.0.0", () => {
   console.log(`ReMarket API listening on http://localhost:${env.port}`);
   console.log(`  health:  http://localhost:${env.port}/health/ready`);
   console.log(`  api:     http://localhost:${env.port}/api/v1`);

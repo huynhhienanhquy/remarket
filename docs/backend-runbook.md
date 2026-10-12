@@ -48,6 +48,11 @@ against private test ports, then removes only its test schema/profile/uploads.
 
 ## Runtime baseline
 
+For a Render Free demo, see [the demo deploy guide](render-demo.md) and `render.yaml`.
+`EMAIL_ENABLED=false` explicitly disables email tokens/delivery and password-reset
+requests without weakening HTTPS, cookies, JWT or private storage requirements.
+Normal deployments keep email enabled and require SMTP.
+
 - Node.js 22, pnpm 11.9, PostgreSQL 16.
 - API: `apps/api`; web: `apps/web`; shared contracts: `packages/shared`.
 - Copy `.env.example` to `.env` and replace every sample secret. Production boot fails until the JWT key, web origins/public URL, SMTP settings and Supabase Storage settings are complete.

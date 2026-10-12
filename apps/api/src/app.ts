@@ -11,6 +11,7 @@ import { authMiddleware, requireRole } from "./middleware/auth.js";
 import { prisma } from "./utils/prisma.js";
 import { collectWorkerMetrics, workerSnapshot } from "./jobs/runner.js";
 import { createGlobalRateLimit } from "./middleware/rate-limit.js";
+import { mountWeb } from "./web.js";
 
 import { authRouter } from "./routes/auth.js";
 import { categoriesRouter } from "./routes/categories.js";
@@ -32,13 +33,20 @@ import { adminRouter } from "./routes/admin.js";
  * Express app (detail-project 3). Middleware order matters:
  * request-id -> security -> CORS -> parser -> rate limit -> routes.
  */
-export function createApp(): express.Express {
+export function createApp(options: { webRoot?: string } = {}): express.Express {
   const app = express();
 
   app.disable("x-powered-by");
   if (env.trustProxyHops > 0) app.set("trust proxy", env.trustProxyHops);
   app.use(requestIdMiddleware);
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        "img-src": ["'self'", "data:", "blob:", ...(env.storage.supabaseUrl ? [env.storage.supabaseUrl] : [])],
+        "connect-src": ["'self'", env.publicWebUrl.replace(/^http/, "ws")],
+      },
+    },
+  }));
   app.use(
     cors({
       origin: env.corsOrigins,
@@ -126,6 +134,9 @@ export function createApp(): express.Express {
   api.use("/admin", authMiddleware, requireRole("ADMIN"), adminRouter);
 
   app.use("/api/v1", api);
+
+  const webRoot = options.webRoot ?? (env.serveWeb ? env.webDistPath : undefined);
+  if (webRoot) mountWeb(app, webRoot);
 
   // Unknown endpoint -> the frontend expects the standard error envelope.
   app.use((req, res) => {

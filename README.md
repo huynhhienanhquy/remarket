@@ -2,6 +2,12 @@
 
 React/TypeScript web, Express API và Prisma 5.22/PostgreSQL trong một pnpm monorepo.
 
+## Demo trên Render Free
+
+Một service phục vụ cả web, API và Socket.IO trên cùng URL. Xem
+[hướng dẫn deploy demo](docs/render-demo.md); cấu hình nằm trong `render.yaml`.
+Demo tắt gửi email, xác minh tài khoản vẫn qua admin. Database và ảnh dùng Supabase.
+
 ## Chạy local
 
 Yêu cầu Node.js 22 và pnpm 11.9. Cấu hình backend trong `apps/api/.env` theo
@@ -113,5 +119,5 @@ Kiểm thử PostgreSQL/browser tách biệt cho luồng này:
 `node apps/api/scripts/verify-isolated.mjs --browser --email-only`.
 
 Link email cũ/đặt lại mật khẩu ở môi trường development được in tại console
-API. Production cần SMTP và Supabase private storage hợp lệ; không đưa secret
+API. Production cần SMTP (trừ demo đặt `EMAIL_ENABLED=false`) và Supabase private storage hợp lệ; không đưa secret
 vào frontend hay commit `.env`.

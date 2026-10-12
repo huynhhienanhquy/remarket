@@ -6,6 +6,8 @@ import { useSession } from "../../contexts/SessionContext";
 import { safeReturnTo } from "../../config/route/guards";
 import { api } from "../../services/api";
 import { Button, FormField, InlineAlert, Input } from "../../components/common";
+import { EMAIL_ENABLED } from "../../config/environment";
+import { isApiError } from "../../helpers/errors";
 
 export function ForgotPasswordPage() {
   const [params] = useSearchParams();
@@ -54,13 +56,25 @@ export function ForgotPasswordPage() {
       await api.auth.forgotPassword(email.trim());
       // Always show the same neutral message regardless of whether the email exists
       setFormSuccess("Nếu email có trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.");
-    } catch {
+    } catch (error) {
+      if (isApiError(error) && error.code === "EMAIL_DISABLED") {
+        setFormError(error.message);
+        return;
+      }
       // Never reveal whether the email exists — always show the same message
       setFormSuccess("Nếu email có trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.");
     } finally {
       setPending(false);
     }
   }
+
+  if (!EMAIL_ENABLED) return (
+    <div className="space-y-6">
+      <h1 className="t-h1 text-ink">Quên mật khẩu</h1>
+      <InlineAlert tone="info" title="Bản demo không hỗ trợ gửi email đặt lại mật khẩu." />
+      <Link to="/login" className="t-label text-brand hover:underline">← Quay lại đăng nhập</Link>
+    </div>
+  );
 
   return (
     <div className="space-y-6">

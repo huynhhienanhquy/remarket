@@ -7,3 +7,5 @@ export const API_BASE_URL: string =
 
 export const SOCKET_URL: string =
   (import.meta.env.VITE_SOCKET_URL as string | undefined) ?? "";
+
+export const EMAIL_ENABLED = import.meta.env.VITE_EMAIL_ENABLED !== "false";

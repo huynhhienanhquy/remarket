@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: remarket-demo
+    runtime: node
+    plan: free
+    region: singapore
+    autoDeployTrigger: "off"
+    buildCommand: corepack pnpm@11.9.0 install --frozen-lockfile --prod=false && node scripts/build-demo.mjs
+    startCommand: cd apps/api && node node_modules/tsx/dist/cli.mjs scripts/preflight-migration.ts && node node_modules/prisma/build/index.js migrate deploy && exec node dist/apps/api/src/index.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_WEB
+        value: "true"
+      - key: WEB_DIST_PATH
+        value: ../web/dist
+      - key: EMAIL_ENABLED
+        value: "false"
+      - key: VITE_EMAIL_ENABLED
+        value: "false"
+      - key: VITE_API_BASE_URL
+        value: /api/v1
+      - key: VITE_SOCKET_URL
+        value: ""
+      - key: RUN_JOBS
+        value: auto
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: DATABASE_CONNECTION_LIMIT
+        value: "2"
+      - key: BACKGROUND_DATABASE_CONNECTION_LIMIT
+        value: "1"
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: STORAGE_BUCKET
+        value: remarket-private
+      - key: JWT_SIGNING_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

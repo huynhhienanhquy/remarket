@@ -9,6 +9,7 @@
     "dev:web": "pnpm --filter @remarket/web dev",
     "dev:api": "pnpm --filter @remarket/api dev",
     "build": "pnpm -r build",
+    "build:demo": "node scripts/build-demo.mjs",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
