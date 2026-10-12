@@ -8,6 +8,10 @@ Một service phục vụ cả web, API và Socket.IO trên cùng URL. Xem
 [hướng dẫn deploy demo](docs/render-demo.md); cấu hình nằm trong `render.yaml`.
 Demo tắt gửi email, xác minh tài khoản vẫn qua admin. Database và ảnh dùng Supabase.
 
+Nếu tách frontend sang Vercel và giữ backend trên Render, xem
+[hướng dẫn Vercel + Render](docs/vercel-demo.md). Cấu hình frontend nằm trong
+`vercel.json`; API đi qua proxy để giữ phiên đăng nhập, chat kết nối đến Render.
+
 ## Chạy local
 
 Yêu cầu Node.js 22 và pnpm 11.9. Cấu hình backend trong `apps/api/.env` theo
