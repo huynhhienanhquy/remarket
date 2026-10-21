@@ -4,7 +4,7 @@ import type { Message } from "@prisma/client";
 import { CHAT_LIMITS, validateChatMessage } from "@remarket/shared";
 import type { AuthUser } from "../middleware/auth.js";
 import { enqueueOutbox } from "../outbox/outbox.js";
-import { accountLocked, emailNotVerified, notFound, productNotAvailable, validationError } from "../shared/errors.js";
+import { accountLocked, emailNotVerified, notFound, productNotAvailable, validationError, forbidden } from "../shared/errors.js";
 import { toMessage } from "../shared/dto-mappers.js";
 import { prisma } from "../utils/prisma.js";
 
@@ -69,13 +69,22 @@ export async function sendChatMessage(input: {
 
   try {
     const message = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${viewer.id} FOR SHARE`;
+      const participantIds = [conversation.buyerId, conversation.sellerId].sort();
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" IN (${participantIds[0]}, ${participantIds[1]}) ORDER BY "id" FOR SHARE`;
+      const blocked = await tx.userBlock.findFirst({ where: { OR: [
+        { blockerId: conversation.buyerId, blockedId: conversation.sellerId },
+        { blockerId: conversation.sellerId, blockedId: conversation.buyerId },
+      ] }, select: { blockerId: true } });
+      if (blocked) throw forbidden("Không thể nhắn tin giữa hai tài khoản đã chặn nhau.");
       const liveViewer = await tx.user.findUnique({
         where: { id: viewer.id },
         select: { status: true, emailVerifiedAt: true },
       });
       if (!liveViewer || liveViewer.status !== "ACTIVE") throw accountLocked();
       if (liveViewer.emailVerifiedAt === null) throw emailNotVerified();
+      const recipientId = conversation.buyerId === viewer.id ? conversation.sellerId : conversation.buyerId;
+      const recipient = await tx.user.findUnique({ where: { id: recipientId }, select: { status: true, deletedAt: true } });
+      if (!recipient || recipient.deletedAt || recipient.status !== "ACTIVE") throw forbidden("Người nhận hiện không thể nhận tin nhắn mới.");
       const thread = await tx.conversation.findUnique({ where: { id: conversationId }, select: { productId: true } });
       if (!thread) throw notFound("Không tìm thấy cuộc hội thoại này.");
       if (thread.productId) {
@@ -90,8 +99,6 @@ export async function sendChatMessage(input: {
         where: { id: conversationId },
         data: { updatedAt: new Date() },
       });
-      const recipientId =
-        conversation.buyerId === viewer.id ? conversation.sellerId : conversation.buyerId;
       await createNotification(tx, {
         data: {
           userId: recipientId,

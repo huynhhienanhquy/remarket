@@ -250,9 +250,10 @@ export async function deliverAuthEmail(event: RealtimeEvent): Promise<void> {
   const subject = purpose === "VERIFY_EMAIL" ? "Xác minh tài khoản ReMarket" : "Đặt lại mật khẩu ReMarket";
   const action = purpose === "VERIFY_EMAIL" ? "xác minh tài khoản" : "đặt lại mật khẩu";
   const url = `${env.publicWebUrl}/${route}?token=${encodeURIComponent(token)}`;
+  const links = payload.mobile === true ? `${url}\n\nMở bằng app ReMarket:\nremarket://${route}?token=${encodeURIComponent(token)}` : url;
   await sendEmail({
     to,
     subject,
-    text: `Bạn vừa yêu cầu ${action} trên ReMarket.\n\nMở liên kết sau để tiếp tục:\n${url}\n\nNếu không thực hiện yêu cầu này, bạn có thể bỏ qua email.`,
+    text: `Bạn vừa yêu cầu ${action} trên ReMarket.\n\nMở liên kết sau để tiếp tục:\n${links}\n\nNếu không thực hiện yêu cầu này, bạn có thể bỏ qua email.`,
   });
 }

@@ -14,6 +14,11 @@ Nếu tách frontend sang Vercel và giữ backend trên Render, xem
 
 ## Chạy local
 
+App Expo cho Android/iOS nằm trong `apps/mobile`. Xem [hướng dẫn mobile](apps/mobile/README.md)
+và [báo cáo cập nhật Expo](docs/expo-mobile-implementation-2026-10-14.md). Web và app
+dùng chung API, DTO và endpoint client; mobile có cả khu vực quản trị. Chạy `pnpm dev:mobile`
+với development client sau khi cấu hình API/socket URL trên thiết bị.
+
 Yêu cầu Node.js 22 và pnpm 11.9. Cấu hình backend trong `apps/api/.env` theo
 `.env.example`, gồm database và signing key riêng. Cấu hình frontend trong
 `apps/web/.env` chỉ với các giá trị công khai:

@@ -19,7 +19,7 @@ function user(id: string, fullName: string): User {
     id, fullName, email: `${id}@example.test`, passwordHash: "private-hash",
     avatarUrl: null, role: "USER", status: "ACTIVE", emailVerifiedAt: now,
     emailVerificationRequestedAt: null, phone: "0900000000", provinceCode: null,
-    defaultAddress: "Private address", joinedAt: now, lockReason: null, lockedAt: null,
+    defaultAddress: "Private address", joinedAt: now, lockReason: null, lockedAt: null, deletedAt: null,
   };
 }
 const buyer = user("buyer", "Người mua của đơn");

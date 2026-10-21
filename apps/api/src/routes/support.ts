@@ -35,6 +35,19 @@ function currentUser(req: AuthRequest): AuthUser {
   return req.user;
 }
 
+async function lockSupportUser(tx: Prisma.TransactionClient, userId: string) {
+  // Deletion takes this User lock before Order locks and scrubbing content.
+  // Keep it through commit so a previously authenticated request cannot write
+  // after deletion. Non-deleted LOCKED accounts retain access to support.
+  await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR SHARE`;
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { deletedAt: true, fullName: true, emailVerifiedAt: true },
+  });
+  if (!user || user.deletedAt !== null) throw unauthorized();
+  return user;
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
@@ -187,6 +200,10 @@ router.post(
     for (let attempt = 1; attempt <= CODE_MAX_ATTEMPTS; attempt += 1) {
       try {
         ticket = await prisma.$transaction(async (tx) => {
+          const liveUser = await lockSupportUser(tx, user.id);
+          if (liveUser.emailVerifiedAt === null && input.type !== "ACCOUNT") {
+            throw forbidden("Xác minh email để gửi yêu cầu về giao dịch.");
+          }
           if (orderId !== null) {
             await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
             const lockedOrder = await tx.order.findUnique({
@@ -258,6 +275,7 @@ router.post(
     // Reopening an owner reply to a RESOLVED ticket happens atomically with
     // appending the message (detail-project 14.4).
     const updated = await prisma.$transaction(async (tx) => {
+      const liveUser = await lockSupportUser(tx, user.id);
       const ticket = await lockSupportTicketWithOrder(tx, id);
       if (!ticket || ticket.userId !== user.id) {
         throw notFound("Không tìm thấy yêu cầu hỗ trợ này.");
@@ -286,7 +304,7 @@ router.post(
             userId: ticket.assignedAdminId,
             type: "TICKET_REPLY",
             title: "Có phản hồi mới trong yêu cầu hỗ trợ",
-            content: `Yêu cầu ${ticket.code} có phản hồi mới từ ${user.fullName}.`,
+            content: `Yêu cầu ${ticket.code} có phản hồi mới từ ${liveUser.fullName}.`,
             referenceType: "ticket",
             referenceId: ticket.id,
           },
@@ -308,6 +326,7 @@ router.post(
     if (!id) throw notFound("Không tìm thấy yêu cầu hỗ trợ này.");
 
     const updated = await prisma.$transaction(async (tx) => {
+      await lockSupportUser(tx, user.id);
       const ticket = await lockSupportTicketWithOrder(tx, id);
       if (!ticket || ticket.userId !== user.id) {
         throw notFound("Không tìm thấy yêu cầu hỗ trợ này.");

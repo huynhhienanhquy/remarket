@@ -223,6 +223,11 @@ try {
   await fill(buyer, "#chat-message", content); await click(buyer, "Gửi tin nhắn");
   await wait(buyer, `document.body.innerText.includes(${JSON.stringify(content)}) && !document.body.innerText.includes('Đang gửi…')`, "chat persisted");
   await wait(seller, `document.body.innerText.includes(${JSON.stringify(content)})`, "chat received");
+  // A notification event can refetch REST history before the message event is relayed.
+  // Keep the WebSocket assertion, but wait for that specific frame rather than assuming DOM timing proves it arrived.
+  for (let attempt = 0; attempt < 100 && !seller.frames.some(frame => frame.includes('message:created') && frame.includes(content)); attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   assert(seller.frames.some(frame => frame.includes('message:created') && frame.includes(content)), 'Message must arrive over an actual WebSocket event');
   await wait(buyer, "document.body.innerText.includes('Đã xem')", "read receipt");
   await screenshot(seller, "chat-live-received"); console.log("PASS: two-session live chat and read receipt");

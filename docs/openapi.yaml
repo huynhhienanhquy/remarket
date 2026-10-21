@@ -115,6 +115,170 @@ x-operation-error-codes:
   adminReplyTicket: *AdminOperationErrors
   adminAudit: *AdminOperationErrors
   adminCancelOrder: *AdminOperationErrors
+  mobileRegister:
+    - VALIDATION_ERROR
+    - RATE_LIMITED
+    - INTERNAL
+  mobileLogin:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileRefreshSession:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - SESSION_EXPIRED
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileBootstrapSession:
+    - VALIDATION_ERROR
+    - FORBIDDEN
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileGetSession:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  mobileLogout:
+    - VALIDATION_ERROR
+    - FORBIDDEN
+    - SESSION_CHANGED
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileLogoutAll:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - FORBIDDEN
+    - SESSION_CHANGED
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileVerifyEmail:
+    - VALIDATION_ERROR
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  mobileGetEmailVerificationRequest:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  mobileRequestEmailVerification:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - FORBIDDEN
+    - EMAIL_NOT_VERIFIED
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - INVALID_ORDER_TRANSITION
+    - VERSION_CONFLICT
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileResendVerification:
+    - VALIDATION_ERROR
+    - RATE_LIMITED
+    - INTERNAL
+  mobileForgotPassword:
+    - VALIDATION_ERROR
+    - RATE_LIMITED
+    - INTERNAL
+  mobileResetPassword:
+    - VALIDATION_ERROR
+    - RATE_LIMITED
+    - INTERNAL
+  mobileUpdateProfile:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - FORBIDDEN
+    - EMAIL_NOT_VERIFIED
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - INVALID_ORDER_TRANSITION
+    - VERSION_CONFLICT
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  mobileUpdateAvatar:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - SESSION_EXPIRED
+    - FORBIDDEN
+    - EMAIL_NOT_VERIFIED
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - INVALID_ORDER_TRANSITION
+    - VERSION_CONFLICT
+    - RETRY_LATER
+    - RATE_LIMITED
+    - INTERNAL
+  listUserBlocks:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  blockUser:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  unblockUser:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  registerPushDevice:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  unregisterPushDevice:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+  deleteOwnAccount:
+    - VALIDATION_ERROR
+    - UNAUTHORIZED
+    - FORBIDDEN
+    - ACCOUNT_LOCKED
+    - NOT_FOUND
+    - RATE_LIMITED
+    - INTERNAL
+    - ACCOUNT_DELETION_PENDING
+
+  refreshOwnUploadPreview: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, RATE_LIMITED, INTERNAL]
 paths:
   /auth/register:
     post: { tags: [Auth], operationId: register, requestBody: { $ref: '#/components/requestBodies/RegisterBody' }, responses: { '201': { $ref: '#/components/responses/RegisterSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
@@ -399,6 +563,578 @@ paths:
     get: { tags: [Admin], operationId: adminAudit, security: [{ bearerAuth: [] }], parameters: [{ name: action, in: query, schema: { type: string, maxLength: 100 } }, { name: entity_type, in: query, schema: { type: string, maxLength: 50 } }, { name: entity_id, in: query, schema: { type: string } }, { name: actor_id, in: query, schema: { type: string } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AuditLogListSuccess' } } }
   /admin/orders/{id}/cancel:
     post: { tags: [Admin], operationId: adminCancelOrder, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminOrderCancelBody' }, responses: { '200': { $ref: '#/components/responses/AdminOrderCancelSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
+
+  /auth/mobile/register:
+    post:
+      tags:
+        - Auth
+      operationId: mobileRegister
+      requestBody:
+        $ref: "#/components/requestBodies/RegisterBody"
+      responses:
+        "201":
+          $ref: "#/components/responses/RegisterSuccess"
+        "422":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/login:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileLogin
+      requestBody:
+        $ref: "#/components/requestBodies/LoginBody"
+      responses:
+        "200":
+          description: Native session credentials; never emits a cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - access_token
+                          - refresh_token
+                          - user
+                        properties:
+                          access_token:
+                            type: string
+                          refresh_token:
+                            type: string
+                            pattern: ^[A-Za-z0-9_-]{43}$
+                          user:
+                            $ref: "#/components/schemas/SessionUser"
+        "401":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/refresh:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileRefreshSession
+      responses:
+        "200":
+          description: Native session credentials; never emits a cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - access_token
+                          - refresh_token
+                          - user
+                        properties:
+                          access_token:
+                            type: string
+                          refresh_token:
+                            type: string
+                            pattern: ^[A-Za-z0-9_-]{43}$
+                          user:
+                            $ref: "#/components/schemas/SessionUser"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                refresh_token:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{43}$
+  /auth/mobile/bootstrap:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileBootstrapSession
+      responses:
+        "200":
+          $ref: "#/components/responses/BootstrapSuccess"
+        "403":
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                refresh_token:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{43}$
+  /auth/mobile/me:
+    get:
+      tags:
+        - Auth
+      operationId: mobileGetSession
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/SessionUserSuccess"
+        "401":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/logout:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileLogout
+      description: Trusted-Origin idempotent logout using the refresh cookie or
+        bearer. A mismatched live bearer/cookie session returns 409 without
+        clearing credentials.
+      responses:
+        "200":
+          $ref: "#/components/responses/AckSuccess"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                refresh_token:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{43}$
+  /auth/mobile/logout-all:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileLogoutAll
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/AckSuccess"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/verify-email:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileVerifyEmail
+      description: Consumes a legacy one-time mailbox token and submits an admin
+        approval request. Opens a session but does NOT mark email verified.
+      requestBody:
+        $ref: "#/components/requestBodies/TokenBody"
+      responses:
+        "200":
+          description: Native session credentials; never emits a cookie
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - access_token
+                          - refresh_token
+                          - user
+                        properties:
+                          access_token:
+                            type: string
+                          refresh_token:
+                            type: string
+                            pattern: ^[A-Za-z0-9_-]{43}$
+                          user:
+                            $ref: "#/components/schemas/SessionUser"
+        "403":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/email-verification-request:
+    get:
+      tags:
+        - Auth
+      operationId: mobileGetEmailVerificationRequest
+      security:
+        - bearerAuth: []
+      description: Own request only; null when no request exists. Never accepts a
+        target email or user ID.
+      responses:
+        "200":
+          $ref: "#/components/responses/EmailVerificationSuccess"
+        "401":
+          $ref: "#/components/responses/Error"
+    post:
+      tags:
+        - Auth
+      operationId: mobileRequestEmailVerification
+      security:
+        - bearerAuth: []
+      description: ACTIVE account submits its immutable email for admin approval.
+        Idempotent retries, no self-verification. Limit 3 per account per hour;
+        trusted Origin required in production. Frontend returns home on success.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              example: {}
+      responses:
+        "200":
+          $ref: "#/components/responses/EmailVerificationSuccess"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/resend-verification:
+    post:
+      tags:
+        - Auth
+      operationId: mobileResendVerification
+      requestBody:
+        $ref: "#/components/requestBodies/ResendVerificationBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/VerificationResendSuccess"
+  /auth/mobile/forgot-password:
+    post:
+      tags:
+        - Auth
+      operationId: mobileForgotPassword
+      requestBody:
+        $ref: "#/components/requestBodies/EmailBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/AcceptedSuccess"
+  /auth/mobile/reset-password:
+    parameters:
+      - name: X-Session-Scope
+        in: header
+        required: false
+        description: Non-secret UUID selecting this tab's HttpOnly refresh cookie. Omit
+          only for legacy shared-cookie clients. Invalid values return 422.
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+    post:
+      tags:
+        - Auth
+      operationId: mobileResetPassword
+      requestBody:
+        $ref: "#/components/requestBodies/ResetPasswordBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/AcceptedSuccess"
+        "422":
+          $ref: "#/components/responses/Error"
+  /auth/mobile/profile:
+    patch:
+      tags:
+        - Auth
+      operationId: mobileUpdateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/ProfileBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SessionUserSuccess"
+  /auth/mobile/avatar:
+    patch:
+      tags:
+        - Auth
+      operationId: mobileUpdateAvatar
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/AvatarBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SessionUserSuccess"
+
+  /mobile/blocks:
+    get:
+      operationId: listUserBlocks
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - user_ids
+                          - users
+                        properties:
+                          user_ids:
+                            type: array
+                            items:
+                              type: string
+                          users:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - id
+                                - name
+                              properties:
+                                id:
+                                  type: string
+                                name:
+                                  type: string
+  /mobile/blocks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    put:
+      operationId: blockUser
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - blocked
+                        properties:
+                          blocked: &a1
+                            type: boolean
+    delete:
+      operationId: unblockUser
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - blocked
+                        properties:
+                          blocked: *a1
+  /mobile/push-registration:
+    put:
+      operationId: registerPushDevice
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - installation_id
+                - token
+                - platform
+              additionalProperties: false
+              properties:
+                installation_id:
+                  type: string
+                  format: uuid
+                token:
+                  type: string
+                platform:
+                  type: string
+                  enum:
+                    - ios
+                    - android
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - registered
+                        properties:
+                          registered: *a1
+    delete:
+      operationId: unregisterPushDevice
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - registered
+                        properties:
+                          registered: *a1
+  /mobile/delete-account:
+    post:
+      operationId: deleteOwnAccount
+      tags:
+        - Mobile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              additionalProperties: false
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required:
+                          - deleted
+                        properties:
+                          deleted: *a1
+
+  /uploads/{filename}/preview-url:
+    parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - Marketplace
+      operationId: refreshOwnUploadPreview
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/UploadSuccess"
 
 components:
   securitySchemes:
@@ -1637,6 +2373,7 @@ components:
         - RATE_LIMITED
         - SESSION_EXPIRED
         - SESSION_CHANGED
+        - ACCOUNT_DELETION_PENDING
         - INTERNAL
       example: VERSION_CONFLICT
     ErrorEnvelope:

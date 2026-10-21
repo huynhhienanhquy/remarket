@@ -123,6 +123,7 @@ router.post(
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} FOR UPDATE`;
       const target = await tx.user.findUnique({ where: { id } });
       if (!target) throw notFound("Không tìm thấy người dùng này.");
+      if (target.deletedAt) throw notFound("Tài khoản đã được xóa.");
       const user = await tx.user.update({
         where: { id: target.id },
         data: { status: "ACTIVE", lockReason: null, lockedAt: null },

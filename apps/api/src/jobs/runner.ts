@@ -5,6 +5,7 @@ import { enqueueOutbox, processOutboxBatch } from "../outbox/outbox.js";
 import { deliverAuthEmail } from "../services/email.js";
 import { deleteStorageObject } from "../services/storage.js";
 import { cleanupExpiredRecords } from "./retention.js";
+import { deliverMobilePush } from "./push.js";
 
 const BATCH_SIZE = 50;
 const CONFIRMED_REMINDER_MS = 72 * 60 * 60 * 1000;
@@ -163,6 +164,7 @@ export async function runJobsOnce(): Promise<void> {
     await cleanupOrphanUploads();
     await cleanupExpiredRecords();
     await drainOutbox();
+    await deliverMobilePush();
     snapshot.last_success_at = new Date().toISOString();
     snapshot.last_error = null;
   } catch (error) {

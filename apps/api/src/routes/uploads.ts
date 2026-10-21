@@ -237,6 +237,14 @@ const router = Router();
 // visibility checks for public product/avatar images.
 
 // POST /api/v1/uploads — multipart/form-data with `file` + `purpose`.
+router.get("/:filename/preview-url", authMiddleware, asyncHandler(async (req: AuthRequest, res) => {
+  const filename = req.params.filename;
+  if (typeof filename !== "string" || !/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(filename)) throw notFound();
+  const asset = await prisma.uploadAsset.findFirst({ where: { userId: req.user!.id, storagePath: { endsWith: `/${filename}` } }, select: { storagePath: true } });
+  if (!asset) throw notFound("Không tìm thấy ảnh của tài khoản này.");
+  ok(res, { storage_path: asset.storagePath, url: createPrivateStorageUrl(asset.storagePath) });
+}));
+
 router.post(
   "/",
   authMiddleware,

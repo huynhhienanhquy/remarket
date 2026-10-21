@@ -46,7 +46,7 @@ function retryDelayMs(attempts: number): number {
   return Math.min(60 * 60 * 1000, 1000 * 2 ** Math.min(attempts, 12));
 }
 
-/** Claims rows with a DB lease so multiple worker processes cannot double-send. */
+/** Dispatch with renewable DB leases and ownership checks across workers. */
 export async function processOutboxBatch(
   publish: OutboxPublisher,
   batchSize = 50,
@@ -78,43 +78,72 @@ export async function processOutboxBatch(
     WHERE event."id" = candidates."id"
     RETURNING event."id", event."eventType", event."aggregateId", event."payload", event."attempts"
   `;
+  if (rows.length === 0) return 0;
 
-  for (const row of rows) {
-    try {
-      await publish({
-        eventType: row.eventType,
-        aggregateId: row.aggregateId,
-        payload: row.payload,
-      });
-      await client.$transaction(async (tx) => {
-        // Sequence allocation is serialized THROUGH COMMIT. A bare sequence
-        // does not order commits: another worker could commit a higher value
-        // while this transaction is still invisible to the relay.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':outbox-relay-sequence', 0))`;
-        await tx.$executeRaw`
-          UPDATE "OutboxEvent"
-          SET "processedAt" = NOW(), "relaySequence" = nextval('"OutboxRelaySequence"'),
-              "lockedAt" = NULL, "lockId" = NULL, "lastError" = NULL
-          WHERE "id" = ${row.id} AND "lockId" = ${lockId} AND "processedAt" IS NULL
-        `;
-      });
-    } catch (error) {
-      const attempts = row.attempts + 1;
-      const message = error instanceof Error ? error.message : "Unknown outbox error";
-      await client.outboxEvent.updateMany({
-        where: { id: row.id, lockId },
-        data: {
-          attempts,
-          nextAttemptAt: new Date(Date.now() + retryDelayMs(attempts)),
-          lockedAt: null,
-          lockId: null,
-          lastError: message.slice(0, 2000),
-        },
-      });
-      if (attempts >= MAX_ATTEMPTS) {
-        console.error(`Outbox event ${row.id} (${row.eventType}) reached the retry limit.`);
+  // Renew ALL outstanding claims, including rows still waiting behind a slow
+  // publisher. The original lease starts at batch claim time, not dispatch.
+  let renewal: Promise<void> | null = null;
+  let renewalError: unknown;
+  const heartbeat = setInterval(() => {
+    if (renewal) return;
+    renewal = client.outboxEvent.updateMany({
+      where: { lockId, processedAt: null },
+      data: { lockedAt: new Date() },
+    }).then(() => undefined).catch((error: unknown) => {
+      renewalError = error;
+    }).finally(() => { renewal = null; });
+  }, LEASE_MS / 3);
+  heartbeat.unref();
+
+  try {
+    for (const row of rows) {
+      if (renewalError) throw renewalError;
+      try {
+        // A worker that resumes after losing its lease must not publish rows
+        // reclaimed by another worker. Refresh and verify ownership atomically.
+        const owned = await client.outboxEvent.updateMany({
+          where: { id: row.id, lockId, processedAt: null },
+          data: { lockedAt: new Date() },
+        });
+        if (owned.count !== 1) continue;
+        await publish({
+          eventType: row.eventType,
+          aggregateId: row.aggregateId,
+          payload: row.payload,
+        });
+        await client.$transaction(async (tx) => {
+          // Sequence allocation is serialized THROUGH COMMIT. A bare sequence
+          // does not order commits: another worker could commit a higher value
+          // while this transaction is still invisible to the relay.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':outbox-relay-sequence', 0))`;
+          await tx.$executeRaw`
+            UPDATE "OutboxEvent"
+            SET "processedAt" = NOW(), "relaySequence" = nextval('"OutboxRelaySequence"'),
+                "lockedAt" = NULL, "lockId" = NULL, "lastError" = NULL
+            WHERE "id" = ${row.id} AND "lockId" = ${lockId} AND "processedAt" IS NULL
+          `;
+        });
+      } catch (error) {
+        const attempts = row.attempts + 1;
+        const message = error instanceof Error ? error.message : "Unknown outbox error";
+        await client.outboxEvent.updateMany({
+          where: { id: row.id, lockId },
+          data: {
+            attempts,
+            nextAttemptAt: new Date(Date.now() + retryDelayMs(attempts)),
+            lockedAt: null,
+            lockId: null,
+            lastError: message.slice(0, 2000),
+          },
+        });
+        if (attempts >= MAX_ATTEMPTS) {
+          console.error(`Outbox event ${row.id} (${row.eventType}) reached the retry limit.`);
+        }
       }
     }
+  } finally {
+    clearInterval(heartbeat);
+    await renewal;
   }
 
   return rows.length;

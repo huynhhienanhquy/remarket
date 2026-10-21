@@ -114,7 +114,7 @@ export async function applyOrderAction(
   input: OrderActionInput,
   actor: AuthUser,
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  const failure = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${actor.id} FOR SHARE`;
     const liveActor = await tx.user.findUnique({
       where: { id: actor.id },
@@ -148,6 +148,11 @@ export async function applyOrderAction(
         if (order.expiresAt !== null && order.expiresAt.getTime() <= now.getTime()) {
           throw orderExpired();
         }
+        if (order.version !== input.expected_version) {
+          throw versionConflict("Đơn hàng đã thay đổi ở phiên bản khác. Vui lòng tải lại.", {
+            current_version: order.version,
+          });
+        }
 
         /* the reservation must still be intact (11.1) */
         const products = await tx.product.findMany({
@@ -168,7 +173,20 @@ export async function applyOrderAction(
           if (!valid) reservationOk = false;
         }
         if (!reservationOk) {
-          throw new AppError(
+          const cancelled = await cancelOrder(tx, order, {
+            reason: "PRODUCT_NOT_AVAILABLE", at: now, expectedVersion: input.expected_version,
+            actor: { type: "SYSTEM", name: "Hệ thống" },
+            eventKey: `order:${order.id}:status:CANCELLED`,
+            notification: {
+              title: "Đơn hàng đã bị hủy",
+              content: `Đơn #${order.code} đã hủy vì món đồ không còn khả dụng.`,
+              key: (userId) => `order:${order.id}:unavailable:${userId}`,
+            },
+          });
+          if (!cancelled) throw versionConflict();
+          // Return the failure and throw only AFTER committing cancellation
+          // and releasing reservations; throwing here would undo the cleanup.
+          return new AppError(
             API_ERROR_CODES.PRODUCT_NOT_AVAILABLE,
             "Món đồ trong đơn không còn khả dụng.",
             409,
@@ -326,4 +344,5 @@ export async function applyOrderAction(
       }
     }
   });
+  if (failure) throw failure;
 }

@@ -48,14 +48,14 @@ function sendAuthError(res: Response, code: string, message: string, status: num
 async function loadUser(sessionId: string, userId: string): Promise<{ user: AuthUser; profile: SessionProfile } | null> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    select: { userId: true, revokedAt: true, expiresAt: true, user: { select: sessionProfileSelect } },
+    select: { userId: true, revokedAt: true, expiresAt: true, user: { select: { ...sessionProfileSelect, deletedAt: true } } },
   });
   const user = session?.user;
 
   if (!session || session.userId !== userId) return null;
   if (session.revokedAt !== null) return null;
   if (session.expiresAt.getTime() <= Date.now()) return null;
-  if (!user) return null;
+  if (!user || user.deletedAt) return null;
 
   return {
     user: {

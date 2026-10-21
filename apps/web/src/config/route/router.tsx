@@ -35,6 +35,7 @@ const ConversationPage = lazy(() => import("../../pages/ConversationPage/Convers
 const SupportListPage = lazy(() => import("../../pages/SupportListPage/SupportListPage").then((m) => ({ default: m.SupportListPage })));
 const SupportNewPage = lazy(() => import("../../pages/SupportNewPage/SupportNewPage").then((m) => ({ default: m.SupportNewPage })));
 const SupportTicketPage = lazy(() => import("../../pages/SupportTicketPage/SupportTicketPage").then((m) => ({ default: m.SupportTicketPage })));
+const AccountDeletionPage = lazy(() => import("../../pages/AccountDeletionPage/AccountDeletionPage").then((m) => ({ default: m.AccountDeletionPage })));
 const AdminDashboardPage = lazy(() => import("../../pages/AdminDashboardPage/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })));
 const AdminUsersPage = lazy(() => import("../../pages/AdminUsersPage/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })));
 const AdminEmailVerificationsPage = lazy(() => import("../../pages/AdminEmailVerificationsPage/AdminEmailVerificationsPage").then((m) => ({ default: m.AdminEmailVerificationsPage })));
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
           { path: "products", element: <SearchPage /> },
           { path: "products/:id", element: <ProductDetailPage /> },
           { path: "users/:id", element: <SellerProfilePage /> },
+          { path: "delete-account", element: <AccountDeletionPage /> },
           { path: "403", element: <ForbiddenBody /> },
           { path: "404", element: <NotFoundBody /> },
           { path: "*", element: <NotFoundBody /> },

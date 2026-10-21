@@ -14,6 +14,7 @@ export async function createEmailToken(
     purpose: "VERIFY_EMAIL" | "RESET_PASSWORD";
     ttlMs: number;
     token: string;
+    mobile?: boolean;
   },
 ): Promise<void> {
   if (!env.emailEnabled) return;
@@ -35,6 +36,7 @@ export async function createEmailToken(
       purpose: input.purpose,
       token_id: created.id,
       sealed_token: sealEmailToken(input.token),
+      ...(input.mobile ? { mobile: true } : {}),
     });
   }
 }
@@ -45,11 +47,12 @@ export async function issueEmailToken(
   purpose: "VERIFY_EMAIL" | "RESET_PASSWORD",
   ttlMs: number,
   label: string,
+  mobile = false,
 ): Promise<void> {
   const token = newEmailToken();
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
-    await createEmailToken(tx, { userId, recipient, purpose, ttlMs, token });
+    await createEmailToken(tx, { userId, recipient, purpose, ttlMs, token, mobile });
   });
 
   // Non-production environments also surface the token for manual testing.

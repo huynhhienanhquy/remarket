@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@remarket/api-client": "workspace:*",
     "@remarket/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.7",
     "react": "^19.1.0",

@@ -14,7 +14,7 @@ export interface IssuedSession {
  * or neither does. Also accepts an existing transaction (email verification).
  * No raw token is persisted, and no JWT is issued before persistence succeeds.
  */
-export async function createSession(tx: Prisma.TransactionClient, userId: string): Promise<IssuedSession> {
+export async function createSession(tx: Prisma.TransactionClient, userId: string, transport: "WEB" | "MOBILE" = "WEB"): Promise<IssuedSession> {
   const sessionId = randomUUID();
   const tokenId = randomUUID();
   const refreshToken = newRefreshToken();
@@ -23,8 +23,8 @@ export async function createSession(tx: Prisma.TransactionClient, userId: string
   const expiresAt = new Date(now.getTime() + env.refreshTtlDays * 24 * 60 * 60 * 1000);
   const inserted = await tx.$executeRaw`
     WITH issued AS (
-      INSERT INTO "Session" ("id", "userId", "refreshHash", "expiresAt", "lastUsedAt")
-      VALUES (${sessionId}, ${userId}, ${refreshHash}, ${expiresAt}, ${now})
+      INSERT INTO "Session" ("id", "userId", "refreshHash", "expiresAt", "lastUsedAt", "transport")
+      VALUES (${sessionId}, ${userId}, ${refreshHash}, ${expiresAt}, ${now}, ${transport})
       RETURNING "id"
     )
     INSERT INTO "AuthToken" ("id", "userId", "sessionId", "purpose", "tokenHash", "expiresAt")

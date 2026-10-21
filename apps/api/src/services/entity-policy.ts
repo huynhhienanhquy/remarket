@@ -108,7 +108,7 @@ export function orderAllowedActions(
         break;
       case "CONFIRMED":
         if (order.deliveryMethod === "MEETUP") add("deliver");
-        else add("cancel");
+        add("cancel");
         break;
       case "SHIPPING":
         if (order.deliveryMethod === "COD") add("deliver");

@@ -137,6 +137,10 @@ model User {
   joinedAt               DateTime  @default(now())
   lockReason             String?
   lockedAt               DateTime?
+  deletedAt              DateTime?
+  blockedUsers           UserBlock[] @relation("BlockOwner")
+  blockedBy              UserBlock[] @relation("BlockTarget")
+  pushRegistrations      PushRegistration[]
 
   // Relations
   products               Product[]
@@ -176,6 +180,8 @@ model User {
 /// in an httpOnly cookie, and only its SHA-256 lands here (detail-project 5).
 model Session {
   id              String    @id @default(uuid())
+  transport       String    @default("WEB")
+  pushRegistrations PushRegistration[]
   userId          String
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// SHA-256 of the current refresh token.
@@ -558,6 +564,7 @@ model Notification {
   dedupeKey      String?
   readAt         DateTime?
   createdAt      DateTime         @default(now())
+  pushDeliveries PushDelivery[]
 
   @@unique([userId, dedupeKey])
   @@index([userId])
@@ -694,4 +701,47 @@ model WorkerHeartbeat {
   lastSuccessAt DateTime?
   lastError     String?
   updatedAt     DateTime @updatedAt
+}
+
+model UserBlock {
+  blockerId String
+  blockedId String
+  blocker User @relation("BlockOwner", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model PushRegistration {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  installationId String
+  token String @unique
+  platform String
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deliveries PushDelivery[]
+  @@unique([userId, installationId])
+  @@index([userId, enabled])
+}
+
+model PushDelivery {
+  id String @id @default(uuid())
+  notificationId String
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  registrationId String
+  registration PushRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  status String @default("PENDING")
+  attempts Int @default(0)
+  ticketId String?
+  lastError String?
+  nextAttemptAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@unique([notificationId, registrationId])
+  @@index([status, nextAttemptAt])
 }

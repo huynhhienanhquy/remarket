@@ -5,6 +5,7 @@ const client = vi.hoisted(() => ({
   session: { findUnique: vi.fn() }, user: { findUnique: vi.fn() },
   conversation: { findUnique: vi.fn(), update: vi.fn() },
   product: { findUnique: vi.fn() },
+  userBlock: { findFirst: vi.fn() },
   message: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn(), create: vi.fn() },
   outboxEvent: { createMany: vi.fn() },
   outboxDedupeKey: { createManyAndReturn: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
@@ -23,9 +24,20 @@ beforeEach(() => {
   client.conversation.findUnique.mockResolvedValue({ buyerId: user.id, sellerId: "seller", productId: "product" });
   client.user.findUnique.mockResolvedValue(user);
   client.message.findUnique.mockResolvedValue(null);
+  client.userBlock.findFirst.mockResolvedValue(null);
   client.$transaction.mockImplementation(async (action: (tx: typeof client) => unknown) => action(client));
 });
 describe("conversation access and delivery", () => {
+  it("does not create messages for a deleted or locked recipient", async () => {
+    client.user.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === user.id ? user : { status: "LOCKED", deletedAt: new Date() });
+    await expect(sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "deleted-recipient", content: "Xin chào" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(client.message.create).not.toHaveBeenCalled();
+  });
+  it("rejects new messages when either participant has blocked the other", async () => {
+    client.userBlock.findFirst.mockResolvedValue({ blockerId: "seller" });
+    await expect(sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "blocked-message", content: "Xin chào" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(client.message.create).not.toHaveBeenCalled();
+  });
   it.each([0, 104])("returns the aggregate unread count %i using the static route", async (count) => {
     client.message.count.mockResolvedValue(count);
     const response = await request(createApp()).get("/api/v1/conversations/unread-count")

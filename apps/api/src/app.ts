@@ -28,6 +28,8 @@ import { notificationsRouter } from "./routes/notifications.js";
 import { supportRouter } from "./routes/support.js";
 import { usersRouter } from "./routes/profiles.js";
 import { adminRouter } from "./routes/admin.js";
+import { nativeAuthOnly } from "./services/auth-transport.js";
+import { mobileRouter } from "./routes/mobile.js";
 
 /**
  * Express app (detail-project 3). Middleware order matters:
@@ -109,6 +111,7 @@ export function createApp(options: { webRoot?: string } = {}): express.Express {
   const api = express.Router();
 
   // Public
+  api.use("/auth/mobile", nativeAuthOnly, authRouter);
   api.use("/auth", authRouter);
   api.use("/categories", categoriesRouter);
   api.use("/provinces", provincesRouter);
@@ -120,6 +123,7 @@ export function createApp(options: { webRoot?: string } = {}): express.Express {
 
   // Authenticated
   api.use("/favorites", authMiddleware, favoritesRouter);
+  api.use("/mobile", authMiddleware, mobileRouter);
   api.use("/cart", authMiddleware, cartRouter);
   api.use("/checkout", authMiddleware, checkoutRouter);
   api.use("/orders", authMiddleware, ordersRouter);

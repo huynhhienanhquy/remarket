@@ -3047,6 +3047,7 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         "RATE_LIMITED",
         "SESSION_EXPIRED",
         "SESSION_CHANGED",
+        "ACCOUNT_DELETION_PENDING",
         "INTERNAL"
       ]
     },
@@ -5114,6 +5115,672 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
                   "version": {
                     "type": "integer",
                     "minimum": 2
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/register",
+      "method": "POST",
+      "status": 201,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "pending_verification",
+                  "email"
+                ],
+                "properties": {
+                  "pending_verification": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/login",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "access_token",
+                  "refresh_token",
+                  "user"
+                ],
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "user": {
+                    "$ref": "#/components/schemas/SessionUser"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/refresh",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "access_token",
+                  "refresh_token",
+                  "user"
+                ],
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "user": {
+                    "$ref": "#/components/schemas/SessionUser"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/bootstrap",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "user",
+                  "access_token"
+                ],
+                "properties": {
+                  "user": {
+                    "nullable": true,
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/SessionUser"
+                      }
+                    ]
+                  },
+                  "access_token": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/me",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/SessionUser"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/logout",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "ok"
+                ],
+                "properties": {
+                  "ok": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/logout-all",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "ok"
+                ],
+                "properties": {
+                  "ok": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/verify-email",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "access_token",
+                  "refresh_token",
+                  "user"
+                ],
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  },
+                  "user": {
+                    "$ref": "#/components/schemas/SessionUser"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/email-verification-request",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/EmailVerificationRequest"
+                  }
+                ],
+                "nullable": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/email-verification-request",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/EmailVerificationRequest"
+                  }
+                ],
+                "nullable": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/resend-verification",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "retry_after": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/forgot-password",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "accepted"
+                ],
+                "properties": {
+                  "accepted": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/reset-password",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "accepted"
+                ],
+                "properties": {
+                  "accepted": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/profile",
+      "method": "PATCH",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/SessionUser"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/auth/mobile/avatar",
+      "method": "PATCH",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/SessionUser"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/blocks",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "user_ids",
+                  "users"
+                ],
+                "properties": {
+                  "user_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "users": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/blocks/{id}",
+      "method": "PUT",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "blocked"
+                ],
+                "properties": {
+                  "blocked": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/blocks/{id}",
+      "method": "DELETE",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "blocked"
+                ],
+                "properties": {
+                  "blocked": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/push-registration",
+      "method": "PUT",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "registered"
+                ],
+                "properties": {
+                  "registered": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/push-registration",
+      "method": "DELETE",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "registered"
+                ],
+                "properties": {
+                  "registered": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/mobile/delete-account",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "deleted"
+                ],
+                "properties": {
+                  "deleted": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/uploads/{filename}/preview-url",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "storage_path",
+                  "url"
+                ],
+                "properties": {
+                  "storage_path": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
                   }
                 }
               }

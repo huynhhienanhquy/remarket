@@ -53,7 +53,7 @@ async function identityFromToken(token: string): Promise<SocketIdentity | null> 
   if (
     !session ||
     session.userId !== claims.userId ||
-    session.revokedAt !== null ||
+    session.revokedAt !== null || !!session.user.deletedAt ||
     session.expiresAt <= new Date()
   ) return null;
   return {
@@ -75,7 +75,7 @@ async function refreshIdentity(identity: SocketIdentity): Promise<SocketIdentity
     where: { id: identity.sessionId },
     include: { user: true },
   });
-  if (!session || session.revokedAt !== null || session.expiresAt <= new Date()) return null;
+  if (!session || session.user.deletedAt || session.revokedAt !== null || session.expiresAt <= new Date()) return null;
   return {
     sessionId: session.id,
     expiresAt: Math.min(identity.expiresAt, session.expiresAt.getTime()),

@@ -67,7 +67,7 @@ export async function blockProduct(
           type: "ORDER_PROBLEM",
           status: "OPEN",
         },
-        update: {},
+        update: { status: "OPEN", resolvedAt: null, closedAt: null, resolutionNote: null },
       });
       escalatedOrders += 1;
       continue;
@@ -175,7 +175,7 @@ export async function lockUser(
           type: "ORDER_PROBLEM",
           status: "OPEN",
         },
-        update: {},
+        update: { status: "OPEN", resolvedAt: null, closedAt: null, resolutionNote: null },
       });
       escalatedOrders += 1;
       continue;

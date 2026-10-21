@@ -17,7 +17,7 @@ const baseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 assert.ok(baseUrl, "Configure a PostgreSQL URL before isolated verification");
 const isolatedUrl = new URL(baseUrl);
 isolatedUrl.searchParams.set("schema", schema);
-isolatedUrl.searchParams.set("connection_limit", "5");
+isolatedUrl.searchParams.set("connection_limit", process.argv.includes("--mobile-only") || process.argv.includes("--storage-only") ? "1" : "5");
 const admin = new PrismaClient({ datasources: { db: { url: baseUrl } } });
 const isolated = new PrismaClient({ datasources: { db: { url: isolatedUrl.toString() } } });
 const services = [];
@@ -29,6 +29,7 @@ const childEnv = {
   BACKGROUND_DATABASE_URL: isolatedUrl.toString(),
   TEST_DATABASE_URL: isolatedUrl.toString(), DATABASE_USE_DIRECT_URL: "false",
   DATABASE_TRANSACTION_TIMEOUT_MS: "120000", DATABASE_TRANSACTION_MAX_WAIT_MS: "60000",
+  ...(process.argv.includes("--mobile-only") || process.argv.includes("--storage-only") ? { DATABASE_CONNECTION_LIMIT: "1", BACKGROUND_DATABASE_CONNECTION_LIMIT: "1" } : {}),
   JWT_SIGNING_KEY: randomUUID() + randomUUID(), JWT_SECRET: undefined,
   TEST_ACCOUNT_PASSWORD: randomUUID() + randomUUID(),
   SMOKE_WEB_URL: "http://127.0.0.1:5321",
@@ -78,7 +79,7 @@ try {
   // normal prisma:deploy keeps its deployment lock.
   await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"], apiDir, { PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" });
   if (process.argv.includes("--query-plans")) await run("tsx/cli", ["scripts/verify-query-plans.ts"]);
-  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--storage-only") ? "tests/integration/shared-storage.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--mobile-only") ? "tests/integration/mobile.test.ts" : process.argv.includes("--storage-only") ? "tests/integration/shared-storage.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
   if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only") || process.argv.includes("--auth-browser")) {
     await run("tsx/cli", ["tests/fixtures/browser-seed.ts"]);
   }

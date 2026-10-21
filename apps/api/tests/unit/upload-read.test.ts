@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const client = vi.hoisted(() => ({ uploadAsset: { findFirst: vi.fn() }, session: { findUnique: vi.fn() } }));
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
 import { createApp } from "../../src/app.js";
+import { signAccessToken } from "../../src/shared/tokens.js";
 import { createPrivateStorageUrl, createPublicStorageUrl, deleteStorageObject, putStorageObject } from "../../src/services/storage.js";
 
 const app = createApp();
@@ -16,6 +17,19 @@ beforeAll(async () => {
 afterAll(() => deleteStorageObject(storagePath));
 beforeEach(() => vi.resetAllMocks());
 describe("bounded signed image reads", () => {
+  it("renews an expired owner's preview capability after rechecking ownership", async () => {
+    client.session.findUnique.mockResolvedValue({ userId: "owner", revokedAt: null, expiresAt: new Date(Date.now() + 60_000), user: { id: "owner", role: "USER", status: "ACTIVE" } });
+    client.uploadAsset.findFirst.mockResolvedValue({ storagePath });
+    const filename = storagePath.split("/").at(-1)!;
+    const response = await request(app).get(`/api/v1/uploads/${filename}/preview-url`).set("Authorization", `Bearer ${signAccessToken("owner", "session")}`).expect(200);
+    expect(response.body.data.url).toContain("signature=");
+    expect(client.uploadAsset.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "owner", storagePath: { endsWith: `/${filename}` } } }));
+  });
+  it("does not issue another account's preview capability", async () => {
+    client.session.findUnique.mockResolvedValue({ userId: "owner", revokedAt: null, expiresAt: new Date(Date.now() + 60_000), user: { id: "owner", role: "USER", status: "ACTIVE" } });
+    client.uploadAsset.findFirst.mockResolvedValue(null);
+    await request(app).get(`/api/v1/uploads/${storagePath.split("/").at(-1)}/preview-url`).set("Authorization", `Bearer ${signAccessToken("owner", "session")}`).expect(404);
+  });
   it("serves a private preview without DB metadata/session reads", async () => {
     const response = await request(app).get(createPrivateStorageUrl(storagePath)).set("Authorization", "Bearer invalid").expect(200);
     expect(response.headers["content-type"]).toContain("image/png");

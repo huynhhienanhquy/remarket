@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { env } from "../config/env.js";
 import { forbidden, validationError } from "../shared/errors.js";
+import { authTransport, readNativeRefresh, nativeAuthOnly } from "./auth-transport.js";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -19,6 +20,10 @@ export function refreshCookieName(req: Request): string {
 }
 
 export function setRefreshCookie(req: Request, res: Response, token: string): void {
+  if (authTransport(req) === "MOBILE") {
+    res.locals.nativeRefreshToken = token;
+    return;
+  }
   res.cookie(refreshCookieName(req), token, {
     httpOnly: true,
     sameSite: "lax",
@@ -29,6 +34,7 @@ export function setRefreshCookie(req: Request, res: Response, token: string): vo
 }
 
 export function clearRefreshCookie(req: Request, res: Response): void {
+  if (authTransport(req) === "MOBILE") return;
   res.clearCookie(refreshCookieName(req), {
     httpOnly: true,
     sameSite: "lax",
@@ -38,6 +44,7 @@ export function clearRefreshCookie(req: Request, res: Response): void {
 }
 
 export function readRefreshCookie(req: Request): string | null {
+  if (authTransport(req) === "MOBILE") return readNativeRefresh(req);
   const cookieName = refreshCookieName(req);
   const header = req.headers.cookie;
   if (!header) return null;
@@ -57,6 +64,7 @@ export function readRefreshCookie(req: Request): string | null {
 
 /** Browser endpoints that create, rotate or clear a cookie require a trusted Origin. */
 export function requireTrustedOrigin(req: Request, _res: Response, next: NextFunction): void {
+  if (authTransport(req) === "MOBILE") return nativeAuthOnly(req, _res, next);
   // Validate before any DB writes or Set-Cookie side effects.
   refreshCookieName(req);
   const value = req.headers.origin;

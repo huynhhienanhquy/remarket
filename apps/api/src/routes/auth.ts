@@ -24,6 +24,7 @@ import { requestEmailVerification, toEmailVerificationRequest } from "../service
 import { RateQuota } from "../services/rate-quota.js";
 import { lockRefreshState } from "../services/refresh-locks.js";
 import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
+import { authTransport, authSessionResponse } from "../services/auth-transport.js";
 import { ok } from "../shared/api-response.js";
 import { sessionProfileSelect, toSessionUser } from "../shared/dto-mappers.js";
 import { accountLocked, unauthorized, validationError } from "../shared/errors.js";
@@ -191,6 +192,7 @@ router.post(
           purpose: "VERIFY_EMAIL",
           ttlMs: VERIFY_EMAIL_TTL_MS,
           token,
+          mobile: authTransport(req) === "MOBILE",
         });
         return created;
       });
@@ -234,12 +236,12 @@ router.post(
       // new session from the password snapshot read before bcrypt completed.
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
       const live = await tx.user.findUnique({ where: { id: user.id } });
-      if (!live || live.passwordHash !== user.passwordHash) throw unauthorized("Email hoặc mật khẩu không đúng.");
-      return { issued: await createSession(tx, live.id), identity: live };
+      if (!live || live.deletedAt || live.passwordHash !== user.passwordHash) throw unauthorized("Email hoặc mật khẩu không đúng.");
+      return { issued: await createSession(tx, live.id, authTransport(req)), identity: live };
     });
     setRefreshCookie(req, res, issued.refreshToken);
     // Login already loaded the identity; avoid a second HTTP + DB round trip.
-    ok(res, { access_token: issued.accessToken, user: toSessionUser(identity) });
+    authSessionResponse(req, res, { access_token: issued.accessToken, user: toSessionUser(identity) });
   }),
 );
 
@@ -273,6 +275,8 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
     const locked = await lockRefreshState(tx, { id: candidate.id, userId: candidate.userId, sessionId: candidateSessionId });
     if (!locked) return { kind: "invalid" as const };
     const { user, session, token: current } = locked;
+    if (user.deletedAt) return { kind: "invalid" as const };
+    if (session.transport !== authTransport(req)) return { kind: "invalid" as const };
     if (
       !current ||
       !session ||
@@ -350,7 +354,7 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
   }
 
   setRefreshCookie(req, res, nextToken);
-  ok(res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
+  authSessionResponse(req, res, { access_token: signAccessToken(result.userId, result.sessionId), user: toSessionUser(result.user) });
 }
 
 // Anonymous/expired discovery is a successful empty session; DB errors still fail.
@@ -383,8 +387,12 @@ router.post(
     const raw = readRefreshCookie(req);
     const candidate = raw ? await prisma.authToken.findUnique({ where: { tokenHash: sha256(raw) } }) : null;
     const cookieSession = candidate?.purpose === "REFRESH" && candidate.sessionId ? candidate : null;
+    if (authTransport(req) === "MOBILE" && cookieSession) {
+      const session = await prisma.session.findUnique({ where: { id: cookieSession.sessionId! } });
+      if (!session || session.transport !== "MOBILE") throw unauthorized();
+    }
     const header = req.headers.authorization;
-    const access = header?.startsWith("Bearer ") ? verifyAccessToken(header.slice(7).trim()) : null;
+    const access = authTransport(req) === "WEB" && header?.startsWith("Bearer ") ? verifyAccessToken(header.slice(7).trim()) : null;
     if (access && cookieSession && access.sessionId !== cookieSession.sessionId) {
       throw new AppError(API_ERROR_CODES.SESSION_CHANGED, "Phiên đăng nhập đã thay đổi. Vui lòng kiểm tra lại.", 409);
     }
@@ -494,10 +502,10 @@ router.post(
       }
       await requestEmailVerification(tx, userId);
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: sessionProfileSelect });
-      return { issued: await createSession(tx, userId), user };
+      return { issued: await createSession(tx, userId, authTransport(req)), user };
     });
     setRefreshCookie(req, res, issued.refreshToken);
-    ok(res, { access_token: issued.accessToken, user: toSessionUser(user) });
+    authSessionResponse(req, res, { access_token: issued.accessToken, user: toSessionUser(user) });
   }),
 );
 
@@ -524,7 +532,7 @@ router.post(
 
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true, emailVerifiedAt: true } });
     if (user && user.emailVerifiedAt === null) {
-      await issueEmailToken(user.id, email, "VERIFY_EMAIL", VERIFY_EMAIL_TTL_MS, "verify token");
+      await issueEmailToken(user.id, email, "VERIFY_EMAIL", VERIFY_EMAIL_TTL_MS, "verify token", authTransport(req) === "MOBILE");
     }
 
     ok(res, {});
@@ -543,7 +551,7 @@ router.post(
 
     const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (user) {
-      await issueEmailToken(user.id, email, "RESET_PASSWORD", RESET_PASSWORD_TTL_MS, "reset token");
+      await issueEmailToken(user.id, email, "RESET_PASSWORD", RESET_PASSWORD_TTL_MS, "reset token", authTransport(req) === "MOBILE");
     }
 
     ok(res, { accepted: true as const });

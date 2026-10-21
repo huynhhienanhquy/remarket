@@ -50,6 +50,9 @@ const requiredOperations: Array<[string, HttpMethod]> = [
   ["/admin/support-tickets/{id}", "patch"], ["/admin/support-tickets/{id}/messages", "post"],
   ["/admin/audit-logs", "get"], ["/admin/orders/{id}/cancel", "post"],
 ];
+requiredOperations.push(...requiredOperations.filter(([route]) => route.startsWith("/auth/")).map(([route, method]): [string, HttpMethod] => [route.replace("/auth/", "/auth/mobile/"), method]),
+  ["/mobile/blocks", "get"], ["/mobile/blocks/{id}", "put"], ["/mobile/blocks/{id}", "delete"],
+  ["/mobile/push-registration", "put"], ["/mobile/push-registration", "delete"], ["/mobile/delete-account", "post"], ["/uploads/{filename}/preview-url", "get"]);
 
 function asNode(value: unknown): OpenApiNode {
   expect(value).toBeTypeOf("object");
@@ -187,7 +190,9 @@ describe("OpenAPI contract", () => {
 
     const serviceFiles = (await readdir(servicesDirectory, { recursive: true }))
       .filter((file) => file.endsWith(".ts") && !file.split(/[\\/]/).includes("__tests__"));
-    const source = (await Promise.all(
+    const sharedDirectory = fileURLToPath(new URL("../../../../packages/api-client/src/", import.meta.url));
+    const sharedSources = await Promise.all(["catalog.ts", "commerce.ts", "communication.ts"].map((file) => readFile(join(sharedDirectory, file), "utf8")));
+    const source = sharedSources.join("\n") + (await Promise.all(
       serviceFiles.map((file) => readFile(join(servicesDirectory, file), "utf8")),
     )).join("\n");
     const callPattern = /http\.(getOrNull|get|post|put|patch|delete)(?:<[^>]+>)?\(\s*([`"'])(\/[^`"']+)\2/g;

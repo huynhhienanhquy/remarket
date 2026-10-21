@@ -43,6 +43,8 @@ jobs:
       - run: pnpm -r lint
       - run: pnpm -r test
       - run: pnpm -r build
+      - name: Expo dependency and configuration checks
+        run: pnpm --filter @remarket/mobile doctor
       - name: Browser smoke against an isolated database schema
         run: |
           chrome_path="$(command -v google-chrome || command -v chromium)"

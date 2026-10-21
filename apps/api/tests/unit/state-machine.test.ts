@@ -25,6 +25,15 @@ function ticket(status: SupportTicket["status"]): SupportTicket {
 }
 
 describe("authoritative action projections", () => {
+  it.each(["COD", "MEETUP"] as const)("lets the buyer cancel a confirmed %s order before delivery", (deliveryMethod) => {
+    const actions = orderAllowedActions(
+      order({ status: "CONFIRMED", deliveryMethod }),
+      { id: "buyer-1", status: "ACTIVE" }, false, false,
+    );
+    expect(actions).toContain("cancel");
+    expect(actions.includes("deliver")).toBe(deliveryMethod === "MEETUP");
+  });
+
   it("lets a COD seller declare a shipment delivered without claiming buyer receipt", () => {
     expect(
       orderAllowedActions(
