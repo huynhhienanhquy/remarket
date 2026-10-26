@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatDateTime, formatRelative } from "@remarket/shared";
 import type { Notification } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Button, Dialog, Icon, Pagination, useToast } from "../../components/common";
 import { ListLoading, OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
@@ -22,8 +22,8 @@ export function NotificationsPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const online = useConnectivity();
-  const notifications = useQuery({ queryKey: queryKeys.notifications(unread, page), queryFn: () => api.notifications.list({ unread, page }), refetchInterval: 15000 });
-  const reports = useQuery({ queryKey: queryKeys.myReports, queryFn: () => api.reports.mine(), enabled: selected?.reference_type === "report" });
+  const notifications = useQuery({ queryKey: queryKeys.notifications(unread, page), queryFn: ({ signal }) => apiForQuery(signal).notifications.list({ unread, page }), refetchInterval: 15000 });
+  const reports = useQuery({ queryKey: queryKeys.myReports, queryFn: ({ signal }) => apiForQuery(signal).reports.mine(), enabled: selected?.reference_type === "report" });
   const read = useMutation({ mutationFn: async (entry: Notification | null) => {
     if (!entry) return api.notifications.markAllRead();
     if (!entry.read_at) await api.notifications.markRead(entry.id);

@@ -6,7 +6,7 @@ import {
   formatRelative,
   formatVnd,
 } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Icon, MarketplaceImage, Pagination, StatusBadge } from "../../components/common";
 import { AccountEmptyState, AccountFilters, AccountPageHeader } from "../../components/AccountPageHeader/AccountPageHeader";
@@ -29,8 +29,8 @@ export function OrdersPage({ role }: OrdersPageProps) {
 
   const orders = useQuery({
     queryKey: queryKeys.orders(role, status, page),
-    queryFn: () =>
-      api.orders.list({
+    queryFn: ({ signal }) =>
+      apiForQuery(signal).orders.list({
         role,
         status: status === "ALL" ? undefined : status,
         page,

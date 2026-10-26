@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
 import { errorTitle } from "../../helpers/errors";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Button, FormField, InlineAlert, Input, Skeleton, useToast } from "../../components/common";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
@@ -15,7 +15,7 @@ export function VerifyEmailPage() {
   const [params, setParams] = useSearchParams();
   const [token] = useState(() => params.get("token"));
   const navigate = useNavigate();
-  const { viewer, status } = useSession();
+  const { viewer, status, refresh } = useSession();
   const online = useConnectivity();
   const toast = useToast();
   const [error, setError] = useState<unknown>(null);
@@ -27,10 +27,16 @@ export function VerifyEmailPage() {
   }, [params, setParams]);
   const request = useQuery({
     queryKey: queryKeys.emailVerification(viewer?.id ?? "guest"),
-    queryFn: () => api.auth.emailVerificationRequest(),
+    queryFn: ({ signal }) => apiForQuery(signal).auth.emailVerificationRequest(),
     enabled: !!viewer && !token && !viewer.email_verified_at && viewer.status === "ACTIVE",
     refetchInterval: 15000,
   });
+  // Approval fallback belongs to this page, instead of polling /me on every route.
+  useEffect(() => {
+    if (request.data?.status === "APPROVED" && viewer && !viewer.email_verified_at) {
+      void refresh().catch(() => {});
+    }
+  }, [request.data?.status, request.dataUpdatedAt, viewer, refresh]);
   async function submit() {
     if (pending || !online) return;
     setPending(true); setError(null);

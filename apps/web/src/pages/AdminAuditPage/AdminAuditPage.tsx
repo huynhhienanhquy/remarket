@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AuditLogItem } from "@remarket/shared";
 import { formatDateTime } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Drawer, EmptyState, Input, Pagination, SectionCard, useToast } from "../../components/common";
 import type { DataTableColumn } from "../../components/common";
@@ -27,7 +27,7 @@ export function AdminAuditPage() {
   const [entityType, setEntityType] = useState(params.get("entity_type") ?? "");
   useEffect(() => { setAction(params.get("action") ?? ""); setEntityType(params.get("entity_type") ?? ""); }, [params]);
   const queryInput = useMemo(() => ({ ...(params.get("action") ? { action: params.get("action")! } : {}), ...(params.get("entity_type") ? { entity_type: params.get("entity_type")! } : {}), ...(params.get("entity_id") ? { entity_id: params.get("entity_id")! } : {}), ...(params.get("actor_id") ? { actor_id: params.get("actor_id")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [params, page]);
-  const query = useQuery({ queryKey: queryKeys.adminAudit(queryInput), queryFn: () => api.admin.audit(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminAudit(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.audit(queryInput) });
   const selected = query.data?.items.find((entry) => entry.id === selectedId) ?? null;
 
   const columns: Array<DataTableColumn<AuditLogItem>> = [

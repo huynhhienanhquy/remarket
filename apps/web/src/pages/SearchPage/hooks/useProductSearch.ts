@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ProductListItem } from "@remarket/shared";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { loginPathFor } from "@/config/route/guards";
 import { type FilterValues } from "@/pages/SearchPage/sections/FilterPanel";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const PAGE_SIZE = 12;
 
@@ -30,6 +31,7 @@ export function useProductSearch() {
   const [keyword, setKeyword] = useState(q);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [draft, setDraft] = useState<FilterValues>(filters);
+  const desktopFilters = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => setKeyword(q), [q]);
   // Discard unapplied sheet edits whenever it is reopened (ui-spec 8).
@@ -41,8 +43,8 @@ export function useProductSearch() {
   // Start the page content before auxiliary filters compete for the small DB pool.
   const listQuery = useQuery({
     queryKey: queryKeys.products({ ...Object.fromEntries(searchParams), page_size: PAGE_SIZE }),
-    queryFn: () =>
-      api.products.list({
+    queryFn: ({ signal }) =>
+      apiForQuery(signal).products.list({
         q: q || undefined,
         category_id: filters.category_id || undefined,
         min_price: filters.min_price || undefined,
@@ -61,14 +63,14 @@ export function useProductSearch() {
 
   const categories = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => api.categories.tree(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
     enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
   const provinces = useQuery({
     queryKey: queryKeys.provinces,
-    queryFn: () => api.categories.provinces(),
-    enabled: status === "ready",
+    queryFn: ({ signal }) => apiForQuery(signal).categories.provinces(),
+    enabled: status === "ready" && (desktopFilters || sheetOpen || !!filters.province_code),
     staleTime: 5 * 60_000,
   });
 

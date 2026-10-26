@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, formatDateTime, validateSupportMessage } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { apiFieldErrors } from "../../helpers/errors";
 import { Button, ConfirmDialog, FormField, InlineAlert, StatusBadge, Textarea, useToast } from "../../components/common";
@@ -19,8 +19,8 @@ export function SupportTicketPage() {
   const client = useQueryClient();
   const toast = useToast();
   const online = useConnectivity();
-  const ticket = useQuery({ queryKey: queryKeys.ticket(id), queryFn: () => api.support.detail(id), refetchInterval: 15000 });
-  const relatedOrder = useQuery({ queryKey: queryKeys.order(ticket.data?.order_id ?? ""), queryFn: () => api.orders.detail(ticket.data!.order_id!), enabled: Boolean(ticket.data?.order_id) });
+  const ticket = useQuery({ queryKey: queryKeys.ticket(id), queryFn: ({ signal }) => apiForQuery(signal).support.detail(id), refetchInterval: 15000 });
+  const relatedOrder = useQuery({ queryKey: queryKeys.order(ticket.data?.order_id ?? ""), queryFn: ({ signal }) => apiForQuery(signal).orders.detail(ticket.data!.order_id!), enabled: Boolean(ticket.data?.order_id) });
   const change = useMutation({ mutationFn: (action: "reply" | "close") => action === "reply" ? api.support.reply(id, message.trim()) : api.support.close(id),
     onSuccess: (data, action) => { client.setQueryData(queryKeys.ticket(id), data); void client.invalidateQueries({ queryKey: ["support", "list"] }); setMessage(""); setConfirmClose(false); toast.success(action === "close" ? "Đã đóng yêu cầu" : "Đã gửi phản hồi"); },
     onError: (error) => { setConfirmClose(false); setFieldError(apiFieldErrors(error)?.message); void ticket.refetch(); } });

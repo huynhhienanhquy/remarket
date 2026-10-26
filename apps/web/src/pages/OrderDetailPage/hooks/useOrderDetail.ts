@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ORDER_STATUS_LABELS } from "@remarket/shared";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { isApiError } from "@/helpers/errors";
@@ -27,7 +27,7 @@ export function useOrderDetail(role: "buyer" | "seller") {
 
   const detail = useQuery({
     queryKey: queryKeys.order(id),
-    queryFn: () => api.orders.detail(id),
+    queryFn: ({ signal }) => apiForQuery(signal).orders.detail(id),
     enabled: id !== "",
   });
 

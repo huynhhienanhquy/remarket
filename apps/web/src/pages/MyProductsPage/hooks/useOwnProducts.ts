@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProductAction } from "@remarket/shared";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { useToast } from "@/components/common";
@@ -30,7 +30,7 @@ export function useOwnProducts() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.ownProducts({ status, page }),
-    queryFn: () => api.products.mine({ status: status === "ALL" ? undefined : status, page, page_size: 12 } as const),
+    queryFn: ({ signal }) => apiForQuery(signal).products.mine({ status: status === "ALL" ? undefined : status, page, page_size: 12 } as const),
     enabled: !!viewer,
   });
 

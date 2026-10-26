@@ -45,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -73,6 +74,7 @@ describe("account navigation through the application router", () => {
   });
 
   it("opens and switches conversations in the inbox panel while preserving the account layout and list page", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
     const first = { id: "official-chat", is_system: true, can_send: true, unavailable_reason: null,
       counterparty: { id: "private-admin", name: "Hệ thống ReMarket", avatar_url: null, is_system: true },
       product: null, last_message: null, unread_count: 0, updated_at: timestamp };

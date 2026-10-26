@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ORDER_STATUS_LABELS, TICKET_TYPES, TICKET_TYPE_LABELS, validateSupportMessage, validateSupportSubject } from "@remarket/shared";
 import type { TicketType } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { apiFieldErrors } from "../../helpers/errors";
 import { Button, FormField, Input, Select, Textarea, useToast } from "../../components/common";
@@ -13,7 +13,7 @@ import { useConnectivity } from "../../hooks/useConnectivity";
 
 function useOrderOptions(role: "buyer" | "seller", enabled: boolean) {
   return useInfiniteQuery({ queryKey: ["orders", "support-picker", role], initialPageParam: 1,
-    queryFn: ({ pageParam }) => api.orders.list({ role, page: pageParam }),
+    queryFn: ({ pageParam, signal }) => apiForQuery(signal).orders.list({ role, page: pageParam }),
     getNextPageParam: (last) => last.meta.page < last.meta.total_pages ? last.meta.page + 1 : undefined, enabled });
 }
 
@@ -33,7 +33,7 @@ export function SupportNewPage() {
   const needsOrder = type === "ORDER_PROBLEM";
   const buyer = useOrderOptions("buyer", needsOrder);
   const seller = useOrderOptions("seller", needsOrder);
-  const prefill = useQuery({ queryKey: queryKeys.order(orderPrefill), queryFn: () => api.orders.detail(orderPrefill), enabled: needsOrder && Boolean(orderPrefill) });
+  const prefill = useQuery({ queryKey: queryKeys.order(orderPrefill), queryFn: ({ signal }) => apiForQuery(signal).orders.detail(orderPrefill), enabled: needsOrder && Boolean(orderPrefill) });
   const orders = [...new Map([...(buyer.data?.pages.flatMap((entry) => entry.items) ?? []), ...(seller.data?.pages.flatMap((entry) => entry.items) ?? []), ...(prefill.data ? [prefill.data] : [])].map((entry) => [entry.id, entry])).values()];
   const create = useMutation({ mutationFn: () => api.support.create({ type, subject: subject.trim(), message: message.trim(), ...(needsOrder ? { order_id: orderId } : {}) }),
     onSuccess: (ticket) => { client.setQueryData(queryKeys.ticket(ticket.id), ticket); void client.invalidateQueries({ queryKey: ["support"] }); toast.success("Đã gửi yêu cầu hỗ trợ"); navigate(`/support/${ticket.id}`); },

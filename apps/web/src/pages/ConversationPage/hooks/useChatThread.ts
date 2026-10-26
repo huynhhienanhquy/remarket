@@ -4,7 +4,7 @@ import { mergeMessage, validateChatMessage } from "@remarket/shared";
 import type { Message, MessageHistory } from "@remarket/shared";
 import { useSession } from "@/contexts/SessionContext";
 import { useRealtime } from "@/contexts/RealtimeContext";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors, isApiError } from "@/helpers/errors";
 import { useConnectivity } from "@/hooks/useConnectivity";
@@ -36,9 +36,9 @@ export function useChatThread(id: string) {
     activeViewer.current = viewer?.id;
     return () => { activeViewer.current = undefined; };
   }, [viewer?.id]);
-  const conversation = useQuery({ queryKey: ["chat", "detail", id], queryFn: () => api.chat.detail(id) });
+  const conversation = useQuery({ queryKey: ["chat", "detail", id], queryFn: ({ signal }) => apiForQuery(signal).chat.detail(id) });
   const history = useInfiniteQuery({ queryKey: queryKeys.messages(id), initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => api.chat.messages(id, pageParam),
+    queryFn: ({ pageParam, signal }) => apiForQuery(signal).chat.messages(id, pageParam),
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     refetchInterval: connected ? false : 5000,
   });

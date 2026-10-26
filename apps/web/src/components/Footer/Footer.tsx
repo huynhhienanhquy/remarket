@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../../contexts/SessionContext";
 import type { CategoryNode } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Logo } from "../Logo/Logo";
 
@@ -14,7 +14,7 @@ export function Footer() {
   const { status } = useSession();
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => api.categories.tree(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
     enabled: status === "ready",
     staleTime: 5 * 60_000,
   });

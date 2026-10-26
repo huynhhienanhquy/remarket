@@ -194,6 +194,7 @@ function sessionChanged(): ApiError {
 }
 
 interface RequestOptions {
+  signal?: AbortSignal;
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   query?: Record<string, string | number | undefined | null>;
@@ -273,6 +274,7 @@ async function parseEnvelope<T>(response: Response, path: string, method: string
 }
 
 async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  options.signal?.throwIfAborted();
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { "X-Session-Scope": getSessionScope(), ...options.headers };
   const requestToken = accessToken;
@@ -295,14 +297,17 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
       headers,
       body,
       credentials: "include",
+      signal: options.signal,
     });
   } catch {
+    options.signal?.throwIfAborted();
     throw networkError();
   }
 
   const credentialEndpoint = ["/auth/login", "/auth/register", "/auth/bootstrap", "/auth/refresh", "/auth/logout", "/auth/logout-all", "/auth/forgot-password", "/auth/reset-password", "/auth/verify-email", "/auth/resend-verification"].includes(path);
   // Never attach an old private response (or replay a mutation) to a new account.
   const assertRequestContext = () => {
+    options.signal?.throwIfAborted();
     if (!credentialEndpoint && (requestEpoch !== credentialEpoch || requestRevision !== getSessionRevision())) throw sessionChanged();
   };
   assertRequestContext();
@@ -341,8 +346,8 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
 }
 
 export const http = {
-  get: <T>(path: string, query?: RequestOptions["query"]) =>
-    send<T>(path, { method: "GET", query }),
+  get: <T>(path: string, query?: RequestOptions["query"], signal?: AbortSignal) =>
+    send<T>(path, { method: "GET", query, signal }),
   post: <T>(
     path: string,
     body?: unknown,

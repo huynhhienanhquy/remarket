@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Condition, DeliveryMethod } from "@remarket/shared";
 import type { ProductAction, ProductImage } from "@remarket/shared";
 import type { ProductInput } from "@/types/api";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors } from "@/helpers/errors";
 import { useToast } from "@/components/common";
@@ -52,17 +52,17 @@ export function useProductForm() {
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const initializedId = useRef<string | null>(null);
-  const productQuery = useQuery({ queryKey: queryKeys.product(id ?? ""), queryFn: () => api.products.detail(id!), enabled: mode === "edit" && !!id, staleTime: Infinity });
+  const productQuery = useQuery({ queryKey: queryKeys.product(id ?? ""), queryFn: ({ signal }) => apiForQuery(signal).products.detail(id!), enabled: mode === "edit" && !!id, staleTime: Infinity });
   const existingProduct = productQuery.data ?? null;
   const loadError = productQuery.error;
 
   // Load categories for select
   const categoryQuery = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => api.categories.tree(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
   });
   const categories = categoryQuery.data;
-  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: () => api.categories.provinces() });
+  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: ({ signal }) => apiForQuery(signal).categories.provinces() });
 
   // Flatten categories for select (leaf only)
   const flatCategories = categories?.flatMap((root) =>

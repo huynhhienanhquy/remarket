@@ -13,7 +13,7 @@ import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readPage } from "../../utils/adminParams";
 
 function Stars({ value }: { value: number }) {
@@ -34,7 +34,7 @@ export function AdminReviewsPage() {
   const [reason, setReason] = useState("");
   useEffect(() => setSearch(params.get("q") ?? ""), [params]);
   const queryInput = useMemo(() => ({ ...(rating ? { rating } : {}), ...(visibility ? { visibility } : {}), ...(params.get("q") ? { q: params.get("q")! } : {}), ...(params.get("handled_by") ? { handled_by: params.get("handled_by")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [rating, visibility, params, page]);
-  const query = useQuery({ queryKey: queryKeys.adminReviews(queryInput), queryFn: () => api.admin.reviews(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminReviews(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.reviews(queryInput) });
   const selected = query.data?.items.find((review) => review.id === selectedId) ?? null;
 
   const mutation = useMutation({

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orderShippingFee, addVnd, validateShippingFee, validatePhone } from "@remarket/shared";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { invalidateCart } from "@/helpers/cartCache";
 import { useSession } from "@/contexts/SessionContext";
@@ -53,12 +53,12 @@ export function useCheckout() {
 
   const cart = useQuery({
     queryKey: queryKeys.cart,
-    queryFn: () => api.cart.get(),
+    queryFn: ({ signal }) => apiForQuery(signal).cart.get(),
   });
 
   const provinces = useQuery({
     queryKey: queryKeys.provinces,
-    queryFn: () => api.categories.provinces(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.provinces(),
     staleTime: 5 * 60_000,
   });
 

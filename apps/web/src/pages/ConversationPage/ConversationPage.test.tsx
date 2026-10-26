@@ -15,6 +15,7 @@ afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks()
 
 describe("member workflows through the HTTP adapter", () => {
   it("shows official messages as system in the inbox and history and lets the user reply", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
     const conversation = { id: "official-chat", is_system: true, can_send: true, unavailable_reason: null,
       counterparty: { id: "private-admin", name: "Hệ thống ReMarket", avatar_url: null, is_system: true },
       product: null, last_message: null, unread_count: 1, updated_at: timestamp };

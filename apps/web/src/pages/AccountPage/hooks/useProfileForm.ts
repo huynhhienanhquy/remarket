@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { SessionUser } from "@remarket/shared";
 import { useSession } from "@/contexts/SessionContext";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors } from "@/helpers/errors";
 import { useToast } from "@/components/common";
@@ -25,7 +25,7 @@ export function useProfileForm(viewer: SessionUser) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: () => api.categories.provinces() });
+  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: ({ signal }) => apiForQuery(signal).categories.provinces() });
   const save = useMutation({ mutationFn: () => api.auth.updateProfile({ full_name: name.trim(), phone: phone.trim() || null, province_code: province || null, default_address: address.trim() || null }),
     onSuccess: async () => { await refresh(); toast.success("Đã lưu hồ sơ"); }, onError: (error) => setFields(apiFieldErrors(error) ?? {}) });
   const avatar = useMutation({ mutationFn: async (file: File) => { const uploaded = await api.uploads.upload(file, "avatar"); return api.auth.uploadAvatar(uploaded.storage_path); }, onSuccess: async () => { await refresh(); toast.success("Đã đổi ảnh đại diện"); } });

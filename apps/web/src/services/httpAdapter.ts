@@ -1,26 +1,18 @@
 import type { ApiAdapter } from "../types/api";
-import { auth } from "./endpoints/auth";
-import { categories, products, uploads, profiles } from "./endpoints/catalog";
-import { favorites, cart, checkout, orders, reviews } from "./endpoints/commerce";
-import { chat, reports, notifications, support } from "./endpoints/communication";
-import { admin } from "./endpoints/admin";
+import { createAuthEndpoints } from "./endpoints/auth";
+import { catalogEndpoints, commerceEndpoints, communicationEndpoints, adminEndpoints } from "@remarket/api-client";
+import { http } from "./http";
 
-export function createHttpAdapter(): ApiAdapter {
+export function createHttpAdapter(signal?: AbortSignal): ApiAdapter {
+  const transport: typeof http = signal ? {
+    ...http,
+    get: (path, query) => http.get(path, query, signal),
+  } : http;
   return {
-    auth,
-    categories,
-    products,
-    uploads,
-    favorites,
-    cart,
-    checkout,
-    orders,
-    chat,
-    reviews,
-    reports,
-    notifications,
-    support,
-    profiles,
-    admin,
+    auth: createAuthEndpoints(transport),
+    ...catalogEndpoints(transport),
+    ...commerceEndpoints(transport),
+    ...communicationEndpoints(transport),
+    admin: adminEndpoints(transport),
   };
 }

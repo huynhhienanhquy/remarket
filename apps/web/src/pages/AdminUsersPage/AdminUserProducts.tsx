@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { ApiImage, EmptyState, Pagination, StatusBadge, Tabs } from "../../components/common";
 import { queryKeys } from "../../config/queryClient";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 
 const FILTERS = [
   { value: "ALL", label: "Tất cả" },
@@ -19,7 +19,7 @@ export function AdminUserProducts({ userId }: { userId: string }) {
   const [status, setStatus] = useState("ALL");
   const [page, setPage] = useState(1);
   const input = { seller_id: userId, ...(status === "ALL" ? {} : { status: status as ProductStatus }), page };
-  const query = useQuery({ queryKey: queryKeys.adminProducts(input), queryFn: () => api.admin.products(input) });
+  const query = useQuery({ queryKey: queryKeys.adminProducts(input), queryFn: ({ signal }) => apiForQuery(signal).admin.products(input) });
 
   return (
     <section aria-label="Sản phẩm của người dùng" className="space-y-4 border-t border-line pt-6">

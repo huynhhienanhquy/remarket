@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addVnd } from "@remarket/shared";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { useConnectivity } from "@/hooks/useConnectivity";
@@ -20,7 +20,7 @@ export function useCart() {
 
   const cart = useQuery({
     queryKey: queryKeys.cart,
-    queryFn: () => api.cart.get(),
+    queryFn: ({ signal }) => apiForQuery(signal).cart.get(),
   });
 
   const removeItem = useMutation({

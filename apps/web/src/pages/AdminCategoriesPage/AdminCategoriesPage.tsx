@@ -9,7 +9,7 @@ import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources } from "../../helpers/adminCache";
 import { errorDescription, fieldError } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readEnumParam, readPage } from "../../utils/adminParams";
 
 function slugify(value: string): string {
@@ -34,7 +34,7 @@ export function AdminCategoriesPage() {
   const status = readEnumParam(params, "status", ["ACTIVE", "INACTIVE"] as const);
   const [search, setSearch] = useState(params.get("q") ?? "");
   useEffect(() => setSearch(params.get("q") ?? ""), [params]);
-  const tree = useQuery({ queryKey: queryKeys.adminCategoryTree, queryFn: () => api.admin.categoryTree() });
+  const tree = useQuery({ queryKey: queryKeys.adminCategoryTree, queryFn: ({ signal }) => apiForQuery(signal).admin.categoryTree() });
   const queryInput = useMemo(() => ({
     ...(params.get("q") ? { q: params.get("q")! } : {}),
     ...(status ? { status } : {}),
@@ -43,7 +43,7 @@ export function AdminCategoriesPage() {
     ...(params.get("to") ? { to: params.get("to")! } : {}),
     page,
   }), [params, page, status]);
-  const query = useQuery({ queryKey: queryKeys.adminCategories(queryInput), queryFn: () => api.admin.categories(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminCategories(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.categories(queryInput) });
   const selected = findCategory(tree.data ?? [], params.get("selected"));
   const creating = params.get("new") === "1";
   const [name, setName] = useState("");

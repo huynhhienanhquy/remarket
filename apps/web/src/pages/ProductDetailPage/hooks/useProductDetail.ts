@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { isApiError } from "@/helpers/errors";
 import { useSession } from "@/contexts/SessionContext";
@@ -29,7 +29,7 @@ export function useProductDetail() {
 
   const detail = useQuery({
     queryKey: queryKeys.product(id),
-    queryFn: () => api.products.detail(id),
+    queryFn: ({ signal }) => apiForQuery(signal).products.detail(id),
     enabled: id !== "" && sessionStatus === "ready",
   });
 

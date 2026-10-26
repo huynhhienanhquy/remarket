@@ -2,7 +2,7 @@ import { HeroArt } from "../../assets/images/illustrations/HeroArt";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CategoryNode, ProductListItem } from "@remarket/shared";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
@@ -39,14 +39,14 @@ export function HomePage() {
 
   const categories = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => api.categories.tree(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
     enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
 
   const latest = useQuery({
     queryKey: queryKeys.products({ sort: "newest", page_size: 10 }),
-    queryFn: () => api.products.list({ sort: "newest", page_size: 10, page: 1 }),
+    queryFn: ({ signal }) => apiForQuery(signal).products.list({ sort: "newest", page_size: 10, page: 1 }),
     enabled: status === "ready",
   });
 

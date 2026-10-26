@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatRelative } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { ApiImage, ChatIcon, EmptyState, Pagination } from "../common";
 import { ListLoading, QueryFailure } from "../common/PageFeedback/PageFeedback";
@@ -18,7 +18,7 @@ export function ConversationList({ activeId }: { activeId?: string }) {
   if (returnTo) conversationParams.set("return_to", returnTo);
   const conversationSearch = conversationParams.size ? `?${conversationParams}` : "";
   const { connected } = useRealtime();
-  const conversations = useQuery({ queryKey: queryKeys.conversations(page), queryFn: () => api.chat.conversations(page), refetchInterval: connected ? false : 15000 });
+  const conversations = useQuery({ queryKey: queryKeys.conversations(page), queryFn: ({ signal }) => apiForQuery(signal).chat.conversations(page), refetchInterval: connected ? false : 15000 });
   return <div className="space-y-4">
     <div className="border-b border-line p-4"><h2 className="text-base font-semibold text-ink">Cuộc trò chuyện</h2><p className="mt-1 text-xs text-muted">Tin nhắn với người mua, người bán và hệ thống</p></div>
     {conversations.isPending ? <ListLoading /> : conversations.isError ? <QueryFailure error={conversations.error} retry={() => void conversations.refetch()} /> : conversations.data.items.length === 0 ? <EmptyState className="rm-account-empty" icon={<ChatIcon size={28} />} title="Bạn chưa có tin nhắn" description="Mở một tin đăng và chọn Nhắn tin để trao đổi với người bán." action={{ label: "Khám phá sản phẩm", to: "/products" }} /> : <>

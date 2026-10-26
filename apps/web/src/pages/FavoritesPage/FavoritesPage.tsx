@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Pagination, ProductCard, ProductCardSkeleton, useToast } from "../../components/common";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
@@ -14,7 +14,7 @@ export function FavoritesPage() {
   const client = useQueryClient();
   const toast = useToast();
   const online = useConnectivity();
-  const favorites = useQuery({ queryKey: queryKeys.favorites(page), queryFn: () => api.favorites.list(page) });
+  const favorites = useQuery({ queryKey: queryKeys.favorites(page), queryFn: ({ signal }) => apiForQuery(signal).favorites.list(page) });
   const remove = useMutation({
     mutationFn: (id: string) => api.favorites.set(id, false),
     onSuccess: async () => {

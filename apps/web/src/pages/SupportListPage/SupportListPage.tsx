@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { TICKET_STATUSES, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, formatDateTime } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Icon, Pagination, StatusBadge, buttonClasses } from "../../components/common";
 import { ListLoading, OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
@@ -14,7 +14,7 @@ export function SupportListPage() {
   const status = TICKET_STATUSES.find((entry) => entry === params.get("status"));
   const page = urlPage(params.get("page"));
   const online = useConnectivity();
-  const tickets = useQuery({ queryKey: queryKeys.support(status ?? "ALL", page), queryFn: () => api.support.list({ status, page }) });
+  const tickets = useQuery({ queryKey: queryKeys.support(status ?? "ALL", page), queryFn: ({ signal }) => apiForQuery(signal).support.list({ status, page }) });
   return <div className="space-y-6">
     <AccountPageHeader title="Hỗ trợ" description="Gửi yêu cầu và theo dõi phản hồi từ đội ngũ ReMarket." action={<Link to="/support/new" className={buttonClasses("primary", "md")}>Tạo yêu cầu hỗ trợ</Link>} />
     <OfflineNotice online={online} />

@@ -9,6 +9,7 @@ export interface RecordedRequest {
   url: URL;
   body: unknown;
   headers: Headers;
+  signal?: AbortSignal | null;
 }
 type Handler = (request: RecordedRequest) => unknown | Promise<unknown>;
 
@@ -46,6 +47,7 @@ export function httpContext(viewer: SessionUser | null = null) {
       path: url.pathname.replace(/^\/api\/v1/, ""),
       url, body: typeof options?.body === "string" ? JSON.parse(options.body) : options?.body,
       headers: new Headers(options?.headers),
+      signal: options?.signal,
     };
     context.calls.push(request);
     const handler = handlers.get(request.method + " " + request.path);

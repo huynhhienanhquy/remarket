@@ -14,7 +14,7 @@ import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCac
 import { errorDescription, isVersionConflict } from "../../helpers/adminErrors";
 import { isApiError } from "../../helpers/errors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readPage } from "../../utils/adminParams";
 
 const TABS = [
@@ -49,7 +49,7 @@ export function AdminProductsPage() {
   const [reason, setReason] = useState("");
   useEffect(() => setSearch(params.get("q") ?? ""), [params]);
 
-  const categories = useQuery({ queryKey: queryKeys.adminCategoryTree, queryFn: () => api.admin.categoryTree() });
+  const categories = useQuery({ queryKey: queryKeys.adminCategoryTree, queryFn: ({ signal }) => apiForQuery(signal).admin.categoryTree() });
   const allCategories = useMemo(() => flattenCategories(categories.data ?? []), [categories.data]);
   const queryInput = useMemo(() => ({
     ...(tab !== "ALL" ? { status: tab as ProductStatus | "BLOCKED" } : {}),
@@ -61,7 +61,7 @@ export function AdminProductsPage() {
     ...(params.get("to") ? { to: params.get("to")! } : {}),
     page,
   }), [tab, params, page]);
-  const query = useQuery({ queryKey: queryKeys.adminProducts(queryInput), queryFn: () => api.admin.products(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminProducts(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.products(queryInput) });
   const selected = query.data?.items.find((product) => product.id === selectedId) ?? null;
 
   const mutation = useMutation({

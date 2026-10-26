@@ -27,7 +27,7 @@ import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readEnumParam, readPage } from "../../utils/adminParams";
 import { AdminUserProducts } from "./AdminUserProducts";
 
@@ -71,10 +71,10 @@ export function AdminUsersPage() {
     ...(params.get("to") ? { to: params.get("to")! } : {}),
     page,
   }), [params, status, role, page]);
-  const query = useQuery({ queryKey: queryKeys.adminUsers(queryInput), queryFn: () => api.admin.users(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminUsers(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.users(queryInput) });
   const selectedQuery = useQuery({
     queryKey: queryKeys.adminUser(selectedId ?? ""),
-    queryFn: () => api.admin.user(selectedId!),
+    queryFn: ({ signal }) => apiForQuery(signal).admin.user(selectedId!),
     enabled: selectedId !== null,
   });
   const selected = selectedQuery.data ?? query.data?.items.find((user) => user.id === selectedId) ?? null;

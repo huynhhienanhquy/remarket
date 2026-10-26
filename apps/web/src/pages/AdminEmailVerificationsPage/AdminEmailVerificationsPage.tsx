@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDateTime, type EmailVerificationRequest } from "@remarket/shared";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Button, ConfirmDialog, EmptyState, Pagination, SectionCard, Select, StatusBadge, useToast } from "../../components/common";
 import type { DataTableColumn } from "../../components/common";
@@ -21,7 +21,7 @@ export function AdminEmailVerificationsPage() {
   const toast = useToast();
   const online = useConnectivity();
   const [selected, setSelected] = useState<EmailVerificationRequest | null>(null);
-  const query = useQuery({ queryKey: queryKeys.adminEmailVerifications({ status, page }), queryFn: () => api.admin.emailVerifications({ status, page }), refetchInterval: 15000 });
+  const query = useQuery({ queryKey: queryKeys.adminEmailVerifications({ status, page }), queryFn: ({ signal }) => apiForQuery(signal).admin.emailVerifications({ status, page }), refetchInterval: 15000 });
   const approve = useMutation({
     mutationFn: (id: string) => api.admin.approveEmailVerification(id),
     onSuccess: () => {

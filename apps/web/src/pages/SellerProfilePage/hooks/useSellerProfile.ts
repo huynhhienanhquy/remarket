@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/services/api";
+import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { loginPathFor } from "@/config/route/guards";
@@ -24,19 +24,19 @@ export function useSellerProfile() {
 
   const profile = useQuery({
     queryKey: queryKeys.profile(id),
-    queryFn: () => api.profiles.publicProfile(id),
+    queryFn: ({ signal }) => apiForQuery(signal).profiles.publicProfile(id),
     enabled: id !== "" && status === "ready",
   });
 
   const products = useQuery({
     queryKey: queryKeys.profileProducts(id, page),
-    queryFn: () => api.profiles.products(id, page),
+    queryFn: ({ signal }) => apiForQuery(signal).profiles.products(id, page),
     enabled: id !== "" && tab === "products" && status === "ready",
   });
 
   const reviews = useQuery({
     queryKey: queryKeys.userReviews(id, page),
-    queryFn: () => api.reviews.publicList(id, page),
+    queryFn: ({ signal }) => apiForQuery(signal).reviews.publicList(id, page),
     enabled: id !== "" && tab === "reviews" && status === "ready",
   });
 

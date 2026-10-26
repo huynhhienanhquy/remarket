@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { MarketplaceHeader } from "../../components/MarketplaceHeader/MarketplaceHeader";
 import { MobileBottomNav } from "../../components/MobileBottomNav/MobileBottomNav";
@@ -36,7 +36,7 @@ export function MarketplaceShell() {
 
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,
-    queryFn: () => api.categories.tree(),
+    queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
     enabled: status === "ready",
     staleTime: 5 * 60_000,
   });

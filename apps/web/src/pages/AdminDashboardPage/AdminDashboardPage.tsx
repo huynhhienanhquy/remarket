@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PRODUCT_STATUS_LABELS, TICKET_STATUS_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
 import type { AdminDashboard, ProductStatus } from "@remarket/shared";
-import { api } from "../../services/api";
+import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import {
   Button,
@@ -93,7 +93,7 @@ export function AdminDashboardPage() {
 
   const query = useQuery({
     queryKey: queryKeys.adminDashboard(from, to),
-    queryFn: () => api.admin.dashboard(from, to),
+    queryFn: ({ signal }) => apiForQuery(signal).admin.dashboard(from, to),
     enabled: validRange,
   });
 

@@ -48,7 +48,7 @@ beforeEach(() => {
     context.on("POST", `/conversations/${id}/messages`, ({ body }) => ({ message: { ...(body as object), id: "sent-message", sender_id: admin.id, created_at: timestamp, read_at: null, is_system: true } }));
   }
 });
-afterEach(() => { client.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { client.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("return from admin chat", () => {
   it("returns to the selected user and exact admin filters after sending a message", async () => {
@@ -71,6 +71,7 @@ describe("return from admin chat", () => {
   });
 
   it("retains the admin return destination through inbox pagination and conversation changes", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
     const origin = "/admin/users?page=3&selected=alice";
     context.reply("GET", "/conversations", { items: [conversation, { ...conversation, id: "another-chat", counterparty: { ...conversation.counterparty, name: "Người nhận khác" } }], meta: { page: 1, page_size: 20, total: 21, total_pages: 2 } });
     const user = userEvent.setup();

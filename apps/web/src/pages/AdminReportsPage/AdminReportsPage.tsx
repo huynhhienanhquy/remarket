@@ -13,7 +13,7 @@ import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readPage } from "../../utils/adminParams";
 
 const REPORT_TABS = [
@@ -35,7 +35,7 @@ export function AdminReportsPage() {
   const reason = params.get("reason") as ReportReason | null;
   const targetType = params.get("target_type") as "product" | "user" | null;
   const queryInput = useMemo(() => ({ status, ...(reason ? { reason } : {}), ...(targetType ? { target_type: targetType } : {}), ...(params.get("handled_by") ? { handled_by: params.get("handled_by")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [status, reason, targetType, params, page]);
-  const query = useQuery({ queryKey: queryKeys.adminReports(queryInput), queryFn: () => api.admin.reports(queryInput) });
+  const query = useQuery({ queryKey: queryKeys.adminReports(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.reports(queryInput) });
   const selected = query.data?.items.find((report) => report.id === selectedId) ?? null;
 
   const mutation = useMutation({

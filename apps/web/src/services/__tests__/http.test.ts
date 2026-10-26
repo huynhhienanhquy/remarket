@@ -19,6 +19,44 @@ beforeEach(async () => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("shared session restoration", () => {
+  it("passes query cancellation through the adapter without converting it to a network failure", async () => {
+    const controller = new AbortController();
+    const { createHttpAdapter } = await import("../httpAdapter");
+    fetchMock.mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(options.signal!.reason), { once: true });
+    }));
+    const pending = createHttpAdapter(controller.signal).products.list({ page: 1 });
+    const rejected = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock.mock.calls[0]![1]?.signal).toBe(controller.signal);
+    controller.abort();
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not replay an abandoned page request after a shared token refresh completes", async () => {
+    session.updateSessionUser(user);
+    transport.setAccessToken("old-token");
+    const controller = new AbortController();
+    let finishRefresh!: (response: Response) => void;
+    let startedRefresh!: () => void;
+    const refreshing = new Promise<void>((resolve) => { startedRefresh = resolve; });
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        startedRefresh();
+        return new Promise<Response>((resolve) => { finishRefresh = resolve; });
+      }
+      return failure(401, "SESSION_EXPIRED");
+    });
+    const pending = transport.http.get("/orders", undefined, controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await refreshing;
+    controller.abort();
+    finishRefresh(envelope({ user, access_token: "fresh-token" }));
+    await rejected;
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/orders"))).toHaveLength(1);
+    expect(transport.getAccessToken()).toBe("fresh-token");
+  });
+
   it("uses the identity returned by login without a second me request", async () => {
     const { createHttpAdapter } = await import("../httpAdapter");
     const httpAdapter = createHttpAdapter();

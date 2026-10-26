@@ -13,7 +13,7 @@ import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription, fieldError } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
-import { api } from "../../services/api";
+import { api, apiForQuery } from "../../services/api";
 import { readEnumParam, readPage } from "../../utils/adminParams";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
@@ -35,8 +35,8 @@ export function AdminSupportPage() {
   const [deliveryOutcome, setDeliveryOutcome] = useState<"NOT_DELIVERED" | "RETURNED">("NOT_DELIVERED");
   const [paymentResolution, setPaymentResolution] = useState("");
   const queryInput = useMemo(() => ({ ...(status ? { status: status as TicketStatus } : {}), ...(type ? { type: type as TicketType } : {}), ...(params.get("assigned_admin_id") ? { assigned_admin_id: params.get("assigned_admin_id")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [status, type, params, page]);
-  const query = useQuery({ queryKey: queryKeys.adminTickets(queryInput), queryFn: () => api.admin.tickets(queryInput) });
-  const detail = useQuery({ queryKey: queryKeys.adminTicket(selectedId ?? ""), queryFn: () => api.admin.ticket(selectedId!), enabled: selectedId !== null });
+  const query = useQuery({ queryKey: queryKeys.adminTickets(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.tickets(queryInput) });
+  const detail = useQuery({ queryKey: queryKeys.adminTicket(selectedId ?? ""), queryFn: ({ signal }) => apiForQuery(signal).admin.ticket(selectedId!), enabled: selectedId !== null });
 
   function syncTicket(ticket: AdminSupportTicketDetail) {
     queryClient.setQueryData(queryKeys.adminTicket(ticket.id), ticket);
