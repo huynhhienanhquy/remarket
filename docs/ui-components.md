@@ -62,7 +62,8 @@ thanh điều hướng mobile. Truyền số thật từ API; 0 thì ẩn, trên
 `99+`, nhãn truy cập vẫn chứa số đầy đủ. Đặt trong phần tử `relative`; link
 chứa badge cần nêu số chưa đọc trong `aria-label`.
 
-Tin nhắn dùng `useUnreadMessageCount`, cache riêng theo người xem. API đếm
-tin nhận chưa đọc trong mọi hội thoại của chính người đó. Sự kiện realtime
-và thao tác đọc invalidate cache; polling 30 giây bổ sung khi cần, không
-poll tab ẩn/offline. Guest và tài khoản khóa không gọi API chat.
+Header và thanh điều hướng dùng `useUnreadCounts`/`useNavigationCounts`, cache
+riêng theo người xem. Một request `/notifications/navigation-counts` trả số
+tin nhắn, thông báo chưa đọc và giỏ hàng. Sự kiện realtime, thao tác đọc và
+thay đổi giỏ hàng invalidate cache; reconnect tải lại số đếm. Guest không gọi
+API; API trả số tin nhắn bằng 0 cho tài khoản khóa.

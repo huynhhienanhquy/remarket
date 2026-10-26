@@ -443,9 +443,6 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         "carrier": {
           "type": "string"
         },
-        "tracking_code": {
-          "type": "string"
-        },
         "buyer_confirmed_received": {
           "type": "boolean"
         },

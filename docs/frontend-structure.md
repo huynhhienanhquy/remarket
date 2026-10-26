@@ -23,10 +23,10 @@ apps/web/src/
 │   ├── environment.ts, queryClient.ts
 │   └── route/router.tsx, guards.tsx, navigation configs, __tests__/
 ├── constants/queryKeys.ts
-├── contexts/SessionContext.tsx, RealtimeContext.tsx, ShellContext.tsx, __tests__/
+├── contexts/SessionContext.tsx, RealtimeContext.tsx, __tests__/
 ├── data/authBenefits.ts
 ├── helpers/errors.ts, adminErrors.ts, fieldMessages.ts
-├── hooks/useConnectivity.ts, useUnreadCounts.ts, useUnreadMessageCount.ts, useAdminParams.ts
+├── hooks/useConnectivity.ts, useUnreadCounts.ts, useNavigationCounts.ts, useAdminParams.ts
 ├── layouts/
 │   ├── RootLayout/RootLayout.tsx
 │   ├── AccountShell/AccountShell.tsx, AccountNavigation.test.tsx
@@ -36,7 +36,7 @@ apps/web/src/
 │   ├── <PageName>.tsx và tests hiện có
 │   ├── sections/ khi có UI riêng
 │   └── hooks/ và helpers/config riêng khi cần
-├── services/api.ts, http.ts, httpAdapter.ts, endpoints/, __tests__/
+├── services/api.ts, http.ts, httpAdapter.ts, endpoints/auth.ts, __tests__/
 ├── stores/sessionStore.ts, sessionScope.ts
 ├── styles/globals.css, typography.css
 ├── tests/setup.ts, test-data.ts, http-context.ts, renderMemberPage.tsx
@@ -66,7 +66,8 @@ nguyên thân khai báo. Không còn tầng route-area, `app/`, `lib/`,
 | Hook dùng chung | `hooks/` |
 | Shell/layout | `layouts/<LayoutName>/` |
 | Route screen và phần riêng | `pages/<PageName>/`, `sections/`, `hooks/` |
-| HTTP transport và typed endpoint | `services/`, `services/endpoints/` |
+| HTTP transport và browser auth | `services/`, `services/endpoints/auth.ts` |
+| Typed endpoint dùng chung web/mobile | `packages/api-client/src/` |
 | Session identity/revision/listeners và scope theo tab | `stores/` |
 | Global CSS | `styles/` |
 | Interface frontend dùng chung | `types/api.ts` |

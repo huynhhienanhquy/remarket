@@ -39,7 +39,3 @@ export function okList<T>(
     meta: envelopeMeta(res, { page: page.page, page_size: page.page_size, total: page.total, total_pages: page.total_pages }),
   });
 }
-
-export function noContent(res: Response): Response {
-  return res.status(204).send();
-}

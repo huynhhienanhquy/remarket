@@ -183,8 +183,3 @@ export function useSession(): SessionContextValue {
   if (!context) throw new Error("useSession must be used inside <SessionProvider>");
   return context;
 }
-
-/** Convenience for pages that only need the current viewer. */
-export function useViewer(): SessionUser | null {
-  return useSession().viewer;
-}

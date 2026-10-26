@@ -1,5 +1,10 @@
 # Badge tin nhắn chưa đọc — 09/10/2026
 
+Cập nhật 26/10/2026: header và thanh điều hướng hiện dùng
+`useUnreadCounts`/`useNavigationCounts` với `/notifications/navigation-counts`.
+Hook `useUnreadMessageCount` cũ đã được gỡ vì không còn nơi gọi. Các mô tả
+polling và kết quả kiểm chứng bên dưới ghi nhận triển khai ngày 09/10.
+
 Icon Tin nhắn trong header desktop và thanh điều hướng mobile hiển thị số
 tin nhận chưa đọc. Badge dùng cùng kiểu đỏ với Thông báo; 0 thì ẩn, trên 99
 hiển thị `99+`, nhãn truy cập vẫn chứa số đầy đủ.

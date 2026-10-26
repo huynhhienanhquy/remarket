@@ -26,16 +26,6 @@ export function networkError(message = "Không thể kết nối máy chủ."): 
   });
 }
 
-export function unauthorizedError(
-  message = "Phiên đăng nhập đã hết hạn.",
-): ApiError {
-  return new ApiError({
-    code: API_ERROR_CODES.UNAUTHORIZED,
-    message,
-    status: 401,
-  });
-}
-
 /**
  * Field messages of a 422 response, keyed by field name. The HTTP transport
  * lifts `details.fields` into `ApiError.fields`; also accept the original

@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 import { ToastProvider } from "../../components/common";
 import { PageSkeleton } from "../../components/common/PageSkeleton/PageSkeleton";
 import { SessionExpiryWatcher } from "../../components/SessionExpiryWatcher/SessionExpiryWatcher";
-import { ShellProvider } from "../../contexts/ShellContext";
 
 /**
  * Router root: providers that must render <Link> (toast actions) live inside
@@ -12,12 +11,10 @@ import { ShellProvider } from "../../contexts/ShellContext";
 export function RootLayout() {
   return (
     <ToastProvider>
-      <ShellProvider>
-        <SessionExpiryWatcher />
-        <Suspense fallback={<PageSkeleton label="Đang tải trang…" />}>
-          <Outlet />
-        </Suspense>
-      </ShellProvider>
+      <SessionExpiryWatcher />
+      <Suspense fallback={<PageSkeleton label="Đang tải trang…" />}>
+        <Outlet />
+      </Suspense>
     </ToastProvider>
   );
 }

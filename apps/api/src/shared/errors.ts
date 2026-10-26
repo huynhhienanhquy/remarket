@@ -42,11 +42,6 @@ export function notFound(message = "Không tìm thấy nội dung này."): AppEr
   return new AppError(API_ERROR_CODES.NOT_FOUND, message, 404);
 }
 
-/** 404 for a private resource hides its existence (detail-project 17). */
-export function privateNotFound(message = "Không tìm thấy nội dung này."): AppError {
-  return notFound(message);
-}
-
 export function conflict(code: string, message: string, status = 409): AppError {
   return new AppError(code, message, status);
 }

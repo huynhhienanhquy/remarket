@@ -24,10 +24,6 @@ export class AppError extends Error {
   }
 }
 
-export function isAppError(error: unknown): error is AppError {
-  return error instanceof AppError;
-}
-
 /** Compact correlated log line: message only, never payloads or stack data. */
 function log(error: Error, requestId: string): void {
   const message = error.message.replace(/[\r\n]+/g, " ").slice(0, 1_000);

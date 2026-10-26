@@ -61,7 +61,7 @@ Phải kiểm tra đủ login, bootstrap, refresh, logout, logout-all, yêu cầ
 
 `http.ts` dùng `window.location`, `navigator.locks`, `BroadcastChannel` và session scope theo tab. Upload nhận `File`; nhiều hooks dùng React Router, chat read receipt dùng `document.visibilityState`/DOM scroll. Các phần này không thể import nguyên vào Expo.
 
-Nguồn: [HTTP transport](../apps/web/src/services/http.ts), [API types](../apps/web/src/types/api.ts), [catalog endpoints](../apps/web/src/services/endpoints/catalog.ts), [chat hook](../apps/web/src/pages/ConversationPage/hooks/useChatThread.ts).
+Nguồn: [HTTP transport](../apps/web/src/services/http.ts), [API types](../apps/web/src/types/api.ts), [catalog endpoints](../packages/api-client/src/catalog.ts), [chat hook](../apps/web/src/pages/ConversationPage/hooks/useChatThread.ts).
 
 **Đề xuất:** `packages/api-client` chứa endpoint builders, types và xử lý envelope/error không phụ thuộc platform. Inject transport và auth adapter từ web/mobile. DTO và policy thuần tiếp tục ở shared. Hooks điều hướng, đọc trạng thái màn hình và UI ở từng app; chỉ tách query logic dùng chung khi thực sự có hai consumer.
 

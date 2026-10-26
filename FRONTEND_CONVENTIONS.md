@@ -24,7 +24,7 @@ new screens match them.
   `config/route/` owns the router, guards and account/admin navigation config.
 - `apps/web/src/constants/queryKeys.ts` — immutable query keys; preserve their
   values. They are also re-exported from `config/queryClient.ts`.
-- `apps/web/src/contexts/**` — session, realtime and shell React providers.
+- `apps/web/src/contexts/**` — session and realtime React providers.
   Provider order and lifecycle remain unchanged. Provider tests live in
   `contexts/__tests__/`.
 - `apps/web/src/data/**` — static application data, such as auth benefit copy.
@@ -49,11 +49,12 @@ new screens match them.
   and the parent component's keys when extracting logic.
 - `apps/web/src/services/api.ts` — `api` is the single data entry point.
   Never call `fetch` directly from a screen; use the HTTP API adapter.
-- `apps/web/src/services/endpoints/**` — typed HTTP endpoint implementations
-  grouped into auth, catalog, commerce, communication and admin. `httpAdapter.ts`
-  assembles those objects; `http.ts` continues to own transport/session behavior,
-  and `types/api.ts` defines the frontend API contract. Service tests belong in
-  `services/__tests__/`.
+- `packages/api-client/src/` — typed catalog, commerce, communication and admin
+  endpoints shared by web and mobile. `apps/web/src/services/endpoints/auth.ts`
+  owns browser authentication; `httpAdapter.ts` assembles the shared endpoints
+  with the browser transport. `http.ts` owns transport/session behavior, and
+  `types/api.ts` re-exports the shared API contract with a browser upload type.
+  Service tests belong in `services/__tests__/`.
 - `apps/web/src/stores/**` — existing session identity/revision/listeners and
   per-tab scope. Keep tokens, cookie coordination and HTTP transport in
   `services/http.ts`; retain the current memory/storage behavior.
@@ -66,8 +67,6 @@ new screens match them.
 - `apps/web/src/config/route/guards.tsx` — `loginPathFor(pathname, search)` returns the
   internal-only login URL with `returnTo`. Always use it for "login then come
   back" flows; never build `returnTo` by hand.
-- `apps/web/src/contexts/ShellContext.tsx` — `useShellTitle(title)` sets the
-  compact mobile header title for deep task pages.
 - `apps/web/src/styles/**` — global styles and typography.
 - `apps/web/src/tests/**` — common test setup, HTTP fixtures and tests spanning
   multiple route areas. Test-only data must stay out of runtime modules.

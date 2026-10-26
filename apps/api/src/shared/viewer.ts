@@ -1,4 +1,4 @@
-import { eligibleCategoryIds, loadCategoryEligibility } from "../services/category-policy.js";
+import { eligibleCategoryIds } from "../services/category-policy.js";
 import type { Category, Product } from "@prisma/client";
 import { prisma } from "../utils/prisma.js";
 import type { AuthRequest } from "../middleware/auth.js";
@@ -99,5 +99,3 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
     isLeaf: leaf.isLeaf,
   };
 }
-
-export function activeCategoryIds(): Promise<Set<string>> { return loadCategoryEligibility(prisma); }
