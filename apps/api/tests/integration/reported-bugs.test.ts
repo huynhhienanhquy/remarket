@@ -4,6 +4,8 @@ import request from "supertest";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
+import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
 import { blockProduct, lockUser } from "../../src/services/admin-moderation.js";
 
@@ -46,7 +48,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("reported privacy and order regr
     await prisma.order.deleteMany({ where: { buyerId: { in: users } } });
     await prisma.user.deleteMany({ where: { id: { in: users } } });
     await prisma.category.deleteMany({ where: { id: { in: categories } } });
-    await prisma.$disconnect();
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
   });
 
   it("scrubs the deleted account's name in history while preserving the other participant's name", async () => {
@@ -128,7 +130,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("reported privacy and order regr
   it("offers and executes buyer cancellation for a confirmed meetup", async () => {
     const { buyer, order, product } = await sale("CONFIRMED");
     const response = await request(app).get(`/api/v1/orders/${order.id}`).set("Authorization", buyer.authorization).expect(200);
-    expect(response.body.data.allowed_actions).toEqual(expect.arrayContaining(["cancel", "deliver"]));
+    expect(response.body.data.allowed_actions).toContain("cancel");
+    expect(response.body.data.allowed_actions).not.toContain("deliver");
     await request(app).post(`/api/v1/orders/${order.id}/actions`).set("Authorization", buyer.authorization)
       .send({ action: "cancel", expected_version: order.version, reason: "Không thể gặp mặt" }).expect(200);
     expect(await prisma.product.findUnique({ where: { id: product.id } })).toMatchObject({ status: "ACTIVE", reservedOrderId: null });

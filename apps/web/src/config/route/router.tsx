@@ -31,7 +31,6 @@ const OrderDetailPage = lazy(() => import("../../pages/OrderDetailPage/OrderDeta
 const CartPage = lazy(() => import("../../pages/CartPage/CartPage").then((m) => ({ default: m.CartPage })));
 const CheckoutPage = lazy(() => import("../../pages/CheckoutPage/CheckoutPage").then((m) => ({ default: m.CheckoutPage })));
 const MessagesPage = lazy(() => import("../../pages/MessagesPage/MessagesPage").then((m) => ({ default: m.MessagesPage })));
-const ConversationPage = lazy(() => import("../../pages/ConversationPage/ConversationPage").then((m) => ({ default: m.ConversationPage })));
 const SupportListPage = lazy(() => import("../../pages/SupportListPage/SupportListPage").then((m) => ({ default: m.SupportListPage })));
 const SupportNewPage = lazy(() => import("../../pages/SupportNewPage/SupportNewPage").then((m) => ({ default: m.SupportNewPage })));
 const SupportTicketPage = lazy(() => import("../../pages/SupportTicketPage/SupportTicketPage").then((m) => ({ default: m.SupportTicketPage })));
@@ -75,9 +74,9 @@ const router = createBrowserRouter([
         children: [{ index: true, element: privateRoute(<CheckoutPage />) }],
       },
       {
-        element: <ChatShell />,
+        element: privateRoute(<ChatShell />),
         children: [
-          { path: "messages/:id", element: privateRoute(<ConversationPage />) },
+          { path: "messages/:id?", element: <MessagesPage /> },
         ],
       },
       {
@@ -133,7 +132,6 @@ const router = createBrowserRouter([
           },
           { path: "favorites", element: <FavoritesPage /> },
           { path: "cart", element: <CartPage /> },
-          { path: "messages", element: <MessagesPage /> },
           { path: "notifications", element: <NotificationsPage /> },
           { path: "orders", element: <OrdersPage role="buyer" /> },
           { path: "orders/:id", element: <OrderDetailPage role="buyer" /> },

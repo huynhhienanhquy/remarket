@@ -29,7 +29,7 @@ export async function loadCategoryEligibility(tx: Prisma.TransactionClient, ids?
       SELECT c."id", c."parentId", c."status" FROM "Category" c
       JOIN chain child ON c."id" = child."parentId"
     )
-    SELECT c."id", c."parentId", c."status", NOT EXISTS (
+    SELECT c."id", c."parentId", c."status"::text AS status, NOT EXISTS (
       SELECT 1 FROM "Category" child WHERE child."parentId" = c."id"
     ) AS "isLeaf" FROM "Category" c WHERE c."id" IN (SELECT "id" FROM chain)
     ORDER BY c."id" ${lock ? Prisma.sql`FOR SHARE OF c` : Prisma.empty}

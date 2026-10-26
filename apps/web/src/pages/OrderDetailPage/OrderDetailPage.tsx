@@ -219,7 +219,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
                   loading={pendingAction === "deliver"}
                   onClick={openDeliver}
                 >
-                  Xác nhận giao hàng
+                  Ghi nhận đã giao hàng
                 </Button>
               )}
 

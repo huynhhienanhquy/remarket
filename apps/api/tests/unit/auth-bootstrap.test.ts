@@ -34,7 +34,8 @@ beforeEach(() => {
   client.$executeRaw.mockResolvedValue(1);
   client.$queryRaw.mockImplementation(async (query: TemplateStringsArray) => {
     const sql = query.join("?");
-    if (sql.includes("WITH locked_user")) return [lockedRow(await client.authToken.findUnique())];
+    const record = await client.authToken.findUnique.getMockImplementation()?.();
+    if (sql.includes("locked_user AS") && record) return [lockedRow(record)];
     return [];
   });
   client.$transaction.mockImplementation((fn: (tx: typeof client) => Promise<unknown>) => fn(client));
@@ -48,7 +49,8 @@ describe("cookie session discovery", () => {
   it("discovers only the selected tab cookie in a jar containing multiple accounts", async () => {
     const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("X-Session-Scope", scope).set("Cookie", sharedJar).expect(200);
     expect(response.body.data.user.id).toBe(user.id);
-    expect(client.authToken.findUnique.mock.calls[0]![0]).toEqual({ where: { tokenHash: sha256("opaque-test-token") } });
+    expect(client.$queryRaw.mock.calls[0]![1]).toBe(sha256("opaque-test-token"));
+    expect(client.authToken.findUnique).not.toHaveBeenCalled();
     expect(response.headers["set-cookie"]).toBeUndefined();
   });
 
@@ -99,6 +101,7 @@ describe("cookie session discovery", () => {
     expect(response.headers["set-cookie"]).toBeUndefined();
     expect(client.$executeRaw).not.toHaveBeenCalled();
     expect(client.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(client.$transaction).not.toHaveBeenCalled();
     const sql = client.$queryRaw.mock.calls[0]![0].join("?");
     expect(sql).toContain('FROM "User"');
     expect(sql).toContain('CROSS JOIN locked_user');
@@ -116,7 +119,7 @@ describe("cookie session discovery", () => {
     expect(response.body.data.user.role).toBe("ADMIN");
     expect(client.user.findUnique).not.toHaveBeenCalled();
     expect(client.session.findUnique).not.toHaveBeenCalled();
-    expect(client.authToken.findUnique).toHaveBeenCalledTimes(1);
+    expect(client.authToken.findUnique).not.toHaveBeenCalled();
   });
   it.each([null, { ...token, expiresAt: new Date(0) }])("returns guest for unknown or expired cookies", async (record) => {
     client.authToken.findUnique.mockResolvedValue(record);
@@ -132,7 +135,7 @@ describe("cookie session discovery", () => {
     expect(client.$executeRaw).not.toHaveBeenCalled();
   });
   it("does not clear cookies or report a guest on a database timeout", async () => {
-    client.$transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Timed out", { code: "P2028", clientVersion: "5.22.0" }));
+    client.$queryRaw.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("Timed out", { code: "P2028", clientVersion: "5.22.0" }));
     const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(409);
     expect(response.body.error.code).toBe("RETRY_LATER");
     expect(response.headers["set-cookie"]).toBeUndefined();
@@ -162,5 +165,25 @@ describe("cookie session discovery", () => {
     await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
     const payload = client.outboxEvent.createMany.mock.calls[0]![0].data[0].payload;
     expect(payload).toEqual({ session_ids: ["session"] });
+  });
+
+  it.each([
+    { deletedAt: new Date() }, { transport: "MOBILE" }, { purpose: "RESET_PASSWORD" },
+    { tokenSessionId: "another-session" }, { tokenUserId: "another-user" },
+    { revokedAt: new Date() }, { sessionExpiresAt: new Date(0) },
+  ])("never discovers an invalid state: %j", async (changes) => {
+    client.$queryRaw.mockResolvedValue([{ ...lockedRow(), ...changes }]);
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data).toEqual({ user: null, access_token: null });
+    expect(client.authToken.update).not.toHaveBeenCalled();
+  });
+
+  it("rechecks a hash mismatch in a transaction before revoking it", async () => {
+    client.$queryRaw.mockResolvedValue([{ ...lockedRow(), refreshHash: "different-hash" }]);
+    const response = await request(createApp()).post("/api/v1/auth/bootstrap").set("Cookie", cookie).expect(200);
+    expect(response.body.data.user).toBeNull();
+    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(client.session.update).toHaveBeenCalledWith({ where: { id: "session" }, data: { revokedAt: expect.any(Date) } });
   });
 });

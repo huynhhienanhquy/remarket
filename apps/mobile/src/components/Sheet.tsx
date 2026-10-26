@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   View,
@@ -40,6 +41,12 @@ export function Sheet({
           paddingTop: insets.top + 24,
         }}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Đóng bảng"
+          onPress={onClose}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        />
         <View
           accessibilityViewIsModal
           style={{

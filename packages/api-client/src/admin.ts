@@ -10,6 +10,7 @@ export function adminEndpoints(http: HttpTransport): AdminApi {
     dashboard: (from, to) => http.get("/admin/dashboard", { from, to }),
     users: (query) => http.get("/admin/users", { ...query }),
     user: (id) => http.get(`/admin/users/${id}`),
+    openSystemConversation: (id) => http.post(`/admin/users/${id}/conversation`, {}),
     lockUser: (id, reason) => http.post(`/admin/users/${id}/lock`, { reason }),
     unlockUser: (id) => http.post(`/admin/users/${id}/unlock`),
     products: (query) => http.get("/admin/products", { ...query }),

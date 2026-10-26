@@ -4,6 +4,8 @@ import request from "supertest";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
+import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { deliverMobilePush } from "../../src/jobs/push.js";
 import { verifyAccessToken } from "../../src/shared/tokens.js";
 
@@ -52,7 +54,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
         where: { OR: [{ buyerId: { in: ids } }, { sellerId: { in: ids } }] },
       });
       await prisma.user.deleteMany({ where: { id: { in: ids } } });
-      await prisma.$disconnect();
+      await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
     });
     it("separates browser/native refresh, preserves bootstrap, and revokes replay on the correct device", async () => {
       const user = await account();

@@ -14,6 +14,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DIRECT_URL: z.string().optional(),
   DATABASE_USE_DIRECT_URL: z.enum(["true", "false"]).default("false"),
+  DATABASE_DRIVER_ADAPTER: z.enum(["native", "pg"]).default("native"),
   DATABASE_CONNECTION_LIMIT: z.coerce.number().int().min(1).max(50).default(5),
   BACKGROUND_DATABASE_URL: z.string().min(1).optional(),
   BACKGROUND_DATABASE_CONNECTION_LIMIT: z.coerce.number().int().min(1).max(10).default(1),
@@ -35,7 +36,7 @@ const schema = z.object({
   PUBLIC_WEB_URL: z.string().url().default("http://localhost:5173"),
   BCRYPT_COST: z.coerce.number().int().min(10).max(14).default(12),
   ORDER_CONFIRM_TIMEOUT_HOURS: z.coerce.number().int().min(1).max(72).default(24),
-  STORAGE_DRIVER: z.enum(["local", "database", "supabase"]).default("database"),
+  STORAGE_DRIVER: z.enum(["local", "database", "supabase"]).default("supabase"),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1).optional(),
   STORAGE_BUCKET: z.string().trim().min(1).default("remarket-private"),
@@ -53,6 +54,7 @@ const schema = z.object({
   RUN_JOBS: z.enum(["auto", "true", "false"]).default("auto"),
   WORKER_INTERVAL_MS: z.coerce.number().int().min(5_000).max(300_000).default(60_000),
   OUTBOX_INTERVAL_MS: z.coerce.number().int().min(250).max(60_000).default(1_000),
+  MOBILE_PUSH_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(5_000),
 }).superRefine((value, ctx) => {
   if (value.DATABASE_USE_DIRECT_URL === "true" && !value.DIRECT_URL) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["DIRECT_URL"], message: "DIRECT_URL is required when DATABASE_USE_DIRECT_URL=true" });
@@ -73,6 +75,13 @@ const schema = z.object({
           message: `${field} is required when STORAGE_DRIVER=supabase`,
         });
       }
+    }
+    if (value.SUPABASE_SERVICE_ROLE_KEY?.startsWith("sb_publishable_")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SUPABASE_SERVICE_ROLE_KEY"],
+        message: "Use a server-only Supabase service-role key, not a publishable key",
+      });
     }
   }
   if (value.NODE_ENV === "production") {
@@ -137,6 +146,7 @@ export const env = {
   emailEnabled: raw.EMAIL_ENABLED === "true",
   trustProxyHops: raw.TRUST_PROXY_HOPS ?? (raw.NODE_ENV === "production" ? 1 : 0),
   databaseUrl: raw.DATABASE_URL,
+  databaseDriverAdapter: raw.DATABASE_DRIVER_ADAPTER,
   databaseRuntimeUrl: raw.DATABASE_USE_DIRECT_URL === "true" ? raw.DIRECT_URL! : raw.DATABASE_URL,
   databaseConnectionLimit: raw.DATABASE_CONNECTION_LIMIT,
   backgroundDatabaseUrl: raw.BACKGROUND_DATABASE_URL ?? (raw.DATABASE_USE_DIRECT_URL === "true" ? raw.DIRECT_URL! : raw.DATABASE_URL),
@@ -176,6 +186,7 @@ export const env = {
   runJobs: raw.RUN_JOBS === "auto" ? raw.NODE_ENV !== "test" : raw.RUN_JOBS === "true",
   workerIntervalMs: raw.WORKER_INTERVAL_MS,
   outboxIntervalMs: raw.OUTBOX_INTERVAL_MS,
+  mobilePushIntervalMs: raw.MOBILE_PUSH_INTERVAL_MS,
   /** Refresh cookie name shared by login/refresh/logout. */
   refreshCookie: "remarket_refresh",
 } as const;

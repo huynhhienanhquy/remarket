@@ -25,6 +25,65 @@ beforeEach(() => { context = httpContext(member); context.reply("GET", `/orders/
 afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); });
 
 describe("order actions through the HTTP adapter", () => {
+  it("ships without manual tracking input and displays the code returned by the server", async () => {
+    const trackingCode = "RM0123456789ABCDEF01234567";
+    context.reply("GET", `/orders/${order.id}`, { ...order, status: "CONFIRMED", allowed_actions: ["ship", "support"] });
+    context.on("POST", `/orders/${order.id}/actions`, () => {
+      const updated = { ...order, status: "SHIPPING", version: 8, allowed_actions: ["deliver", "support"],
+        delivery: { ...order.delivery, carrier: "GHTK", tracking_code: trackingCode } };
+      context.reply("GET", `/orders/${order.id}`, updated);
+      return updated;
+    });
+    harness.show(<OrderDetailPage role="seller" />, `/sales/${order.id}`, "/sales/:id");
+    await userEvent.click(await screen.findByRole("button", { name: "Giao hàng" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Giao hàng" }));
+    expect(dialog.queryByRole("textbox", { name: "Mã vận đơn" })).not.toBeInTheDocument();
+    expect(dialog.getByText("Mã vận đơn sẽ được tạo tự động khi bạn xác nhận giao hàng.")).toBeInTheDocument();
+    await userEvent.type(dialog.getByRole("textbox", { name: "Đơn vị vận chuyển" }), "GHTK");
+    await userEvent.click(dialog.getByRole("button", { name: "Xác nhận giao hàng" }));
+    expect(await screen.findByText(trackingCode)).toBeInTheDocument();
+    expect(context.requests("POST", `/orders/${order.id}/actions`)[0]?.body).toEqual({ action: "ship", expected_version: 7, carrier: "GHTK" });
+  });
+
+  it.each(["COD", "MEETUP"] as const)("lets the seller record %s delivery without sending buyer confirmations", async (deliveryMethod) => {
+    context.reply("GET", `/orders/${order.id}`, {
+      ...order, status: deliveryMethod === "COD" ? "SHIPPING" : "CONFIRMED", delivery_method: deliveryMethod,
+      allowed_actions: ["deliver", "support"],
+    });
+    context.on("POST", `/orders/${order.id}/actions`, () => {
+      const updated = { ...order, status: "DELIVERED", version: 8, allowed_actions: ["support"] };
+      context.reply("GET", `/orders/${order.id}`, updated);
+      return updated;
+    });
+    harness.show(<OrderDetailPage role="seller" />, `/sales/${order.id}`, "/sales/:id");
+    await userEvent.click(await screen.findByRole("button", { name: "Ghi nhận đã giao hàng" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Ghi nhận đã giao hàng" }));
+    expect(dialog.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(dialog.getByText(/Người mua sẽ kiểm tra hàng và xác nhận hoàn tất/)).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Ghi nhận đã giao" }));
+    await waitFor(() => expect(context.requests("POST", `/orders/${order.id}/actions`)).toHaveLength(1));
+    expect(context.requests("POST", `/orders/${order.id}/actions`)[0]?.body).toEqual({ action: "deliver", expected_version: 7 });
+  });
+
+  it.each(["CONFIRMED", "SHIPPING", "DELIVERED"] as const)("keeps seller actions out of the buyer view at %s", async (status) => {
+    context.reply("GET", `/orders/${order.id}`, {
+      ...order, role: "buyer", status, allowed_actions: ["confirm", "ship", "deliver", "complete", "support"],
+    });
+    harness.show(<OrderDetailPage role="seller" />, `/orders/${order.id}`, "/orders/:id");
+    await screen.findByRole("link", { name: "Đơn mua" });
+    expect(screen.queryByRole("button", { name: "Xác nhận đơn hàng" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Giao hàng" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ghi nhận đã giao hàng" })).not.toBeInTheDocument();
+    expect(context.requests("POST", `/orders/${order.id}/actions`)).toHaveLength(0);
+  });
+
+  it("keeps buyer completion out of the seller view", async () => {
+    context.reply("GET", `/orders/${order.id}`, { ...order, status: "DELIVERED", allowed_actions: ["complete", "support"] });
+    harness.show(<OrderDetailPage role="seller" />, `/sales/${order.id}`, "/sales/:id");
+    await screen.findByRole("link", { name: "Đơn bán" });
+    expect(screen.queryByRole("button", { name: "Hoàn tất đơn hàng" })).not.toBeInTheDocument();
+  });
+
   it("uses the server role and permissions, sends the current version and refreshes the order", async () => {
     context.on("POST", `/orders/${order.id}/actions`, () => {
       const updated = { ...order, version: 8, status: "CONFIRMED", allowed_actions: ["support"] };

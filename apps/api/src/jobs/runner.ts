@@ -25,6 +25,13 @@ const snapshot: WorkerSnapshot = {
   last_error: null,
 };
 let outboxRunning = false;
+let pushRunning = false;
+
+async function pumpPush(): Promise<void> {
+  if (pushRunning) return;
+  pushRunning = true;
+  try { await deliverMobilePush(); } finally { pushRunning = false; }
+}
 
 const HEARTBEAT_ID = "jobs";
 
@@ -164,7 +171,6 @@ export async function runJobsOnce(): Promise<void> {
     await cleanupOrphanUploads();
     await cleanupExpiredRecords();
     await drainOutbox();
-    await deliverMobilePush();
     snapshot.last_success_at = new Date().toISOString();
     snapshot.last_error = null;
   } catch (error) {
@@ -202,7 +208,7 @@ async function drainOutbox(): Promise<void> {
         }
         await deleteStorageObject(payload.storage_path);
       }
-    }, BATCH_SIZE, prisma);
+    }, BATCH_SIZE, prisma, true);
   } finally {
     outboxRunning = false;
   }
@@ -220,7 +226,7 @@ export async function workerSnapshot(): Promise<WorkerSnapshot> {
   };
 }
 
-export function startJobRunner(intervalMs: number, outboxIntervalMs = 1_000): () => void {
+export function startJobRunner(intervalMs: number, outboxIntervalMs = 1_000, pushIntervalMs = 5_000): () => void {
   let stopped = false;
   const execute = (): void => {
     if (stopped) return;
@@ -238,9 +244,16 @@ export function startJobRunner(intervalMs: number, outboxIntervalMs = 1_000): ()
     });
   }, outboxIntervalMs);
   outboxTimer.unref();
+  const push = (): void => {
+    if (!stopped) void pumpPush().catch((error) => console.error("Push pump failed:", error instanceof Error ? error.message : error));
+  };
+  push();
+  const pushTimer = setInterval(push, pushIntervalMs);
+  pushTimer.unref();
   return () => {
     stopped = true;
     clearInterval(timer);
     clearInterval(outboxTimer);
+    clearInterval(pushTimer);
   };
 }

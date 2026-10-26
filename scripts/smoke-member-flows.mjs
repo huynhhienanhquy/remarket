@@ -39,6 +39,14 @@ async function evaluate(tab, expression) {
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
   return r.result.value;
 }
+async function waitForFrame(tab, matches, label) {
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    if (tab.frames.some(matches)) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  assert.fail(`${label}; received ${tab.frames.length} WebSocket frames`);
+}
 async function screenshot(tab, label) {
   const r = await tab.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   await writeFile(path.join(artifacts, `${label}.png`), Buffer.from(r.data, "base64"));
@@ -168,7 +176,10 @@ try {
       await wait(buyer, `document.body.innerText.includes(${JSON.stringify(content)}) && !document.body.innerText.includes('Đang gửi…')`, "message persisted");
       await wait(seller, badge(bottom, 2 + index), "unread badge updates outside the inbox without reload");
     }
-    assert(seller.frames.some(frame => frame.includes("message:created") && frame.includes("Tin mới kiểm thử badge 2")), "Badge update must receive the real WebSocket event");
+    // notification.created may refresh the badge before the next outbox entry
+    // relays message.created. Verify actual WebSocket delivery independently
+    // from the now-faster authoritative count request.
+    await waitForFrame(seller, frame => frame.includes("message:created") && frame.includes("Tin mới kiểm thử badge 2"), "Badge update must receive the real WebSocket event");
     assert.equal(await call(buyer, "return api.chat.unreadCount();"), 1, "Outgoing messages must not increase sender's unread count");
     await screenshot(seller, "chat-badge-new-messages-mobile"); checks.push("chat-badge-live-websocket");
     // A screenshot/navigation does not activate a background CDP tab. Actual read
@@ -257,7 +268,7 @@ try {
   await click(seller, "Xác nhận đơn hàng");
   await wait(seller, "Boolean([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Giao hàng' && !b.disabled))", "order confirmed UI");
   order = await call(seller, `const order = await api.orders.detail(${JSON.stringify(order.id)}); return api.orders.act(order.id,'ship',{expected_version:order.version,carrier:'Kiểm thử',tracking_code:'TEST123'});`);
-  order = await call(buyer, `return api.orders.act(${JSON.stringify(order.id)},'deliver',{expected_version:${order.version}});`);
+  order = await call(seller, `return api.orders.act(${JSON.stringify(order.id)},'deliver',{expected_version:${order.version}});`);
   await visit(buyer, `/orders/${order.id}`, "Hành động", "buyer-order-mobile", true);
   await click(buyer, "Hoàn tất đơn hàng");
   await click(buyer, "Hoàn tất");

@@ -20,12 +20,22 @@ if (label.startsWith("connections")) {
     if (!value) continue;
     const url = new URL(value);
     url.searchParams.set("connection_limit", "2");
+    if (process.argv.includes("--long-connect")) url.searchParams.set("connect_timeout", "15");
     console.log(JSON.stringify({ connection: name, port: url.port, options: Object.fromEntries([...url.searchParams].filter(([key]) => ["pgbouncer", "connection_limit", "sslmode", "connect_timeout", "statement_cache_size"].includes(key))) }));
     const client = new PrismaClient({ datasources: { db: { url: url.toString() } }, log: [{ level: "query", emit: "event" }] });
     client.$on("query", (event) => console.log(JSON.stringify({ connection: name, statement: event.query.split(/\s+/)[0], duration_ms: event.duration })));
     const started = performance.now();
     try {
       await time(`${name}_connect`, () => client.$queryRaw`SELECT 1`);
+      if (name === "runtime" && process.argv.includes("--activity")) {
+        const groups = await client.$queryRaw`
+          SELECT application_name, state, backend_type, COUNT(*)::int AS connections,
+            MAX(EXTRACT(EPOCH FROM (now() - backend_start)))::int AS oldest_seconds,
+            COUNT(*) FILTER (WHERE query LIKE '%remarket_verify_%')::int AS isolated_test_queries
+          FROM pg_stat_activity WHERE datname = current_database()
+          GROUP BY application_name, state, backend_type`;
+        console.log(JSON.stringify({ database_activity: groups }));
+      }
       for (let i = 1; i <= 3; i++) await time(`${name}_warm_${i}`, () => client.$queryRaw`SELECT 1`);
     } catch {
       // Do not dump connection strings or Prisma's long initialization stack.

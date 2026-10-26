@@ -23,6 +23,13 @@ export type MoneyString = string;
 /** ISO 8601 timestamp with timezone. */
 export type IsoDateTime = string;
 
+/** Header badges share a single authenticated database snapshot. */
+export interface NavigationCounts {
+  messages: number;
+  notifications: number;
+  cart: number;
+}
+
 /* ------------------------------------------------------------------ *
  * Envelope (detail-project 14)
  * ------------------------------------------------------------------ */
@@ -375,6 +382,8 @@ export interface CheckoutResult {
 
 export interface ConversationListItem {
   id: string;
+  /** Official channel opened by an admin, independently of any product. */
+  is_system?: boolean;
   /** Authoritative composer capability; historical messages remain readable. */
   can_send?: boolean;
   unavailable_reason?: string | null;
@@ -382,6 +391,7 @@ export interface ConversationListItem {
     id: string;
     name: string;
     avatar_url: string | null;
+    is_system?: boolean;
   };
   product: {
     id: string;
@@ -406,6 +416,8 @@ export interface Message {
   content: string;
   created_at: IsoDateTime;
   read_at: IsoDateTime | null;
+  /** Assigned by the server only for admin messages in an official channel. */
+  is_system?: boolean;
 }
 
 export interface MessagePage {

@@ -1,7 +1,7 @@
 ﻿import { Router } from "express";
 import { z } from "zod";
 import { NOTIFICATION_TYPES } from "@remarket/shared";
-import type { PageMeta } from "@remarket/shared";
+import type { NavigationCounts, PageMeta } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import type { AuthRequest, AuthUser } from "../middleware/auth.js";
@@ -19,6 +19,28 @@ import { toNotification } from "../shared/dto-mappers.js";
  */
 
 const router = Router();
+
+// One authenticated read for all header badges; never load cart products/images
+// just to count them. Locked users retain notifications, without inbox/cart data.
+router.get("/navigation-counts", asyncHandler(async (req: AuthRequest, res) => {
+  const user = currentUser(req);
+  const active = user.status === "ACTIVE";
+  const [counts] = await prisma.$queryRaw<Array<{ messages: bigint; notifications: bigint; cart: bigint }>>`
+    SELECT
+      (SELECT COUNT(*) FROM "Notification" WHERE "userId" = ${user.id} AND "readAt" IS NULL) AS notifications,
+      CASE WHEN ${active} THEN (SELECT COUNT(*) FROM "CartItem" WHERE "userId" = ${user.id}) ELSE 0 END AS cart,
+      CASE WHEN ${active} THEN (
+        SELECT COUNT(*) FROM "Message" m
+        WHERE m."readAt" IS NULL AND m."senderId" <> ${user.id}
+          AND EXISTS (SELECT 1 FROM "Conversation" c WHERE c.id = m."conversationId"
+            AND (c."buyerId" = ${user.id} OR c."sellerId" = ${user.id}))
+      ) ELSE 0 END AS messages
+  `;
+  const result: NavigationCounts = {
+    messages: Number(counts!.messages), notifications: Number(counts!.notifications), cart: Number(counts!.cart),
+  };
+  ok(res, result);
+}));
 
 function currentUser(req: AuthRequest): AuthUser {
   if (!req.user) throw unauthorized();
@@ -58,7 +80,7 @@ router.get(
     const [notifications, total, unread] = await Promise.all([
       prisma.notification.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: offsetOf(paging),
         take: paging.page_size,
       }),

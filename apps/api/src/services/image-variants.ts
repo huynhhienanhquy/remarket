@@ -1,6 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import sharp from "sharp";
-import { getLocalStoragePath, imageVariantPath, putStorageObject, readDatabaseStorageObject } from "./storage.js";
+import { getLocalStoragePath, imageVariantPath, putStorageObject, readDatabaseStorageObject, readDatabaseStorageVariant } from "./storage.js";
 import type { ImageVariant, StorageImage } from "./storage.js";
 
 const pending = new Map<string, Promise<string>>();
@@ -34,8 +34,7 @@ export async function generateImageVariants(storagePath: string, contents: Buffe
 
 /** Legacy shared images without derivatives remain readable with their real MIME type. */
 export async function databaseImageVariant(storagePath: string, variant: ImageVariant): Promise<StorageImage | null> {
-  const image = await readDatabaseStorageObject(imageVariantPath(storagePath, variant));
-  return image ?? (variant === "original" ? null : readDatabaseStorageObject(storagePath));
+  return variant === "original" ? readDatabaseStorageObject(storagePath) : readDatabaseStorageVariant(storagePath, variant);
 }
 
 /** Existing local uploads gain derivatives lazily; never overwrite original bytes. */

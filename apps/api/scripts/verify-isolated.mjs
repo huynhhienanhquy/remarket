@@ -17,8 +17,11 @@ const baseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 assert.ok(baseUrl, "Configure a PostgreSQL URL before isolated verification");
 const isolatedUrl = new URL(baseUrl);
 isolatedUrl.searchParams.set("schema", schema);
-isolatedUrl.searchParams.set("connection_limit", process.argv.includes("--mobile-only") || process.argv.includes("--storage-only") ? "1" : "5");
-const admin = new PrismaClient({ datasources: { db: { url: baseUrl } } });
+isolatedUrl.searchParams.set("connection_limit", process.argv.includes("--driver-pg") || process.argv.includes("--system-chat-only") ? "2" : process.argv.includes("--mobile-only") || process.argv.includes("--storage-only") ? "1" : "5");
+const adminUrl = new URL(baseUrl);
+adminUrl.searchParams.set("connection_limit", "1");
+adminUrl.searchParams.set("pool_timeout", "30");
+const admin = new PrismaClient({ datasources: { db: { url: adminUrl.toString() } } });
 const isolated = new PrismaClient({ datasources: { db: { url: isolatedUrl.toString() } } });
 const services = [];
 let owned = false;
@@ -28,6 +31,7 @@ const childEnv = {
   DATABASE_URL: isolatedUrl.toString(), DIRECT_URL: isolatedUrl.toString(),
   BACKGROUND_DATABASE_URL: isolatedUrl.toString(),
   TEST_DATABASE_URL: isolatedUrl.toString(), DATABASE_USE_DIRECT_URL: "false",
+  ...(process.argv.includes("--driver-pg") ? { DATABASE_DRIVER_ADAPTER: "pg", DATABASE_CONNECTION_LIMIT: "2", BACKGROUND_DATABASE_CONNECTION_LIMIT: "1" } : {}),
   DATABASE_TRANSACTION_TIMEOUT_MS: "120000", DATABASE_TRANSACTION_MAX_WAIT_MS: "60000",
   ...(process.argv.includes("--mobile-only") || process.argv.includes("--storage-only") ? { DATABASE_CONNECTION_LIMIT: "1", BACKGROUND_DATABASE_CONNECTION_LIMIT: "1" } : {}),
   JWT_SIGNING_KEY: randomUUID() + randomUUID(), JWT_SECRET: undefined,
@@ -79,7 +83,22 @@ try {
   // normal prisma:deploy keeps its deployment lock.
   await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"], apiDir, { PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" });
   if (process.argv.includes("--query-plans")) await run("tsx/cli", ["scripts/verify-query-plans.ts"]);
-  if (!process.argv.includes("--browser-only")) await run("vitest/vitest.mjs", ["run", process.argv.includes("--mobile-only") ? "tests/integration/mobile.test.ts" : process.argv.includes("--storage-only") ? "tests/integration/shared-storage.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration", "--testTimeout=120000", "--hookTimeout=120000"]);
+  const targets = process.argv.includes("--product-reads-only")
+    ? ["tests/integration/product-reads.test.ts", "tests/integration/navigation.test.ts", "tests/integration/product-search.test.ts", "tests/integration/image-availability.test.ts"]
+    : process.argv.includes("--system-chat-only")
+    ? ["tests/integration/system-chat.test.ts"]
+    : process.argv.includes("--communication-only")
+    ? ["tests/integration/communication-performance.test.ts"]
+    : process.argv.includes("--performance-only")
+    ? ["tests/integration/shared-storage.test.ts", "tests/integration/image-availability.test.ts", "tests/integration/product-search.test.ts", "tests/integration/reliability.test.ts"]
+    : process.argv.includes("--storage-only")
+    ? ["tests/integration/shared-storage.test.ts", "tests/integration/image-availability.test.ts"]
+    : [process.argv.includes("--navigation-only") ? "tests/integration/navigation.test.ts" : process.argv.includes("--mobile-only") ? "tests/integration/mobile.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration"];
+  if (!process.argv.includes("--browser-only") && !process.argv.includes("--first-load")) await run("vitest/vitest.mjs", ["run", ...targets, "--testTimeout=120000", "--hookTimeout=120000", ...(process.argv.includes("--driver-pg") ? ["--maxWorkers=1"] : [])]);
+  if (process.argv.includes("--first-load")) {
+    await run("tsx/cli", ["tests/fixtures/first-load-seed.ts"], apiDir, { STORAGE_DRIVER: "database" });
+    await run("../../scripts/benchmark-first-load.mjs", ["first-load-member", "--fixture"], path.resolve(apiDir, "../.."), { STORAGE_DRIVER: "database" });
+  }
   if (process.argv.includes("--benchmark") || process.argv.includes("--browser") || process.argv.includes("--browser-only") || process.argv.includes("--auth-browser")) {
     await run("tsx/cli", ["tests/fixtures/browser-seed.ts"]);
   }

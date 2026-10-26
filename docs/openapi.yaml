@@ -83,6 +83,7 @@ x-operation-error-codes:
   listOwnReports: *SessionReadErrors
   listNotifications: *SessionReadErrors
   unreadNotificationCount: *SessionReadErrors
+  navigationCounts: *SessionReadErrors
   readNotification: *RestrictedMutationErrors
   readAllNotifications: *RestrictedMutationErrors
   listSupportTickets: *SessionReadErrors
@@ -93,6 +94,7 @@ x-operation-error-codes:
   adminDashboard: *AdminOperationErrors
   adminUsers: *AdminOperationErrors
   adminLockUser: *AdminOperationErrors
+  adminOpenSystemConversation: *ActiveMutationErrors
   adminUnlockUser: *AdminOperationErrors
   adminUserDetail: *AdminOperationErrors
   adminProducts: *AdminOperationErrors
@@ -501,6 +503,8 @@ paths:
     get: { tags: [Trust], operationId: listNotifications, security: [{ bearerAuth: [] }], parameters: [{ name: type, in: query, schema: { $ref: '#/components/schemas/NotificationType' } }, { name: unread, in: query, schema: { type: boolean } }, { name: unread_only, in: query, schema: { type: boolean } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/NotificationListSuccess' } } }
   /notifications/unread-count:
     get: { tags: [Trust], operationId: unreadNotificationCount, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/CountSuccess' } } }
+  /notifications/navigation-counts:
+    get: { tags: [Trust], operationId: navigationCounts, security: [{ bearerAuth: [] }], responses: { '200': { $ref: '#/components/responses/NavigationCountsSuccess' } } }
   /notifications/{id}/read:
     post: { tags: [Trust], operationId: readNotification, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/MutationCountSuccess' } } }
   /notifications/read-all:
@@ -525,6 +529,29 @@ paths:
     post: { tags: [Admin], operationId: adminUnlockUser, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
   /admin/users/{id}:
     get: { tags: [Admin], operationId: adminUserDetail, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
+  /admin/users/{id}/conversation:
+    post:
+      tags: [Admin]
+      operationId: adminOpenSystemConversation
+      description: Open or reuse an official private channel between the authenticated admin and an active USER account. Product chats are unchanged.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Official conversation opened
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [conversation_id]
+                        additionalProperties: false
+                        properties:
+                          conversation_id: { type: string, format: uuid }
   /admin/products:
     get: { tags: [Admin], operationId: adminProducts, security: [{ bearerAuth: [] }], parameters: [{ name: handled_by, in: query, description: Admin who has audited an action on this entity., schema: { type: string, maxLength: 64 } }, { name: status, in: query, schema: { type: string, enum: [PENDING, ACTIVE, REJECTED, RESERVED, SOLD, INACTIVE, BLOCKED, ALL] } }, { name: category_id, in: query, schema: { type: string } }, { name: seller_id, in: query, schema: { type: string } }, { name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminProductListSuccess' } } }
   /admin/products/{id}/approve:
@@ -1380,6 +1407,9 @@ components:
     CountSuccess:
       description: Count
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: integer, minimum: 0 } } }] } } }
+    NavigationCountsSuccess:
+      description: Header counts from one snapshot; locked accounts receive zero cart and message counts
+      content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [messages, notifications, cart], additionalProperties: false, properties: { messages: { type: integer, minimum: 0 }, notifications: { type: integer, minimum: 0 }, cart: { type: integer, minimum: 0 } } } } }] } } }
     MutationCountSuccess:
       description: Updated and remaining counts
       content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/SuccessEnvelope' }, { type: object, properties: { data: { type: object, required: [unread, updated], additionalProperties: false, properties: { unread: { type: integer, minimum: 0 }, updated: { type: integer, minimum: 0 } } } } }] } } }
@@ -1581,7 +1611,6 @@ components:
         expected_version: { type: integer, minimum: 1 }
         reason: { type: string, maxLength: 500 }
         carrier: { type: string, maxLength: 100 }
-        tracking_code: { type: string, maxLength: 100 }
         buyer_confirmed_received: { type: boolean }
         buyer_confirmed_paid: { type: boolean }
     ReviewInput:
@@ -1931,7 +1960,7 @@ components:
         recipient_phone: { type: string }
         delivery_address: { type: string }
         carrier: { type: string, nullable: true }
-        tracking_code: { type: string, nullable: true }
+        tracking_code: { type: string, nullable: true, description: "Mã do hệ thống tự sinh khi người bán xác nhận giao hàng." }
     OrderReviewState:
       type: object
       description: Review eligibility and the existing review readable by this order's buyer and seller. Only the buyer may submit a review.
@@ -1971,6 +2000,7 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         avatar_url: { type: string, nullable: true }
+        is_system: { type: boolean, description: True when the counterparty is displayed as the official ReMarket system identity. }
     ConversationProduct:
       type: object
       required: [id, title, image_url, status, price]
@@ -1996,6 +2026,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         can_send: { type: boolean, description: Whether this listing permits new messages. }
+        is_system: { type: boolean, description: Official private admin-user channel. }
         unavailable_reason: { type: string, nullable: true }
         counterparty: { $ref: '#/components/schemas/ConversationCounterparty' }
         product: { allOf: [{ $ref: '#/components/schemas/ConversationProduct' }], nullable: true }
@@ -2009,6 +2040,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         client_message_id: { type: string }
+        is_system: { type: boolean, description: Server-assigned official sender flag. Cannot be supplied by a client. }
         sender_id: { type: string, format: uuid }
         content: { type: string }
         created_at: { $ref: '#/components/schemas/IsoDateTime' }

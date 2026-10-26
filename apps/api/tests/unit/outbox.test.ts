@@ -28,7 +28,7 @@ describe("outbox worker leases", () => {
       lockId: null as string | null, lockedAt: null as Date | null, processedAt: null as Date | null,
     }));
     const client = {
-      $queryRaw: vi.fn(async (_sql, _maxAttempts, staleBefore: Date, batchSize: number, lockId: string) => {
+      $queryRaw: vi.fn(async (_sql, _maxAttempts, staleBefore: Date, _filter: unknown, batchSize: number, lockId: string) => {
         const claimed = rows.filter((row) => !row.processedAt && (!row.lockedAt || row.lockedAt < staleBefore)).slice(0, batchSize);
         for (const row of claimed) { row.lockId = lockId; row.lockedAt = new Date(); }
         return claimed.map((row) => ({ ...row }));

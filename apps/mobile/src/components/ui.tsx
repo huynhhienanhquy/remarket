@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MarketplaceImage } from "./MarketplaceImage";
 import { useRouter, usePathname, useLocalSearchParams } from "expo-router";
 import { loginReturnRoute } from "../services/linking";
+import { showBottomNavigation } from "../services/navigation";
 import { useSession } from "../services/session-context";
 import { session } from "../services/runtime";
 import { useNetInfo } from "@react-native-community/netinfo";
@@ -145,6 +146,7 @@ export function Screen({
   titleCard?: boolean;
 }) {
   const connectivity = useNetInfo();
+  const bottomNavigation = showBottomNavigation(usePathname());
   const insets = useSafeAreaInsets();
   const { user } = useSession();
   return (
@@ -213,7 +215,7 @@ export function Screen({
             borderTopWidth: 1,
             borderColor: colors.border,
             padding: 12,
-            paddingBottom: Math.max(12, insets.bottom),
+            paddingBottom: bottomNavigation ? 12 : Math.max(12, insets.bottom),
           }}
         >
           {footer}
@@ -433,12 +435,15 @@ export function LoginPrompt() {
   const pathname = usePathname();
   const params = useLocalSearchParams<{
     product_id?: string;
+    items?: string;
     order_id?: string;
     role?: string;
   }>();
   const query =
     pathname === "/checkout" && params.product_id
       ? `?product_id=${params.product_id}`
+      : pathname === "/checkout" && params.items
+        ? `?items=${params.items}`
       : pathname === "/support/new" && params.order_id
         ? `?order_id=${params.order_id}`
         : pathname === "/orders" && params.role

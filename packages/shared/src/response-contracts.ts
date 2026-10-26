@@ -1752,6 +1752,9 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         "avatar_url": {
           "type": "string",
           "nullable": true
+        },
+        "is_system": {
+          "type": "boolean"
         }
       }
     },
@@ -1819,6 +1822,9 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         "can_send": {
           "type": "boolean"
         },
+        "is_system": {
+          "type": "boolean"
+        },
         "unavailable_reason": {
           "type": "string",
           "nullable": true
@@ -1867,6 +1873,9 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         },
         "client_message_id": {
           "type": "string"
+        },
+        "is_system": {
+          "type": "boolean"
         },
         "sender_id": {
           "type": "string"
@@ -4433,6 +4442,45 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
       }
     },
     {
+      "path": "/notifications/navigation-counts",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "messages",
+                  "notifications",
+                  "cart"
+                ],
+                "properties": {
+                  "messages": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "notifications": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cart": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "path": "/notifications/{id}/read",
       "method": "POST",
       "status": 200,
@@ -4694,6 +4742,34 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
             "properties": {
               "data": {
                 "$ref": "#/components/schemas/AdminUser"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/admin/users/{id}/conversation",
+      "method": "POST",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "conversation_id"
+                ],
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }

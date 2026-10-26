@@ -1,7 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const client = vi.hoisted(() => ({ $queryRaw: vi.fn() }));
+const filesystem = vi.hoisted(() => ({ hasImage: vi.fn() }));
 vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
+vi.mock("../../src/config/env.js", async (original) => {
+  const actual = await original<typeof import("../../src/config/env.js")>();
+  return { env: { ...actual.env, storage: { ...actual.env.storage, driver: "database" } } };
+});
+vi.mock("../../src/services/storage.js", async (original) => ({
+  ...await original<typeof import("../../src/services/storage.js")>(), hasLocalStorageImage: filesystem.hasImage,
+}));
 import { searchPublicProducts } from "../../src/shared/product-search.js";
 import type { ProductSearch } from "../../src/shared/product-search.js";
 import { ANONYMOUS_VIEWER } from "../../src/shared/dto-mappers.js";
@@ -14,7 +22,7 @@ const row = {
   sellerName: "Seller", sellerAvatar: null, sellerProvince: "VN-01", sellerJoinedAt: new Date(),
   rating: 4.666666, reviewCount: 3n, completedSalesCount: 2n, favorited: false, total: 7n,
 };
-beforeEach(() => { vi.resetAllMocks(); client.$queryRaw.mockResolvedValue([row]); });
+beforeEach(() => { vi.resetAllMocks(); client.$queryRaw.mockResolvedValue([row]); filesystem.hasImage.mockResolvedValue(false); });
 describe("single-snapshot public search", () => {
   it("maps exact money/reputation/page metadata with only one SQL query", async () => {
     const result = await searchPublicProducts(input, ANONYMOUS_VIEWER);
@@ -45,5 +53,23 @@ describe("single-snapshot public search", () => {
       .toMatchObject({ is_favorited: true, is_blocked: false, is_hidden: false });
     expect((await searchPublicProducts(input, { ...ANONYMOUS_VIEWER, viewerId: "buyer" })).items[0])
       .not.toHaveProperty("is_blocked");
+  });
+
+  it("returns the placeholder for missing bytes and rechecks restored images without caching availability", async () => {
+    const image = { ...row, imageUrl: "/api/v1/uploads/missing.png", imagePath: "users/seller/product/missing.png", imageInDatabase: false };
+    client.$queryRaw.mockResolvedValueOnce([image]).mockResolvedValueOnce([{ ...image, imageInDatabase: true }]);
+    const first = await searchPublicProducts(input, ANONYMOUS_VIEWER);
+    expect(first.items[0]!.image_url).toBeNull();
+    const next = await searchPublicProducts(input, ANONYMOUS_VIEWER);
+    expect(next.items[0]!.image_url).toContain("signature=");
+    expect(client.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves readable legacy files when their shared bytes have not been imported yet", async () => {
+    client.$queryRaw.mockResolvedValue([{ ...row, imageUrl: "/api/v1/uploads/local.png",
+      imagePath: "users/seller/product/local.png", imageInDatabase: false }]);
+    filesystem.hasImage.mockImplementation(async (path: string) => path.endsWith("/local.png"));
+    expect((await searchPublicProducts(input, ANONYMOUS_VIEWER)).items[0]!.image_url).toContain("signature=");
+    expect(client.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

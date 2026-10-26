@@ -15,6 +15,23 @@ describe("push navigation", () => {
     expect(notificationRoute("admin", id)).toBeNull();
     expect(notificationRoute("order", null)).toBeNull();
   });
+  it("opens moderation, support and system notifications in the correct account area", () => {
+    const admin = { role: "ADMIN", status: "ACTIVE" } as const;
+    const member = { role: "USER", status: "ACTIVE" } as const;
+    expect(notificationRoute("product", id, member)).toBe("/my-products");
+    expect(notificationRoute("email_verification", id, admin)).toBe(
+      "/admin/email-verifications",
+    );
+    expect(notificationRoute("account", id, member)).toBe("/account");
+    expect(notificationRoute("ticket", id, admin)).toBe("/admin/support");
+    expect(notificationRoute("ticket", id, member)).toBe(`/support/${id}`);
+    expect(notificationRoute("message", id, member)).toBe(`/messages/${id}`);
+    expect(notificationRoute("report", id, member)).toBe("/reports");
+    expect(notificationRoute("report", id, admin)).toBe("/admin/reports");
+    expect(
+      notificationRoute("product", id, { role: "USER", status: "LOCKED" }),
+    ).toBe("/account");
+  });
   it("returns to the authorized app route after login and rejects external redirects", () => {
     expect(loginReturnRoute(`/orders/${id}`)).toBe(`/orders/${id}`);
     expect(loginReturnRoute("/cart")).toBe("/cart");
@@ -31,12 +48,17 @@ describe("push navigation", () => {
       `/support/new?order_id=${id}`,
     );
     expect(loginReturnRoute("/orders?role=seller")).toBe("/orders?role=seller");
+    expect(loginReturnRoute(`/checkout?items=${id}`)).toBe(
+      `/checkout?items=${id}`,
+    );
     for (const path of [
       "//evil.example",
       "/checkout?product_id=https://evil.example",
       `/checkout?product_id=${id}&redirect=https://evil.example`,
       "/orders?role=admin",
       `/checkout?product_id=${id}&product_id=${id}`,
+      "/checkout?items=invalid",
+      `/checkout?items=${id}&redirect=https://evil.example`,
     ])
       expect(loginReturnRoute(path)).toBe("/(tabs)");
   });

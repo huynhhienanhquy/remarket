@@ -1,12 +1,13 @@
 import { IconButton } from "./components/HeaderIconLink";
 import { CategoryBar } from "./components/CategoryBar";
 import { AccountMenu } from "./components/AccountMenu";
+import { MobileHeaderActions } from "./components/MobileHeaderActions";
 import { useUnreadCounts } from "../../hooks/useUnreadCounts";
 import { Link, useLocation } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
-import { BellIcon, CartIcon, ChatIcon, ChevronLeftIcon, SearchInput, UserIcon } from "../common";
+import { BellIcon, CartIcon, ChatIcon, ChevronLeftIcon, SearchInput } from "../common";
 import { Logo } from "../Logo/Logo";
 
 export function MarketplaceHeader({
@@ -91,25 +92,7 @@ export function MarketplaceHeader({
       <div className="border-b border-line lg:hidden">
         <div className="rm-container flex h-14 items-center gap-3">
           <Logo />
-          <div className="ml-auto flex items-center gap-1">
-            <IconButton to={cartTarget} label="Giỏ hàng" badge={cart} visibleWhenGuest>
-              <CartIcon />
-            </IconButton>
-            {viewer && (
-              <>
-                <IconButton to="/notifications" label="Thông báo" badge={notifications}>
-                  <BellIcon />
-                </IconButton>
-                <Link
-                  to="/account"
-                  aria-label="Tài khoản"
-                  className="flex h-11 w-11 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
-                >
-                  <UserIcon />
-                </Link>
-              </>
-            )}
-          </div>
+          <MobileHeaderActions />
         </div>
         {showSearchRow && (
           <div className="rm-container pb-3">
@@ -142,6 +125,7 @@ export function CompactHeader({ title, backTo }: { title: string; backTo: string
           <ChevronLeftIcon />
         </Link>
         <h1 className="min-w-0 flex-1 truncate t-h3 text-ink">{title}</h1>
+        <MobileHeaderActions />
       </div>
     </header>
   );

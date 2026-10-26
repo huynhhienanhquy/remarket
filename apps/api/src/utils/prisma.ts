@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env.js";
+import { createDatabaseClient } from "./database-client.js";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -12,8 +13,9 @@ if (!runtimeUrl.searchParams.has("connection_limit")) {
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    datasources: { db: { url: runtimeUrl.toString() } },
+  createDatabaseClient({
+    url: runtimeUrl.toString(), connectionLimit: env.databaseConnectionLimit,
+    driver: env.databaseDriverAdapter, applicationName: "remarket-http",
     // Remote PostgreSQL needs enough time for the atomic multi-query workflows.
     transactionOptions: {
       maxWait: env.databaseTransactionMaxWaitMs,
@@ -23,5 +25,13 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+/** Open the first two request connections before accepting traffic. Keep the
+ * configured connection budget; startup absorbs TLS/authentication latency. */
+export async function warmHttpDatabasePool(): Promise<void> {
+  const configured = Number(runtimeUrl.searchParams.get("connection_limit"));
+  const connections = Math.min(2, Number.isFinite(configured) && configured > 0 ? configured : env.databaseConnectionLimit);
+  await Promise.all(Array.from({ length: connections }, () => prisma.$queryRaw`SELECT 1`));
+}
 
 export default prisma;

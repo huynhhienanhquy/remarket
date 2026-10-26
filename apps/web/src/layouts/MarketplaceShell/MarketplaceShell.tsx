@@ -6,6 +6,7 @@ import { queryKeys } from "../../config/queryClient";
 import { MarketplaceHeader } from "../../components/MarketplaceHeader/MarketplaceHeader";
 import { MobileBottomNav } from "../../components/MobileBottomNav/MobileBottomNav";
 import { Footer } from "../../components/Footer/Footer";
+import { useSession } from "../../contexts/SessionContext";
 
 /** Discovery pages keep footer + search row; deep task pages drop both. */
 function isDiscovery(pathname: string): boolean {
@@ -21,6 +22,7 @@ function isDiscovery(pathname: string): boolean {
  * footer on discovery pages, and the mobile bottom navigation (ui-spec 3.1).
  */
 export function MarketplaceShell() {
+  const { status } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -35,6 +37,7 @@ export function MarketplaceShell() {
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,
     queryFn: () => api.categories.tree(),
+    enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
 

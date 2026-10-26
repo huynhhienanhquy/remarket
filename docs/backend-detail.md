@@ -419,9 +419,8 @@ Backend có thể triển khai service riêng cho từng action, router action c
 | confirm | seller | PENDING -> CONFIRMED | trước expiresAt; reservation còn đúng |
 | cancel | buyer/seller | PENDING/CONFIRMED -> CANCELLED | reason bắt buộc |
 | ship | seller | CONFIRMED -> SHIPPING | chỉ COD |
-| deliver | buyer | SHIPPING -> DELIVERED | COD; buyer xác nhận đã nhận |
-| deliver | buyer | CONFIRMED -> DELIVERED | chỉ MEETUP |
-| deliver | seller | SHIPPING -> DELIVERED | chỉ khi có xác nhận buyer theo contract |
+| deliver | seller | SHIPPING -> DELIVERED | chỉ COD; ghi nhận đã giao, không xác nhận nhận hàng/thanh toán thay buyer |
+| deliver | seller | CONFIRMED -> DELIVERED | chỉ MEETUP; seller ghi nhận đã giao trực tiếp |
 | complete | buyer | DELIVERED -> COMPLETED | nhận + trả tiền; không có ticket mở |
 
 Mỗi transition là một transaction:
@@ -660,7 +659,7 @@ OpenAPI phải mô tả đúng endpoint frontend đang gọi. Contract test sẽ
 
 ### E2E
 
-Guest -> register -> verify -> seller đăng tin -> admin approve -> buyer cart/checkout -> seller confirm/ship -> buyer deliver/complete -> review.
+Guest -> register -> verify -> seller đăng tin -> admin approve -> buyer cart/checkout -> seller confirm/ship/deliver -> buyer complete -> review. Với MEETUP, seller confirm rồi deliver trực tiếp, không qua ship.
 
 ## 21. Thứ tự triển khai
 

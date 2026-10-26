@@ -1,8 +1,11 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../config/env.js";
+import { databaseImageCache, databaseVariantCacheKey, invalidateDatabaseImage } from "./database-image-cache.js";
+import { databaseImageReader } from "./database-image-reader.js";
 
 // The compiled API lives in dist/apps/api/src; both builds must find the same
 // legacy uploads when moving existing files into shared storage.
@@ -158,6 +161,33 @@ async function assertStorageResponse(response: Response, operation: string): Pro
   throw new Error(`Storage ${operation} failed with HTTP ${response.status}.`);
 }
 
+/** Migration preflight: do not copy private uploads into a public bucket. */
+export async function assertPrivateSupabaseBucket(): Promise<void> {
+  if (env.storage.driver !== "supabase") throw new Error("Supabase storage is not active.");
+  const response = await fetch(`${env.storage.supabaseUrl}/storage/v1/bucket/${encodeURIComponent(env.storage.bucket)}`, {
+    headers: supabaseHeaders(), signal: AbortSignal.timeout(10_000),
+  });
+  await assertStorageResponse(response, "bucket check");
+  const bucket = await response.json() as { public?: unknown };
+  if (bucket.public !== false) throw new Error("STORAGE_BUCKET must be an existing private Supabase bucket.");
+}
+
+/** Missing-object responses vary across Storage versions; auth/errors must fail. */
+export async function hasSupabaseStorageObject(storagePath: string): Promise<boolean> {
+  if (env.storage.driver !== "supabase") throw new Error("Supabase storage is not active.");
+  const response = await fetch(supabaseObjectUrl(storagePath).replace("/storage/v1/object/", "/storage/v1/object/info/authenticated/"), {
+    headers: supabaseHeaders(), signal: AbortSignal.timeout(10_000),
+  });
+  if (response.ok) return true;
+  if (response.status === 404) return false;
+  if (response.status === 400) {
+    const error = await response.json().catch(() => null) as { code?: unknown; error?: unknown; message?: unknown } | null;
+    if (error?.code === "NoSuchKey" || error?.error === "not_found" || error?.message === "Object not found") return false;
+  }
+  await assertStorageResponse(response, "object check");
+  return false;
+}
+
 export async function putStorageObject(
   storagePath: string,
   contents: Buffer,
@@ -165,10 +195,14 @@ export async function putStorageObject(
 ): Promise<void> {
   if (env.storage.driver === "database") {
     const { prisma } = await import("../utils/prisma.js");
-    await prisma.storageObject.create({
-      data: { storagePath: normalizedStoragePath(storagePath), contents, mimeType: contentType },
-      select: { storagePath: true },
-    });
+    const normalized = normalizedStoragePath(storagePath);
+    invalidateDatabaseImage(normalized);
+    try {
+      await prisma.storageObject.create({
+        data: { storagePath: normalized, contents, mimeType: contentType },
+        select: { storagePath: true },
+      });
+    } finally { invalidateDatabaseImage(normalized); }
     return;
   }
   if (env.storage.driver === "local") {
@@ -195,7 +229,11 @@ export async function deleteStorageObject(storagePath: string): Promise<void> {
   const paths = [storagePath, imageVariantPath(storagePath, "card"), imageVariantPath(storagePath, "detail")];
   if (env.storage.driver === "database") {
     const { prisma } = await import("../utils/prisma.js");
-    await prisma.storageObject.deleteMany({ where: { storagePath: { in: paths.map(normalizedStoragePath) } } });
+    const normalized = paths.map(normalizedStoragePath);
+    for (const objectPath of normalized) invalidateDatabaseImage(objectPath);
+    try {
+      await prisma.storageObject.deleteMany({ where: { storagePath: { in: normalized } } });
+    } finally { for (const objectPath of normalized) invalidateDatabaseImage(objectPath); }
     // Remove any legacy copies too, so a later read cannot re-import a deletion.
   }
   if (env.storage.driver === "local" || env.storage.driver === "database") {
@@ -265,6 +303,12 @@ export function getLegacyLocalStoragePath(storagePath: string): string {
   return localAbsolutePath(storagePath);
 }
 
+/** Availability only; grants and bytes still go through the upload route. */
+export async function hasLocalStorageImage(storagePath: string): Promise<boolean> {
+  try { await access(localAbsolutePath(storagePath), constants.R_OK); return true; }
+  catch { return false; }
+}
+
 export interface StorageImage {
   contents: Buffer;
   mimeType: string;
@@ -273,15 +317,35 @@ export interface StorageImage {
 /** Read bytes only after the upload route has authorized the image. */
 export async function readDatabaseStorageObject(storagePath: string): Promise<StorageImage | null> {
   if (env.storage.driver !== "database") throw new Error("Database storage is not active.");
-  const { prisma } = await import("../utils/prisma.js");
   const normalized = normalizedStoragePath(storagePath);
-  const object = await prisma.storageObject.findUnique({
-    where: { storagePath: normalized }, select: { contents: true, mimeType: true },
-  });
-  if (object) return { contents: Buffer.from(object.contents), mimeType: object.mimeType };
+  return databaseImageCache.read(normalized, async () => {
+    const { prisma } = await import("../utils/prisma.js");
+    const object = await prisma.storageObject.findUnique({
+      where: { storagePath: normalized }, select: { contents: true, mimeType: true },
+    });
+    if (object) return { contents: Buffer.from(object.contents), mimeType: object.mimeType };
 
-  // Gradually share legacy files when their original machine reads them.
-  return importLocalStorageObject(normalized);
+    // Gradually share legacy files when their original machine reads them.
+    return importLocalStorageObject(normalized);
+  });
+}
+
+/** Authorized image reads select the derivative/original in the same batch.
+ * Keep variant entries separate from exact-object reads and legacy backfill. */
+export async function readDatabaseStorageVariant(storagePath: string, variant: "card" | "detail"): Promise<StorageImage | null> {
+  if (env.storage.driver !== "database") throw new Error("Database storage is not active.");
+  const original = normalizedStoragePath(storagePath);
+  const preferred = imageVariantPath(original, variant);
+  return databaseImageCache.read(databaseVariantCacheKey(original, variant), async () => {
+    const row = await databaseImageReader.read({ path: preferred, fallback: original });
+    if (row?.storagePath === preferred) return { contents: Buffer.from(row.contents), mimeType: row.mimeType };
+    // Preserve local-legacy derivative preference and idempotent import. The
+    // common shared-object path only performs this cheap ENOENT filesystem read.
+    const localVariant = await importLocalStorageObject(preferred);
+    if (localVariant) return localVariant;
+    if (row) return { contents: Buffer.from(row.contents), mimeType: row.mimeType };
+    return importLocalStorageObject(original);
+  });
 }
 
 /** Idempotent backfill: retain local files and never overwrite shared objects. */
@@ -301,6 +365,7 @@ export async function importLocalStorageObject(storagePath: string): Promise<Sto
     : extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : null;
   if (!mimeType) throw new Error("Unsupported legacy image type.");
   await prisma.storageObject.createMany({ data: [{ storagePath: normalized, contents, mimeType }], skipDuplicates: true });
+  invalidateDatabaseImage(normalized);
   const object = await prisma.storageObject.findUniqueOrThrow({
     where: { storagePath: normalized }, select: { contents: true, mimeType: true },
   });

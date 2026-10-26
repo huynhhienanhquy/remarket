@@ -127,6 +127,7 @@ function mapConversation(row: ConversationRow, viewerId: string): ConversationLi
   const item = toConversationListItem(
     {
       id: row.id,
+      systemKey: row.systemKey,
       updatedAt: row.updatedAt,
       buyerId: row.buyerId,
       sellerId: row.sellerId,
@@ -138,8 +139,12 @@ function mapConversation(row: ConversationRow, viewerId: string): ConversationLi
     viewerId,
     row._count.messages,
   );
-  const canSend = product === null || (!product.isBlocked && product.deletedAt === null);
-  return { ...item, can_send: canSend, unavailable_reason: canSend ? null : "Tin đăng không còn khả dụng nên không thể nhắn tin mới." };
+  const systemAdminActive = !row.systemKey || (row.seller.role === "ADMIN" && row.seller.status === "ACTIVE"
+    && row.seller.emailVerifiedAt !== null && row.seller.deletedAt === null
+    && row.buyer.status === "ACTIVE" && row.buyer.deletedAt === null);
+  const canSend = systemAdminActive && (product === null || (!product.isBlocked && product.deletedAt === null));
+  return { ...item, can_send: canSend, unavailable_reason: canSend ? null : row.systemKey
+    ? "Kênh hệ thống hiện không thể gửi tin nhắn mới." : "Tin đăng không còn khả dụng nên không thể nhắn tin mới." };
 }
 
 async function conversationItem(
@@ -147,6 +152,7 @@ async function conversationItem(
   viewerId: string,
 ): Promise<ConversationListItem> {
   const row = await prisma.conversation.findUnique({
+    relationLoadStrategy: "join",
     where: { id: conversationId },
     include: {
       ...conversationInclude,
@@ -215,6 +221,7 @@ router.get(
 
     const [conversations, total] = await Promise.all([
       prisma.conversation.findMany({
+        relationLoadStrategy: "join",
         where,
         include: {
           ...conversationInclude,
@@ -382,7 +389,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res) => {
     const viewer = viewerOf(req);
     const conversationId = parseId(req.params.conversationId);
-    await assertConversationParticipant(conversationId, viewer.id);
+    const conversation = await assertConversationParticipant(conversationId, viewer.id);
 
     const query = messagePageQuerySchema.parse(req.query);
     const limit = query.page_size ?? DEFAULT_MESSAGE_PAGE_SIZE;
@@ -412,7 +419,7 @@ router.get(
     const oldest = page[0];
     const nextCursor = hasMore && oldest ? encodeCursor(oldest) : null;
     const data: MessagePage = {
-      items: page.map((message) => toMessage(message)),
+      items: page.map((message) => toMessage(message, Boolean(conversation.systemKey) && message.senderId === conversation.sellerId)),
       next_cursor: nextCursor,
     };
     ok(res, data);
@@ -437,7 +444,7 @@ router.post(
       clientMessageId: input.client_message_id,
       content: input.content,
     });
-    ok(res, { message: toMessage(result.message) }, result.created ? 201 : 200);
+    ok(res, { message: toMessage(result.message, result.isSystem) }, result.created ? 201 : 200);
   }),
 );
 

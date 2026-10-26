@@ -38,6 +38,7 @@ export function httpContext(viewer: SessionUser | null = null) {
   context.reply("GET", "/provinces", [{ code: "VN-01", name: "Hà Nội" }, { code: "VN-52", name: "Hồ Chí Minh" }]);
   context.reply("GET", "/categories", []);
   context.reply("GET", "/conversations/unread-count", 0);
+  context.reply("GET", "/notifications/navigation-counts", { messages: 0, notifications: 0, cart: 0 });
   vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, options) => {
     const url = new URL(String(input), window.location.origin);
     const request: RecordedRequest = {

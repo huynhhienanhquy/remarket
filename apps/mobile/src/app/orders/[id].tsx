@@ -9,9 +9,11 @@ import {
   formatDateTime,
   validateReviewComment,
   ORDER_STATUS_LABELS,
+  CONDITION_LABELS,
 } from "@remarket/shared";
 import { api } from "../../services/runtime";
 import { useSession, queryClient } from "../../services/session-context";
+import { MarketplaceImage } from "../../components/MarketplaceImage";
 import {
   Screen,
   Field,
@@ -20,13 +22,15 @@ import {
   LoginPrompt,
   useAction,
   styles,
+  StatusBadge,
+  colors,
 } from "../../components/ui";
 
 const actionLabels = {
   confirm: "Xác nhận đơn",
   cancel: "Hủy đơn",
   ship: "Đã gửi hàng",
-  deliver: "Đã giao / gặp mặt",
+  deliver: "Ghi nhận đã giao hàng",
   complete: "Hoàn tất",
 } as const;
 export default function OrderDetail() {
@@ -36,7 +40,6 @@ export default function OrderDetail() {
   const action = useAction();
   const [reason, setReason] = useState("");
   const [carrier, setCarrier] = useState("");
-  const [tracking, setTracking] = useState("");
   const [received, setReceived] = useState(false);
   const [paid, setPaid] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
@@ -64,22 +67,73 @@ export default function OrderDetail() {
       />
       {order && (
         <>
-          <Text style={styles.heading}>
-            {ORDER_STATUS_LABELS[order.status].label} ·{" "}
-            {order.counterparty.name}
-          </Text>
-          {order.items.map((item) => (
-            <Text key={item.id} style={styles.text}>
-              {item.title_snapshot} · {formatVnd(item.price)}
+          <View style={styles.card}>
+            <StatusBadge {...ORDER_STATUS_LABELS[order.status]} />
+            <Text style={styles.label}>
+              {order.role === "buyer" ? "Người bán" : "Người mua"}:{" "}
+              {order.counterparty.name}
             </Text>
-          ))}
-          <Text style={styles.heading}>
-            Tổng: {formatVnd(order.total_amount)}
-          </Text>
-          <Text style={styles.muted}>
-            Tiền hàng: {formatVnd(order.subtotal)} · Phí giao nhận:{" "}
-            {formatVnd(order.shipping_fee)}
-          </Text>
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.heading}>Món đồ</Text>
+            {order.items.map((item, index) => (
+              <View
+                key={item.id}
+                style={{
+                  flexDirection: "row",
+                  gap: 12,
+                  paddingTop: index ? 12 : 0,
+                  borderTopWidth: index ? 1 : 0,
+                  borderColor: colors.border,
+                }}
+              >
+                <MarketplaceImage
+                  uri={item.image_url ?? ""}
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 8,
+                    backgroundColor: colors.subtle,
+                  }}
+                />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={styles.label}>{item.title_snapshot}</Text>
+                  <Text style={styles.meta}>
+                    {CONDITION_LABELS[item.condition_snapshot]}
+                  </Text>
+                  <Text style={[styles.label, { fontWeight: "700" }]}>
+                    {formatVnd(item.price)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={styles.card}>
+            <View style={[styles.row, { justifyContent: "space-between" }]}>
+              <Text style={styles.muted}>Tiền hàng</Text>
+              <Text style={styles.text}>{formatVnd(order.subtotal)}</Text>
+            </View>
+            <View style={[styles.row, { justifyContent: "space-between" }]}>
+              <Text style={styles.muted}>Phí giao nhận</Text>
+              <Text style={styles.text}>{formatVnd(order.shipping_fee)}</Text>
+            </View>
+            <View
+              style={[
+                styles.row,
+                {
+                  justifyContent: "space-between",
+                  borderTopWidth: 1,
+                  borderColor: colors.border,
+                  paddingTop: 12,
+                },
+              ]}
+            >
+              <Text style={styles.label}>Tổng thanh toán</Text>
+              <Text style={[styles.heading, { color: colors.green }]}>
+                {formatVnd(order.total_amount)}
+              </Text>
+            </View>
+          </View>
           <Text style={styles.muted}>
             {order.delivery_method === "COD"
               ? "Giao hàng, trả tiền mặt"
@@ -97,6 +151,7 @@ export default function OrderDetail() {
             </Text>
           )}
           <View style={styles.card}>
+            <Text style={styles.heading}>Giao nhận</Text>
             <Text style={styles.text}>
               {order.delivery.recipient_name} · {order.delivery.recipient_phone}
             </Text>
@@ -108,39 +163,46 @@ export default function OrderDetail() {
           {order.allowed_actions.includes("cancel") && (
             <Field label="Lý do hủy" value={reason} onChangeText={setReason} />
           )}
-          {order.allowed_actions.includes("ship") && (
-            <>
-              <Field
-                label="Đơn vị vận chuyển"
-                value={carrier}
-                onChangeText={setCarrier}
-              />
-              <Field
-                label="Mã vận đơn"
-                value={tracking}
-                onChangeText={setTracking}
-              />
-            </>
-          )}
-          {order.allowed_actions.includes("complete") && (
-            <>
-              <Button
-                title={
-                  received ? "✓ Đã nhận đủ hàng" : "Xác nhận đã nhận đủ hàng"
-                }
-                secondary
-                onPress={() => setReceived(!received)}
-              />
-              <Button
-                title={paid ? "✓ Đã thanh toán" : "Xác nhận đã thanh toán"}
-                secondary
-                onPress={() => setPaid(!paid)}
-              />
-            </>
-          )}
+          {order.role === "seller" &&
+            order.allowed_actions.includes("ship") && (
+              <>
+                <Field
+                  label="Đơn vị vận chuyển"
+                  value={carrier}
+                  onChangeText={setCarrier}
+                />
+                <Text style={styles.muted}>
+                  Mã vận đơn sẽ được tạo tự động khi bạn xác nhận giao hàng.
+                </Text>
+              </>
+            )}
+          {order.role === "buyer" &&
+            order.allowed_actions.includes("complete") && (
+              <>
+                <Button
+                  title={
+                    received ? "✓ Đã nhận đủ hàng" : "Xác nhận đã nhận đủ hàng"
+                  }
+                  secondary
+                  onPress={() => setReceived(!received)}
+                />
+                <Button
+                  title={paid ? "✓ Đã thanh toán" : "Xác nhận đã thanh toán"}
+                  secondary
+                  onPress={() => setPaid(!paid)}
+                />
+              </>
+            )}
           <View style={styles.row}>
             {(Object.keys(actionLabels) as Array<keyof typeof actionLabels>)
               .filter((name) => order.allowed_actions.includes(name))
+              .filter(
+                (name) =>
+                  name === "cancel" ||
+                  (name === "complete"
+                    ? order.role === "buyer"
+                    : order.role === "seller"),
+              )
               .map((name) => (
                 <Button
                   key={name}
@@ -164,9 +226,7 @@ export default function OrderDetail() {
                                 await api.orders.act(id, name, {
                                   expected_version: order.version,
                                   ...(name === "cancel" ? { reason } : {}),
-                                  ...(name === "ship"
-                                    ? { carrier, tracking_code: tracking }
-                                    : {}),
+                                  ...(name === "ship" ? { carrier } : {}),
                                   ...(name === "complete"
                                     ? {
                                         buyer_confirmed_received: received,

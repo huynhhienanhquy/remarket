@@ -49,22 +49,44 @@ Schema/migrations nằm trong `apps/api/prisma`. Chạy các lệnh Prisma qua
 
 ## Ảnh dùng chung giữa nhiều máy
 
-Khi mỗi máy chạy API riêng và dùng chung database, dùng `STORAGE_DRIVER=database`
-trong `apps/api/.env` (mặc định mới). Ảnh gốc và WebP được lưu trong PostgreSQL,
-nên máy khác đọc được qua API của chính máy đó. `STORAGE_DRIVER=local` chỉ phù hợp
-khi mọi người cùng truy cập một API có chung thư mục upload.
+Local và production mặc định dùng `STORAGE_DRIVER=supabase`. Ảnh gốc và các bản
+WebP được lưu trong bucket Supabase **private**; PostgreSQL chỉ lưu metadata cho
+ảnh mới. API kiểm tra quyền rồi cấp signed URL ngắn hạn để đọc ảnh.
 
-Cập nhật code trên mọi máy, chạy `prisma:deploy` một lần trên database chung,
-chạy `prisma:generate` và khởi động lại API trên mỗi máy. Để chia sẻ ảnh cũ,
-chạy lệnh sau **trên từng máy đã upload ảnh**:
+Cấu hình trong `apps/api/.env` trên mỗi máy:
+
+```dotenv
+STORAGE_DRIVER=supabase
+SUPABASE_URL=https://mokuyrnkgsmqicvokrsq.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key-cua-project>
+STORAGE_BUCKET=remarket-private
+```
+
+Key chỉ đặt ở backend, không đặt trong biến `VITE_` hoặc `EXPO_PUBLIC_`.
+Để chuyển ảnh cũ từ bảng `StorageObject` hoặc `apps/api/uploads` sang bucket,
+dừng API/worker đang dùng driver cũ, rồi chạy trên từng máy còn giữ ảnh local:
 
 ```sh
+pnpm --filter @remarket/api storage:sync --dry-run
 pnpm --filter @remarket/api storage:sync
 ```
 
-Lệnh giữ nguyên file local, bỏ qua ảnh đã đồng bộ và báo số ảnh chưa có trên máy.
-Ảnh chỉ còn trên máy khác cần được đồng bộ từ máy đó hoặc upload lại. Production
-tiếp tục dùng Supabase Storage private theo [backend runbook](docs/backend-runbook.md).
+Lệnh kiểm tra bucket private, giữ nguyên file local và byte trong database, bỏ qua
+object đã có và bổ sung WebP còn thiếu. `--dry-run` chỉ kiểm tra, không upload.
+Ảnh thiếu hoặc lỗi khiến lệnh trả exit code 1; ảnh chỉ còn trên máy khác cần đồng
+bộ từ máy đó hoặc upload lại. Khởi động lại API/worker sau khi đồng bộ thành công.
+Driver `database` vẫn hỗ trợ dữ liệu cũ khi chọn rõ; `local` dành cho một máy API.
+Xem thêm [backend runbook](docs/backend-runbook.md).
+
+## Tin nhắn hệ thống từ admin
+
+Admin có thể mở **Người dùng → chọn người dùng → Nhắn tin hệ thống** để liên hệ
+với tài khoản đang hoạt động. Người nhận thấy tên **Hệ thống ReMarket** trong hộp
+thư, nội dung tin và thông báo, và có thể trả lời trong cùng hội thoại. Mỗi cặp
+admin/người dùng có một kênh riêng; chat mua bán giữ nguyên. Lịch sử audit ghi
+đúng admin thực hiện. Chạy migration `20261024000000_system_conversations` và
+`prisma:generate` trước khi khởi động API/worker mới. Kiểm thử PostgreSQL an toàn:
+`node apps/api/scripts/verify-isolated.mjs --system-chat-only`.
 
 ## Đăng nhập nhiều tài khoản trên cùng trình duyệt
 
@@ -113,6 +135,21 @@ instance; không tự tăng giới hạn HTTP hiện có.
 đọc lần đầu. Bucket Supabase vẫn private; ảnh Supabase cũ chưa có thumbnail sẽ
 fallback ảnh gốc. URL `example.com/org/net` được bỏ khỏi hiển thị, không sửa DB.
 Xem [báo cáo hiệu năng](docs/performance-check.md) và các giới hạn cache/độ trễ mạng.
+
+Kiểm tra chuyển trang mới nhất: [đo độ trễ ngày 21/10/2026](docs/navigation-performance-2026-10-21.md).
+Với ảnh lưu trong PostgreSQL, API cache byte ảnh tối đa 32 MiB/60 giây và gộp
+các lượt đọc trùng; mỗi request vẫn kiểm tra quyền/chữ ký trước khi dùng cache.
+Header web/mobile dùng chung một API số đếm thay vì tải cả giỏ hàng và gọi từng
+badge riêng. API chuẩn bị tối đa hai connection HTTP trước khi nhận request,
+trong giới hạn pool hiện có. Cập nhật backend trước hoặc đồng thời với web/mobile.
+
+Với localhost dùng Supabase transaction pool (port 6543), có thể bật
+`DATABASE_DRIVER_ADAPTER=pg` và `DATABASE_USE_DIRECT_URL=false` trong
+`apps/api/.env`. Adapter chính thức được pin cùng Prisma 5.22, giữ nguyên giới
+hạn connection và xác minh TLS bằng CA Supabase đi kèm. Không cần nâng Prisma
+hoặc chạy migration cho cập nhật hiệu năng này. Khởi động lại `pnpm dev` sau
+khi đổi cấu hình; đặt `DATABASE_DRIVER_ADAPTER=native` để dùng lại engine cũ.
+Schema kiểm thử riêng vẫn dùng session/direct URL để bảo đảm `search_path`.
 
 ## Xác minh email qua admin
 

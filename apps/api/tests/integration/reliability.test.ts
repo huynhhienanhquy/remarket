@@ -4,10 +4,12 @@ import { apiResponseIssue, validApiResponse } from "@remarket/shared";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
+import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { createOrderReminders } from "../../src/jobs/runner.js";
 import { blockProduct } from "../../src/services/admin-moderation.js";
 import { releaseReservedProducts } from "../../src/services/reservations.js";
-import { enqueueOutbox, processOutboxBatch } from "../../src/outbox/outbox.js";
+import { enqueueOutbox, processOutboxBatch, processRealtimeOutboxBatch } from "../../src/outbox/outbox.js";
 import { cleanupExpiredRecords } from "../../src/jobs/retention.js";
 import { startRealtimeRelay } from "../../src/realtime/relay.js";
 import { onRealtimeEvent } from "../../src/realtime/events.js";
@@ -32,7 +34,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("PostgreSQL reliability regressi
     await prisma.order.deleteMany({ where: { buyerId: { in: users } } });
     await prisma.user.deleteMany({ where: { id: { in: users } } });
     await prisma.category.deleteMany({ where: { id: { in: categories } } });
-    await prisma.$disconnect();
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
   });
 
   it("drains 51 reminder candidates in two batches and creates exactly one event per new notification", async () => {
@@ -93,7 +95,16 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("PostgreSQL reliability regressi
     const assignedA = latch(), commitA = latch(), waitingB = latch();
     const delivered: string[] = [];
     const unsubscribe = onRealtimeEvent((event) => delivered.push(event.aggregateId));
-    const stopRelay = await startRealtimeRelay(50, prisma);
+    // Both worker transactions deliberately hold the two HTTP connections.
+    // Observe/relay through the separate background pool, as the API does.
+    // This regression isolates the legacy per-event workers' commit ordering.
+    // Disable promotion only on its observer so it cannot claim their fixtures.
+    const observer = new Proxy(backgroundPrisma, { get(target, key) {
+      if (key === "$executeRaw") return async () => 0;
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    const stopRelay = await startRealtimeRelay(50, observer);
     function wrappedClient(first: boolean): PrismaClient {
       return new Proxy(prisma, { get(target, key) {
         if (key !== "$transaction") {
@@ -117,9 +128,17 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("PostgreSQL reliability regressi
     try {
     const first = processOutboxBatch(() => undefined, 1, wrappedClient(true));
     await assignedA.promise;
-    const second = processOutboxBatch(() => undefined, 1, wrappedClient(false));
+    const batchWorker = new Proxy(prisma, { get(target, key) {
+      if (key === "$executeRaw") return (query: TemplateStringsArray, ...values: unknown[]) => {
+        waitingB.resolve();
+        return target.$executeRaw(query, ...values);
+      };
+      const value: unknown = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    } });
+    const second = processRealtimeOutboxBatch(batchWorker, 1);
     await waitingB.promise;
-    expect(await prisma.outboxEvent.findMany({ where: { id: { in: [a, b] }, processedAt: { not: null } } })).toHaveLength(0);
+    expect(await backgroundPrisma.outboxEvent.findMany({ where: { id: { in: [a, b] }, processedAt: { not: null } } })).toHaveLength(0);
     commitA.resolve(); await Promise.all([first, second]);
     const rows = await prisma.outboxEvent.findMany({ where: { id: { in: [a, b] } }, orderBy: { relaySequence: "asc" } });
     expect(rows.map((row) => row.id)).toEqual([a, b]);

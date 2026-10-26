@@ -22,7 +22,7 @@ import { clearRefreshCookie, readRefreshCookie, REFRESH_MS, requireTrustedOrigin
 import { consumeEmailToken, createEmailToken, issueEmailToken } from "../services/email-tokens.js";
 import { requestEmailVerification, toEmailVerificationRequest } from "../services/email-verification.js";
 import { RateQuota } from "../services/rate-quota.js";
-import { lockRefreshState } from "../services/refresh-locks.js";
+import { discoverRefreshState, lockRefreshState } from "../services/refresh-locks.js";
 import { createSession, rotateSessionRecords } from "../services/session-issuance.js";
 import { authTransport, authSessionResponse } from "../services/auth-transport.js";
 import { ok } from "../shared/api-response.js";
@@ -260,7 +260,23 @@ async function refreshSession(req: Request, res: Response, bootstrap = false) {
   if (!presented) return unavailableSession(req, res, bootstrap);
 
   const presentedHash = sha256(presented);
-  const candidate = await prisma.authToken.findUnique({ where: { tokenHash: presentedHash } });
+  const discovered = bootstrap ? await discoverRefreshState(prisma, presentedHash) : null;
+  if (bootstrap && !discovered) return unavailableSession(req, res, true);
+  if (discovered) {
+    const { user, session, token } = discovered;
+    const now = Date.now();
+    if (!user.deletedAt && session.transport === authTransport(req)
+      && token.purpose === "REFRESH" && token.sessionId === session.id
+      && token.userId === session.userId && user.id === session.userId
+      && token.expiresAt.getTime() > now && token.consumedAt === null
+      && session.revokedAt === null && session.expiresAt.getTime() > now
+      && session.refreshHash === presentedHash) {
+      return ok(res, { user: toSessionUser(user), access_token: signAccessToken(token.userId, session.id) });
+    }
+    // A suspect credential must be checked again under transaction-held locks
+    // before revocation/outbox writes; discovery alone never changes a session.
+  }
+  const candidate = discovered?.token ?? await prisma.authToken.findUnique({ where: { tokenHash: presentedHash } });
   if (!candidate || candidate.purpose !== "REFRESH" || !candidate.sessionId) {
     return unavailableSession(req, res, bootstrap);
   }

@@ -17,6 +17,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
 describe("Render demo environment", () => {
+  it("defaults local development to Supabase and requires server credentials", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("STORAGE_DRIVER", undefined);
+    const { env } = await import("../../src/config/env.js");
+    expect(env.storage.driver).toBe("supabase");
+    vi.resetModules();
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", undefined);
+    await expect(import("../../src/config/env.js")).rejects.toThrow("SUPABASE_SERVICE_ROLE_KEY is required");
+  });
+  it("rejects a publishable key for backend storage access", async () => {
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sb_publishable_test-only-key");
+    await expect(import("../../src/config/env.js")).rejects.toThrow("not a publishable key");
+  });
   it("uses Render's HTTPS origin without requiring SMTP when email is explicitly disabled", async () => {
     const { env } = await import("../../src/config/env.js");
     expect(env.publicWebUrl).toBe("https://remarket-demo.onrender.com");

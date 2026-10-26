@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "../utils/prisma.js";
 
 export interface RealtimeEvent {
@@ -46,11 +47,35 @@ function retryDelayMs(attempts: number): number {
   return Math.min(60 * 60 * 1000, 1000 * 2 ** Math.min(attempts, 12));
 }
 
+/** Realtime has no external side effect. Commit a whole batch for every API
+ * relay in one round trip, independently of email/storage delivery. The same
+ * transaction lock as the legacy worker orders sequence allocation AND commit. */
+export async function processRealtimeOutboxBatch(client: PrismaClient = prisma, batchSize = 100): Promise<number> {
+  return client.$executeRaw`
+    WITH barrier AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':outbox-relay-sequence', 0))
+    ), candidates AS MATERIALIZED (
+      SELECT event."id" FROM "OutboxEvent" event CROSS JOIN barrier
+      WHERE event."processedAt" IS NULL AND event."attempts" < ${MAX_ATTEMPTS}
+        AND event."nextAttemptAt" <= NOW()
+        AND (event."lockedAt" IS NULL OR event."lockedAt" < ${new Date(Date.now() - LEASE_MS)})
+        AND event."eventType" NOT IN ('email.auth', 'storage.delete')
+      ORDER BY event."createdAt", event."id"
+      LIMIT ${batchSize} FOR UPDATE OF event SKIP LOCKED
+    )
+    UPDATE "OutboxEvent" event
+    SET "processedAt" = NOW(), "relaySequence" = nextval('"OutboxRelaySequence"'),
+        "lockedAt" = NULL, "lockId" = NULL, "lastError" = NULL
+    FROM candidates WHERE event."id" = candidates."id"
+  `;
+}
+
 /** Dispatch with renewable DB leases and ownership checks across workers. */
 export async function processOutboxBatch(
   publish: OutboxPublisher,
   batchSize = 50,
   client: PrismaClient = prisma,
+  sideEffectsOnly = false,
 ): Promise<number> {
   const lockId = randomUUID();
   const staleBefore = new Date(Date.now() - LEASE_MS);
@@ -68,6 +93,7 @@ export async function processOutboxBatch(
         AND "attempts" < ${MAX_ATTEMPTS}
         AND "nextAttemptAt" <= NOW()
         AND ("lockedAt" IS NULL OR "lockedAt" < ${staleBefore})
+        ${sideEffectsOnly ? Prisma.sql`AND "eventType" IN ('email.auth', 'storage.delete')` : Prisma.empty}
       ORDER BY "createdAt" ASC
       FOR UPDATE SKIP LOCKED
       LIMIT ${batchSize}

@@ -3,6 +3,8 @@ import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
+import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { sha256, signAccessToken } from "../../src/shared/tokens.js";
 import { requestEmailVerification } from "../../src/services/email-verification.js";
 
@@ -20,7 +22,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("PostgreSQL admin email approval
     await prisma.notification.deleteMany({ where: { OR: [{ userId: { in: ids } }, { referenceId: { in: ids } }] } });
     await prisma.auditLog.deleteMany({ where: { entityId: { in: ids } } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
-    await prisma.$disconnect();
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
   });
   it("queues own requests, restricts approval and serializes concurrent retries", async () => {
     const user = await account(); const admin = await account("ADMIN");

@@ -20,6 +20,7 @@ import type {
   PageMeta,
   MessagePage,
   Notification,
+  NavigationCounts,
   OrderDetail,
   OrderListResponse,
   OwnProduct,
@@ -198,7 +199,6 @@ export interface OrdersApi {
       expected_version: number;
       reason?: string;
       carrier?: string;
-      tracking_code?: string;
       buyer_confirmed_received?: boolean;
       buyer_confirmed_paid?: boolean;
     },
@@ -251,6 +251,7 @@ export interface ReportsApi {
 }
 
 export interface NotificationsApi {
+  navigationCounts(): Promise<NavigationCounts>;
   list(query: { unread?: boolean; page?: number }): Promise<{
     items: Notification[];
     meta: { total: number; unread: number };
@@ -301,6 +302,7 @@ export interface AdminApi {
     };
   }>;
   user(id: string): Promise<AdminUserItem>;
+  openSystemConversation(id: string): Promise<{ conversation_id: string }>;
   lockUser(id: string, reason: string): Promise<AdminUserItem>;
   unlockUser(id: string): Promise<AdminUserItem>;
   products(query: {

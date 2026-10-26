@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { validateChatMessage } from "@remarket/shared";
-import type { Message } from "@remarket/shared";
+import { mergeMessage, validateChatMessage } from "@remarket/shared";
+import type { Message, MessageHistory } from "@remarket/shared";
 import { useSession } from "@/contexts/SessionContext";
 import { useRealtime } from "@/contexts/RealtimeContext";
 import { api } from "@/services/api";
@@ -30,21 +30,38 @@ export function useChatThread(id: string) {
   const olderAnchor = useRef<number | null>(null);
   const readThrough = useRef("");
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const activeViewer = useRef(viewer?.id);
+  activeViewer.current = viewer?.id;
+  useEffect(() => {
+    activeViewer.current = viewer?.id;
+    return () => { activeViewer.current = undefined; };
+  }, [viewer?.id]);
   const conversation = useQuery({ queryKey: ["chat", "detail", id], queryFn: () => api.chat.detail(id) });
   const history = useInfiniteQuery({ queryKey: queryKeys.messages(id), initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => api.chat.messages(id, pageParam),
     getNextPageParam: (last) => last.next_cursor ?? undefined,
-    refetchInterval: connected ? 30000 : 5000,
+    refetchInterval: connected ? false : 5000,
   });
-  const persisted = history.data?.pages.flatMap((page) => page.items) ?? [];
-  const serverIds = new Set(persisted.map((entry) => `${entry.sender_id}:${entry.client_message_id}`));
-  const messages = [...persisted, ...local.filter((entry) => !serverIds.has(`${entry.message.sender_id}:${entry.message.client_message_id}`)).map((entry) => entry.message)]
-    .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
-  const send = useMutation({ mutationFn: (entry: Message) => api.chat.send(id, { content: entry.content, client_message_id: entry.client_message_id }),
-    onSuccess: ({ message }, input) => {
+  const persisted = useMemo(() => history.data?.pages.flatMap((page) => page.items) ?? [], [history.data]);
+  const serverIds = useMemo(() => new Set(persisted.map((entry) => `${entry.sender_id}:${entry.client_message_id}`)), [persisted]);
+  const messages = useMemo(() => Array.from(new Map([...persisted,
+    ...local.filter((entry) => !serverIds.has(`${entry.message.sender_id}:${entry.message.client_message_id}`)).map((entry) => entry.message)]
+    .map((entry) => [entry.id, entry])).values())
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)), [persisted, local, serverIds]);
+  useEffect(() => {
+    setLocal((entries) => {
+      const remaining = entries.filter((entry) => !serverIds.has(`${entry.message.sender_id}:${entry.message.client_message_id}`));
+      return remaining.length === entries.length ? entries : remaining;
+    });
+  }, [serverIds]);
+  const send = useMutation({ scope: { id: `chat-send:${id}` }, mutationFn: (entry: Message) => api.chat.send(id, { content: entry.content, client_message_id: entry.client_message_id }),
+    onSuccess: async ({ message }, input) => {
+      if (activeViewer.current !== input.sender_id) return;
       setLocal((entries) => entries.map((entry) => entry.message.client_message_id === input.client_message_id ? { message, status: "sent" } : entry));
-      void client.invalidateQueries({ queryKey: ["chat"] });
+      await client.cancelQueries({ queryKey: queryKeys.messages(id) });
+      if (activeViewer.current !== input.sender_id) return;
+      client.setQueryData<MessageHistory>(queryKeys.messages(id), (history) => mergeMessage(history, message));
+      void client.invalidateQueries({ queryKey: ["chat", "conversations"] });
     },
     onError: (error, input) => {
       const retryable = !isApiError(error) || error.isNetwork || error.status >= 500 || error.status === 429 || error.code === "RETRY_LATER";
@@ -55,7 +72,7 @@ export function useChatThread(id: string) {
   });
   const markRead = useMutation({ mutationFn: (messageId: string) => api.chat.markRead(id, messageId), onSuccess: () => {
     void client.invalidateQueries({ queryKey: ["chat", "conversations"] });
-    if (viewer) void client.invalidateQueries({ queryKey: queryKeys.chatUnreadCount(viewer.id) });
+    if (viewer) void client.invalidateQueries({ queryKey: queryKeys.navigationCounts(viewer.id) });
   }, onError: () => { readThrough.current = ""; } });
   const markReadRef = useRef(markRead);
   markReadRef.current = markRead;
@@ -77,7 +94,7 @@ export function useChatThread(id: string) {
       setNewCount(0);
     } else if (messages.length > previousCount.current && !history.isFetchingNextPage) setNewCount((count) => count + messages.length - previousCount.current);
     previousCount.current = messages.length;
-  }, [messages.length, history.isFetchingNextPage]);
+  }, [messages.length, history.isFetchingNextPage, conversation.isSuccess]);
 
   useEffect(() => {
     const element = area.current;
@@ -96,7 +113,7 @@ export function useChatThread(id: string) {
     element.addEventListener("scroll", readVisible);
     document.addEventListener("visibilitychange", readVisible);
     return () => { cancelAnimationFrame(frame); element.removeEventListener("scroll", readVisible); document.removeEventListener("visibilitychange", readVisible); };
-  }, [id, messages.length, online]);
+  }, [id, messages.length, online, conversation.isSuccess]);
 
   useEffect(() => {
     const element = textarea.current;
@@ -106,7 +123,7 @@ export function useChatThread(id: string) {
   const data = conversation.data;
   const allowed = Boolean(viewer?.email_verified_at && data && (data.can_send ?? Boolean(data.product)));
   function submit() {
-    if (!allowed || !online || send.isPending || !content.trim()) return;
+    if (!allowed || !online || !content.trim()) return;
     const error = validateChatMessage(content); setFieldError(error ?? undefined); if (error) return;
     const entry: Message = { id: crypto.randomUUID(), client_message_id: crypto.randomUUID(), sender_id: viewer!.id, content: content.trim(), created_at: new Date().toISOString(), read_at: null };
     nearBottom.current = true;

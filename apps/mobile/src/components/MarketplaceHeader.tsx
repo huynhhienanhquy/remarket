@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../services/runtime";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigationCounts } from "../services/use-navigation-counts";
 import { useSession } from "../services/session-context";
 import { colors, IconButton, styles } from "./ui";
 
@@ -63,25 +64,9 @@ export function MarketplaceHeader({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useSession();
   const [input, setInput] = useState("");
   const value = search ?? input;
   const update = onSearchChange ?? setInput;
-  const notifications = useQuery({
-    queryKey: ["notifications", "unread", user?.id],
-    queryFn: api.notifications.unreadCount,
-    enabled: !!user,
-    refetchInterval: 60_000,
-  });
-  const cart = useQuery({
-    queryKey: ["cart", user?.id],
-    queryFn: api.cart.get,
-    enabled: !!user && user.status === "ACTIVE",
-  });
-  const cartCount = cart.data?.groups.reduce(
-    (total, group) => total + group.items.length,
-    0,
-  );
   const submit =
     onSearchSubmit ??
     (() => router.push({ pathname: "/products", params: { q: value.trim() } }));
@@ -112,30 +97,7 @@ export function MarketplaceHeader({
           }}
         >
           <Logo />
-          <View style={{ flexDirection: "row", gap: 4 }}>
-            <IconButton
-              icon="cart-outline"
-              label="Giỏ hàng"
-              badge={cartCount}
-              badgeLabel="sản phẩm"
-              onPress={() => router.push("/cart")}
-            />
-            {user && (
-              <>
-                <IconButton
-                  icon="notifications-outline"
-                  label="Thông báo"
-                  badge={notifications.data}
-                  onPress={() => router.push("/notifications")}
-                />
-                <IconButton
-                  icon="person-outline"
-                  label="Tài khoản"
-                  onPress={() => router.navigate("/account")}
-                />
-              </>
-            )}
-          </View>
+          <MobileHeaderActions />
         </View>
         {showSearch && (
           <View
@@ -187,17 +149,29 @@ export function MarketplaceHeader({
 
 export function MarketplaceFooter() {
   const router = useRouter();
+  const { loading } = useSession();
+  const categories = useQuery({
+    queryKey: ["categories"],
+    queryFn: api.categories.tree,
+    staleTime: 5 * 60_000,
+    enabled: !loading,
+  });
+  const roots = (categories.data ?? []).filter(
+    (item) => item.status === "ACTIVE",
+  );
   return (
     <View
       style={{
         borderTopWidth: 1,
         borderColor: colors.border,
-        paddingTop: 24,
+        paddingVertical: 24,
         gap: 12,
       }}
     >
       <Logo />
-      <Text style={styles.muted}>Nơi món đồ cũ tìm thấy giá trị mới.</Text>
+      <Text style={styles.text}>
+        Sàn trao đổi món đồ đã qua sử dụng giữa những người dùng thật.
+      </Text>
       <Pressable
         accessibilityRole="link"
         onPress={() => router.push("/support")}
@@ -207,6 +181,33 @@ export function MarketplaceFooter() {
           Trung tâm hỗ trợ
         </Text>
       </Pressable>
+      {roots.length > 0 && (
+        <>
+          <Text style={styles.label}>Danh mục</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {roots.map((category) => (
+              <Pressable
+                key={category.id}
+                accessibilityRole="link"
+                onPress={() =>
+                  router.navigate({
+                    pathname: "/products",
+                    params: { category_id: category.id },
+                  })
+                }
+                style={{
+                  minHeight: 44,
+                  width: "47%",
+                  flexGrow: 1,
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={styles.muted}>{category.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -241,28 +242,58 @@ export function CompactHeader({
         <IconButton
           icon="chevron-back"
           label="Quay lại"
-          onPress={() => router.navigate(backTo)}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.navigate(backTo)
+          }
         />
         <Text
           numberOfLines={1}
           style={{
             flex: 1,
-            fontSize: 18,
-            lineHeight: 28,
+            fontSize: 16,
+            lineHeight: 24,
             fontWeight: "600",
             color: colors.text,
           }}
         >
           {title}
         </Text>
-        {backTo === "/account" && (
-          <IconButton
-            icon="menu-outline"
-            label="Menu tài khoản"
-            onPress={() => router.navigate("/account")}
-          />
-        )}
+        <MobileHeaderActions />
       </View>
+    </View>
+  );
+}
+
+/** One set of utilities and count queries for discovery and account headers. */
+export function MobileHeaderActions() {
+  const router = useRouter();
+  const counts = useNavigationCounts();
+  const { user } = useSession();
+  const open = (path: "/messages" | "/notifications" | "/cart") => {
+    if (user) router.navigate(path);
+    else router.push({ pathname: "/login", params: { returnTo: path } });
+  };
+  return (
+    <View style={{ flexDirection: "row", flexShrink: 0 }}>
+      <IconButton
+        icon="chatbubble-outline"
+        label="Tin nhắn"
+        badge={counts.data?.messages}
+        onPress={() => open("/messages")}
+      />
+      <IconButton
+        icon="notifications-outline"
+        label="Thông báo"
+        badge={counts.data?.notifications}
+        onPress={() => open("/notifications")}
+      />
+      <IconButton
+        icon="cart-outline"
+        label="Giỏ hàng"
+        badge={counts.data?.cart}
+        badgeLabel="sản phẩm"
+        onPress={() => open("/cart")}
+      />
     </View>
   );
 }

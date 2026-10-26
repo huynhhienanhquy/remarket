@@ -26,7 +26,10 @@ import {
 } from "../../components/ui";
 import { SelectField } from "../../components/SelectField";
 import { Sheet } from "../../components/Sheet";
-import { MarketplaceHeader } from "../../components/MarketplaceHeader";
+import {
+  MarketplaceFooter,
+  MarketplaceHeader,
+} from "../../components/MarketplaceHeader";
 import {
   validateSearchFilters,
   deliveryLabel,
@@ -282,6 +285,7 @@ function ProductSearch({
           onChange={setPage}
         />
       )}
+      <MarketplaceFooter />
       <Sheet
         visible={open}
         title="Bộ lọc"

@@ -27,13 +27,18 @@ import {
 import type { Decision } from "../../features/admin/common";
 
 export default function AdminProducts() {
+  const params = useLocalSearchParams<{ selected?: string; seller_id?: string; status?: string; page?: string }>();
+  return <AdminProductsView key={JSON.stringify([params.selected, params.seller_id, params.status, params.page])} params={params} />;
+}
+
+function AdminProductsView({ params }: { params: { selected?: string; seller_id?: string; status?: string; page?: string } }) {
   const { user } = useSession();
-  const params = useLocalSearchParams<{ selected?: string }>();
-  const [page, setPage] = useState(1);
+  const initialPage = Number(params.page);
+  const [page, setPage] = useState(Number.isSafeInteger(initialPage) && initialPage > 0 ? initialPage : 1);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState(params.status === "ALL" ? "" : PRODUCT_STATUSES.find((value) => value === params.status) ?? "PENDING");
   const [category, setCategory] = useState("");
-  const [advanced, setAdvanced] = useState<Record<string, string>>({});
+  const [advanced, setAdvanced] = useState<Record<string, string>>(params.seller_id ? { seller_id: params.seller_id } : {});
   const [id, setId] = useState(params.selected);
   const [decision, setDecision] = useState<Decision | null>(null);
   const input = {

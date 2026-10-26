@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { NotificationType, OrderStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { API_ERROR_CODES } from "@remarket/shared";
@@ -20,7 +21,6 @@ export interface OrderActionInput {
   expected_version: number;
   reason?: string;
   carrier?: string;
-  tracking_code?: string;
   buyer_confirmed_received?: boolean;
   buyer_confirmed_paid?: boolean;
 }
@@ -239,39 +239,29 @@ export async function applyOrderAction(
           shippedAt: now,
         });
         const carrier = input.carrier?.trim() ?? "";
-        const trackingCode = input.tracking_code?.trim() ?? "";
-        if (carrier !== "" || trackingCode !== "") {
-          await tx.orderDeliveryInfo.updateMany({
-            where: { orderId: order.id },
-            data: {
-              ...(carrier !== "" ? { carrier } : {}),
-              ...(trackingCode !== "" ? { trackingCode } : {}),
-            },
-          });
-        }
+        const trackingCode = `RM${randomBytes(12).toString("hex").toUpperCase()}`;
+        await tx.orderDeliveryInfo.update({
+          where: { orderId: order.id },
+          data: {
+            ...(carrier !== "" ? { carrier } : {}),
+            trackingCode,
+          },
+        });
         await recordTransition(tx, order, actor, "SHIPPING", null, {
           type: "ORDER_SHIPPED",
           title: "Đơn hàng đang được giao",
-          content: `Đơn #${order.code} đã được gửi${trackingCode !== "" ? ` (mã ${trackingCode})` : ""}.`,
+          content: `Đơn #${order.code} đã được gửi (mã ${trackingCode}).`,
         });
         break;
       }
 
       case "deliver": {
+        if (!isSeller) throw invalidTransition("Chỉ người bán mới ghi nhận giao hàng.");
         let fromStatus: OrderStatus;
-        let markBuyerConfirmed = false;
 
-        if (isBuyer && order.status === "CONFIRMED" && order.deliveryMethod === "MEETUP") {
+        if (order.status === "CONFIRMED" && order.deliveryMethod === "MEETUP") {
           fromStatus = "CONFIRMED";
-          markBuyerConfirmed = true;
-        } else if (isBuyer && order.status === "SHIPPING" && order.deliveryMethod === "COD") {
-          fromStatus = "SHIPPING";
-          markBuyerConfirmed = true;
-        } else if (
-          isSeller &&
-          order.status === "SHIPPING" &&
-          order.deliveryMethod === "COD"
-        ) {
+        } else if (order.status === "SHIPPING" && order.deliveryMethod === "COD") {
           fromStatus = "SHIPPING";
         } else {
           throw invalidTransition("Đơn chưa ở bước giao nhận.");
@@ -280,7 +270,6 @@ export async function applyOrderAction(
         await conditionalTransition(tx, order, [fromStatus], input.expected_version, {
           status: "DELIVERED",
           deliveredAt: now,
-          ...(markBuyerConfirmed ? { buyerConfirmedReceived: true } : {}),
         });
         await recordTransition(tx, order, actor, "DELIVERED", null, {
           type: "ORDER_DELIVERED",

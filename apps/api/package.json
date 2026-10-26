@@ -26,6 +26,7 @@
     "contracts:check": "node scripts/generate-response-contracts.mjs --check"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "5.22.0",
     "@prisma/client": "^5.22.0",
     "@prisma/engines": "5.22.0",
     "@remarket/shared": "workspace:*",
@@ -35,6 +36,7 @@
     "express": "^4.21.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "pg": "8.23.1",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.4",
     "zod": "^3.23.8"
@@ -46,6 +48,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
+    "@types/pg": "8.23.1",
     "@types/supertest": "^6.0.3",
     "eslint": "^9.39.5",
     "globals": "^15.15.0",

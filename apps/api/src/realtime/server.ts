@@ -181,10 +181,7 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
           clientMessageId: input.client_message_id,
           content: input.content,
         });
-        const message = toMessage(result.message);
-        if (result.created) {
-          io.to(`conversation:${input.conversation_id}`).emit("message:created", { message });
-        }
+        const message = toMessage(result.message, result.isSystem);
         ack({ ok: true, data: { message } });
       } catch (error) {
         ack(socketError(error));
@@ -204,11 +201,6 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
           conversationId: input.conversation_id,
           viewerId: identity.user.id,
           lastMessageId: input.last_message_id,
-        });
-        io.to(`conversation:${input.conversation_id}`).emit("conversation:read", {
-          conversation_id: input.conversation_id,
-          reader_id: identity.user.id,
-          ...data,
         });
         ack({ ok: true, data });
       } catch (error) {
@@ -230,13 +222,18 @@ export function attachRealtime(server: HttpServer): { close: () => Promise<void>
     }
     if (event.eventType === "message.created") {
       const recipient = payload.recipient_id;
-      const data = payload.message ? { message: payload.message } : payload;
-      if (typeof recipient === "string") io.to(`user:${recipient}`).emit("message:created", data);
-      io.to(`conversation:${event.aggregateId}`).emit("message:created", data);
+      const data = { ...payload, conversation_id: event.aggregateId };
+      const message = payload.message as { sender_id?: unknown } | undefined;
+      let audience = io.to(`conversation:${event.aggregateId}`);
+      if (typeof recipient === "string") audience = audience.to(`user:${recipient}`);
+      if (typeof message?.sender_id === "string") audience = audience.to(`user:${message.sender_id}`);
+      audience.emit("message:created", data);
       return;
     }
     if (event.eventType === "conversation.read") {
-      io.to(`conversation:${event.aggregateId}`).emit("conversation:read", payload);
+      let audience = io.to(`conversation:${event.aggregateId}`);
+      if (typeof payload.reader_id === "string") audience = audience.to(`user:${payload.reader_id}`);
+      audience.emit("conversation:read", payload);
       return;
     }
     const recipients = Array.isArray(payload.recipients) ? payload.recipients : [];

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../config/queryClient";
 import { httpContext, page } from "../../tests/http-context";
-import { member, seller } from "../../tests/test-data";
+import { member, seller, timestamp } from "../../tests/test-data";
 import { AppRouter } from "../../config/route/router";
 import { SessionProvider } from "../../contexts/SessionContext";
 
@@ -72,6 +72,66 @@ describe("account navigation through the application router", () => {
     expect(context.requests("GET", "/conversations")).toHaveLength(0);
   });
 
+  it("opens and switches conversations in the inbox panel while preserving the account layout and list page", async () => {
+    const first = { id: "official-chat", is_system: true, can_send: true, unavailable_reason: null,
+      counterparty: { id: "private-admin", name: "Hệ thống ReMarket", avatar_url: null, is_system: true },
+      product: null, last_message: null, unread_count: 0, updated_at: timestamp };
+    const second = { ...first, id: "seller-chat", is_system: false,
+      counterparty: { id: seller.id, name: seller.name, avatar_url: null, is_system: false } };
+    context.reply("GET", "/conversations", { items: [first, second], meta: { page: 2, page_size: 20, total: 22, total_pages: 2 } });
+    for (const conversation of [first, second]) {
+      context.reply("GET", `/conversations/${conversation.id}`, conversation);
+      context.reply("GET", `/conversations/${conversation.id}/messages`, { items: [{
+        id: `${conversation.id}-message`, client_message_id: `${conversation.id}-client`,
+        sender_id: conversation.counterparty.id, content: `Nội dung ${conversation.id}`,
+        created_at: timestamp, read_at: timestamp, is_system: conversation.is_system,
+      }], next_cursor: null });
+      context.reply("POST", `/conversations/${conversation.id}/read`, { unread: 0, updated: 0, read_at: timestamp });
+    }
+    context.on("POST", "/conversations/official-chat/messages", ({ body }) => ({ message: {
+      ...(body as object), id: "reply-message", sender_id: member.id, created_at: timestamp, read_at: null,
+    } }));
+
+    show("/messages?page=2");
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Bắt đầu cuộc trò chuyện" });
+    const sidebar = screen.getAllByRole("navigation", { name: "Tài khoản" })[0]!;
+    const list = screen.getByRole("complementary", { name: "Danh sách cuộc trò chuyện" });
+    const firstLink = await within(list).findByRole("link", { name: /Hệ thống ReMarket/ });
+    list.scrollTop = 120;
+    await user.click(firstLink);
+
+    const panel = await screen.findByRole("region", { name: "Nội dung cuộc trò chuyện" });
+    expect(await within(panel).findByText("Nội dung official-chat")).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Danh sách cuộc trò chuyện" })).toBe(list);
+    expect(list.scrollTop).toBe(120);
+    expect(screen.getAllByRole("navigation", { name: "Tài khoản" })[0]).toBe(sidebar);
+    expect(within(sidebar).getByRole("link", { name: "Tin nhắn" })).toHaveAttribute("aria-current", "page");
+    expect(firstLink).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("heading", { name: "Bắt đầu cuộc trò chuyện" })).not.toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe("/messages/official-chat?page=2");
+
+    await user.type(within(panel).getByLabelText("Tin nhắn"), "Trả lời trong khung bên phải");
+    await user.click(within(panel).getByRole("button", { name: "Gửi tin nhắn" }));
+    expect(await within(panel).findByText("Trả lời trong khung bên phải")).toBeInTheDocument();
+    await waitFor(() => expect(context.requests("POST", "/conversations/official-chat/messages")).toHaveLength(1));
+
+    const secondLink = within(list).getByRole("link", { name: new RegExp(seller.name) });
+    await user.click(secondLink);
+    const nextPanel = screen.getByRole("region", { name: "Nội dung cuộc trò chuyện" });
+    expect(await within(nextPanel).findByText("Nội dung seller-chat")).toBeInTheDocument();
+    expect(within(nextPanel).queryByText("Nội dung official-chat")).not.toBeInTheDocument();
+    expect(within(nextPanel).getByLabelText("Tin nhắn")).toHaveValue("");
+    expect(secondLink).toHaveAttribute("aria-current", "page");
+    expect(firstLink).not.toHaveAttribute("aria-current");
+
+    await user.click(screen.getByRole("link", { name: "Quay lại" }));
+    await screen.findByRole("heading", { name: "Bắt đầu cuộc trò chuyện" });
+    expect(window.location.pathname + window.location.search).toBe("/messages?page=2");
+    expect(screen.queryByRole("region", { name: "Nội dung cuộc trò chuyện" })).not.toBeInTheDocument();
+    expect(context.requests("GET", "/conversations").every(({ url }) => url.searchParams.get("page") === "2")).toBe(true);
+  });
+
   it("keeps locked accounts out of messages after the layout change", async () => {
     context.viewer = { ...member, status: "LOCKED" };
     show("/messages");
@@ -91,8 +151,8 @@ describe("account navigation through the application router", () => {
   it("switches destinations from the mobile account menu and closes it", async () => {
     show("/favorites");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Mở menu tài khoản" }));
-    const menu = await screen.findByRole("dialog", { name: "Tài khoản của bạn" });
+    await user.click(await screen.findByRole("button", { name: "Menu" }));
+    const menu = await screen.findByRole("dialog", { name: "Menu" });
     await user.click(within(menu).getByRole("link", { name: "Giỏ hàng" }));
     await waitFor(() => expect(window.location.pathname).toBe("/cart"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -102,9 +162,9 @@ describe("account navigation through the application router", () => {
   it("closes the account menu with Escape and returns focus to its button", async () => {
     show("/cart");
     const user = userEvent.setup();
-    const trigger = await screen.findByRole("button", { name: "Mở menu tài khoản" });
+    const trigger = await screen.findByRole("button", { name: "Menu" });
     await user.click(trigger);
-    await screen.findByRole("dialog", { name: "Tài khoản của bạn" });
+    await screen.findByRole("dialog", { name: "Menu" });
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();

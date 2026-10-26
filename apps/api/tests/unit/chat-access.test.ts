@@ -5,6 +5,7 @@ const client = vi.hoisted(() => ({
   session: { findUnique: vi.fn() }, user: { findUnique: vi.fn() },
   conversation: { findUnique: vi.fn(), update: vi.fn() },
   product: { findUnique: vi.fn() },
+  notification: { create: vi.fn() },
   userBlock: { findFirst: vi.fn() },
   message: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn(), create: vi.fn() },
   outboxEvent: { createMany: vi.fn() },
@@ -14,6 +15,7 @@ vi.mock("../../src/utils/prisma.js", () => ({ prisma: client }));
 import { createApp } from "../../src/app.js";
 import { sendChatMessage, markConversationRead } from "../../src/services/chat-service.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
+import { onRealtimeEvent } from "../../src/realtime/events.js";
 
 const id = "00000000-0000-0000-0000-000000000010";
 const user = { id: "buyer", fullName: "Buyer", email: "buyer@example.test", role: "USER" as const, status: "ACTIVE" as const, emailVerifiedAt: new Date() };
@@ -25,11 +27,44 @@ beforeEach(() => {
   client.user.findUnique.mockResolvedValue(user);
   client.message.findUnique.mockResolvedValue(null);
   client.userBlock.findFirst.mockResolvedValue(null);
+  client.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join("").includes('FROM "User"')
+    ? [user, { id: "seller", status: "ACTIVE", emailVerifiedAt: new Date(), deletedAt: null }]
+    : [{ isBlocked: false, deletedAt: null }]);
   client.$transaction.mockImplementation(async (action: (tx: typeof client) => unknown) => action(client));
 });
 describe("conversation access and delivery", () => {
+  it("commits both durable events together before immediate delivery", async () => {
+    const delivered = vi.fn(), stop = onRealtimeEvent(delivered);
+    const timestamp = new Date();
+    client.message.create.mockResolvedValue({ id: crypto.randomUUID(), clientMessageId: "new-client", conversationId: id,
+      senderId: user.id, content: "New message", createdAt: timestamp, readAt: null });
+    client.notification.create.mockResolvedValue({ id: crypto.randomUUID(), userId: "seller" });
+    client.$transaction.mockImplementation(async (action: (tx: typeof client) => unknown) => {
+      const result = await action(client);
+      expect(delivered).not.toHaveBeenCalled();
+      return result;
+    });
+    try {
+      const result = await sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "new-client", content: "New message" });
+      expect(result.created).toBe(true);
+      expect(client.outboxEvent.createMany).toHaveBeenCalledTimes(1);
+      expect(client.outboxEvent.createMany.mock.calls[0]![0].data).toHaveLength(2);
+      expect(delivered.mock.calls.map(([event]) => event.eventType)).toEqual(["message.created", "notification.created"]);
+    } finally { stop(); }
+  });
+  it("does not publish uncommitted messages when outbox persistence fails", async () => {
+    const delivered = vi.fn(), stop = onRealtimeEvent(delivered);
+    client.message.create.mockResolvedValue({ id: "uncommitted", clientMessageId: "new-client", conversationId: id,
+      senderId: user.id, content: "New message", createdAt: new Date(), readAt: null });
+    client.notification.create.mockResolvedValue({ id: "uncommitted-notification", userId: "seller" });
+    client.outboxEvent.createMany.mockRejectedValue(new Error("Outbox failed"));
+    try {
+      await expect(sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "new-client", content: "New message" })).rejects.toThrow("Outbox failed");
+      expect(delivered).not.toHaveBeenCalled();
+    } finally { stop(); }
+  });
   it("does not create messages for a deleted or locked recipient", async () => {
-    client.user.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === user.id ? user : { status: "LOCKED", deletedAt: new Date() });
+    client.$queryRaw.mockResolvedValue([user, { id: "seller", status: "LOCKED", deletedAt: new Date() }]);
     await expect(sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "deleted-recipient", content: "Xin chào" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(client.message.create).not.toHaveBeenCalled();
   });
@@ -70,7 +105,8 @@ describe("conversation access and delivery", () => {
     expect(client.conversation.findUnique).not.toHaveBeenCalled();
   });
   it.each([{ isBlocked: true, deletedAt: null }, { isBlocked: false, deletedAt: new Date() }, null])("stops new messages when the listing is blocked or deleted", async (product) => {
-    client.product.findUnique.mockResolvedValue(product);
+    client.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join("").includes('FROM "User"')
+      ? [user, { id: "seller", status: "ACTIVE", deletedAt: null }] : product ? [product] : []);
     await expect(sendChatMessage({ conversationId: id, viewer: user, clientMessageId: "retry-id", content: "Xin chào" })).rejects.toMatchObject({ code: "PRODUCT_NOT_AVAILABLE" });
     expect(client.message.create).not.toHaveBeenCalled();
     expect(client.outboxEvent.createMany).not.toHaveBeenCalled();

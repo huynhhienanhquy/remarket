@@ -4,6 +4,8 @@ import request from "supertest";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
+import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
 import {
   cleanupOrphanUploads,
@@ -38,7 +40,7 @@ describe.skipIf(!enabled)("PostgreSQL integration", () => {
   beforeEach(cleanup);
   afterAll(async () => {
     await cleanup();
-    await prisma.$disconnect();
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
   });
 
   async function accessToken(userId: string): Promise<string> {

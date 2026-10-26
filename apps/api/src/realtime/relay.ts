@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { backgroundPrisma as prisma } from "../utils/background-prisma.js";
 import { publishRealtimeEvent } from "./events.js";
+import { processRealtimeOutboxBatch } from "../outbox/outbox.js";
 
 interface ProcessedEventRow {
   id: string;
@@ -34,6 +35,7 @@ export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClien
     running = true;
     try {
       while (!stopped) {
+        const promoted = await processRealtimeOutboxBatch(client, BATCH_SIZE);
         const rows = await client.$queryRaw<ProcessedEventRow[]>`
           SELECT "id", "eventType", "aggregateId", "payload", "relaySequence"
           FROM "OutboxEvent"
@@ -43,7 +45,7 @@ export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClien
           ORDER BY "relaySequence" ASC
           LIMIT ${BATCH_SIZE}
         `;
-        if (rows.length === 0) break;
+        if (rows.length === 0 && promoted < BATCH_SIZE) break;
         for (const row of rows) {
           publishRealtimeEvent({
             eventType: row.eventType,
@@ -52,7 +54,7 @@ export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClien
           });
           cursor = row.relaySequence;
         }
-        if (rows.length < BATCH_SIZE) break;
+        if (rows.length < BATCH_SIZE && promoted < BATCH_SIZE) break;
       }
       if (failures > 0) console.info("Realtime outbox relay recovered.");
       failures = 0;

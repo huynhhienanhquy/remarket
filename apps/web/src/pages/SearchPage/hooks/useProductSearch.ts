@@ -20,7 +20,7 @@ export function useProductSearch() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { viewer } = useSession();
+  const { viewer, status } = useSession();
 
   const q = searchParams.get("q") ?? "";
   const sort = (searchParams.get("sort") ?? "newest") as "newest" | "price_asc" | "price_desc";
@@ -38,14 +38,37 @@ export function useProductSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetOpen]);
 
+  // Start the page content before auxiliary filters compete for the small DB pool.
+  const listQuery = useQuery({
+    queryKey: queryKeys.products({ ...Object.fromEntries(searchParams), page_size: PAGE_SIZE }),
+    queryFn: () =>
+      api.products.list({
+        q: q || undefined,
+        category_id: filters.category_id || undefined,
+        min_price: filters.min_price || undefined,
+        max_price: filters.max_price || undefined,
+        condition: filters.condition || undefined,
+        province_code: filters.province_code || undefined,
+        delivery_method: filters.delivery_method || undefined,
+        sort,
+        page,
+        page_size: PAGE_SIZE,
+      }),
+    placeholderData: keepPreviousData,
+    enabled: status === "ready",
+    staleTime: 10_000,
+  });
+
   const categories = useQuery({
     queryKey: queryKeys.categories,
     queryFn: () => api.categories.tree(),
+    enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
   const provinces = useQuery({
     queryKey: queryKeys.provinces,
     queryFn: () => api.categories.provinces(),
+    enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
 
@@ -75,25 +98,6 @@ export function useProductSearch() {
     },
     [searchParams, setSearchParams],
   );
-
-  const listQuery = useQuery({
-    queryKey: queryKeys.products({ ...Object.fromEntries(searchParams), page_size: PAGE_SIZE }),
-    queryFn: () =>
-      api.products.list({
-        q: q || undefined,
-        category_id: filters.category_id || undefined,
-        min_price: filters.min_price || undefined,
-        max_price: filters.max_price || undefined,
-        condition: filters.condition || undefined,
-        province_code: filters.province_code || undefined,
-        delivery_method: filters.delivery_method || undefined,
-        sort,
-        page,
-        page_size: PAGE_SIZE,
-      }),
-    placeholderData: keepPreviousData,
-    staleTime: 10_000,
-  });
 
   const favorites = useMutation({
     mutationFn: ({ id, on }: { id: string; on: boolean }) => api.favorites.set(id, on),

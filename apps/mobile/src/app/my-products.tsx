@@ -14,6 +14,8 @@ import {
   ProductCard,
   useAction,
   styles,
+  EmptyState,
+  Pagination,
 } from "../components/ui";
 export default function MyProducts() {
   const { user } = useSession();
@@ -111,6 +113,7 @@ export default function MyProducts() {
                   <Button
                     title="Xóa tin"
                     secondary
+                    disabled={action.pending}
                     onPress={() =>
                       Alert.alert("Xóa tin", "Xóa tin đăng này?", [
                         { text: "Hủy", style: "cancel" },
@@ -132,20 +135,28 @@ export default function MyProducts() {
             </View>
           ))}
           {result.data?.items.length === 0 && (
-            <Text style={styles.muted}>Bạn chưa có tin đăng.</Text>
+            <EmptyState
+              icon="pricetags-outline"
+              title={
+                status
+                  ? "Không có tin đăng ở trạng thái này"
+                  : "Bạn chưa có tin đăng"
+              }
+              description={
+                status
+                  ? "Thử chọn trạng thái khác để xem tin đăng của bạn."
+                  : "Đăng món đồ đầu tiên để bắt đầu bán trên ReMarket."
+              }
+            />
           )}
-          <Button
-            title="Trang trước"
-            secondary
-            disabled={page === 1}
-            onPress={() => setPage(page - 1)}
-          />
-          <Button
-            title="Trang sau"
-            secondary
-            disabled={!result.data || page >= result.data.meta.total_pages}
-            onPress={() => setPage(page + 1)}
-          />
+          {result.data && (
+            <Pagination
+              page={page}
+              total={result.data.meta.total}
+              pageSize={result.data.meta.page_size}
+              onChange={setPage}
+            />
+          )}
         </>
       )}
     </Screen>

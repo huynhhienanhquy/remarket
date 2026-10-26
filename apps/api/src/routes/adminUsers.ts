@@ -10,6 +10,8 @@ import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 import { toAdminUserItem } from "../shared/dto-mappers.js";
 import { moderationAuditFilter, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
 import { lockUser } from "../services/admin-moderation.js";
+import { openSystemConversation } from "../services/system-chat.js";
+import { chatRateLimit } from "../middleware/rate-limit.js";
 
 /**
  * User moderation (detail-project 15): list, lock and unlock. Locking ends
@@ -17,6 +19,13 @@ import { lockUser } from "../services/admin-moderation.js";
  */
 
 const router = Router();
+
+router.post("/:id/conversation", chatRateLimit, asyncHandler(async (req: AuthRequest, res) => {
+  z.object({}).strict().parse(req.body ?? {});
+  const id = z.string().uuid().parse(req.params.id);
+  const conversationId = await openSystemConversation(req.user!, id);
+  ok(res, { conversation_id: conversationId });
+}));
 
 const listQuery = z
   .object({

@@ -60,6 +60,19 @@ describe("admin HTTP contracts with isolated persistence", () => {
     blockReason: null, rejectionReason: null, condition: "GOOD", usageMonths: null,
     provinceCode: "79", deliveryMethod: "COD",
   };
+  it.each(["ACTIVE", "SOLD", "PENDING"])("scopes admin user products to their seller and %s status with pagination", async (status) => {
+    client.product.findMany.mockResolvedValue([{ ...pending, status }]);
+    client.product.count.mockResolvedValue(21);
+    const response = await request(createApp()).get(`/api/v1/admin/products?seller_id=seller&status=${status}&page=2&page_size=10`).set("Authorization", authorization()).expect(200);
+    expect(response.body.data).toMatchObject({ items: [{ seller: { id: "seller" }, status }], meta: { page: 2, total: 21 } });
+    expect(client.product.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ sellerId: "seller", status, deletedAt: null }), skip: 10, take: 10 }));
+    expect(client.product.count).toHaveBeenCalledWith({ where: expect.objectContaining({ sellerId: "seller", status, deletedAt: null }) });
+  });
+  it("does not expose a user's pending products to non-admins", async () => {
+    client.user.findUnique.mockResolvedValue({ ...admin, role: "USER" });
+    await request(createApp()).get("/api/v1/admin/products?seller_id=seller&status=PENDING").set("Authorization", authorization()).expect(403);
+    expect(client.product.findMany).not.toHaveBeenCalled();
+  });
   it("approves a fresh pending version with an audit and seller notification", async () => {
     client.product.findUnique.mockResolvedValueOnce(pending).mockResolvedValueOnce(pending).mockResolvedValueOnce({ ...pending, version: 2, status: "ACTIVE" });
     client.product.updateMany.mockResolvedValue({ count: 1 });

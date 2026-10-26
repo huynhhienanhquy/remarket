@@ -29,7 +29,7 @@ export default function Messages() {
     <Screen
       title="Tin nhắn"
       titleCard
-      description="Trao đổi với người mua và người bán về món đồ của bạn."
+      description="Tin nhắn với người mua, người bán và Hệ thống ReMarket."
       onRefresh={
         user
           ? () => {
@@ -113,6 +113,7 @@ export default function Messages() {
                           {formatRelative(thread.updated_at)}
                         </Text>
                       </View>
+                      {thread.is_system && <Text style={styles.meta}>Tin nhắn hệ thống</Text>}
                       {!!thread.product && (
                         <Text numberOfLines={1} style={styles.meta}>
                           {thread.product.title}

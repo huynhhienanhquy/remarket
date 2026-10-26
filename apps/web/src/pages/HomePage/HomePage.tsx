@@ -35,17 +35,19 @@ const STEPS = [
 export function HomePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { viewer } = useSession();
+  const { viewer, status } = useSession();
 
   const categories = useQuery({
     queryKey: queryKeys.categories,
     queryFn: () => api.categories.tree(),
+    enabled: status === "ready",
     staleTime: 5 * 60_000,
   });
 
   const latest = useQuery({
     queryKey: queryKeys.products({ sort: "newest", page_size: 10 }),
     queryFn: () => api.products.list({ sort: "newest", page_size: 10, page: 1 }),
+    enabled: status === "ready",
   });
 
   const favorites = useMutation({

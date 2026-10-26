@@ -25,9 +25,9 @@ export function primaryOrderAction(ctx: OrderContext): OrderAction | null {
       case "PENDING":
         return "cancel";
       case "CONFIRMED":
-        return delivery === "MEETUP" ? "deliver" : "cancel";
+        return "cancel";
       case "SHIPPING":
-        return "deliver";
+        return null;
       case "DELIVERED":
         return "complete";
       case "COMPLETED":
@@ -41,9 +41,9 @@ export function primaryOrderAction(ctx: OrderContext): OrderAction | null {
     case "PENDING":
       return "confirm";
     case "CONFIRMED":
-      return delivery === "COD" ? "ship" : null;
+      return delivery === "COD" ? "ship" : "deliver";
     case "SHIPPING":
-      return "deliver";
+      return delivery === "COD" ? "deliver" : null;
     case "DELIVERED":
     case "COMPLETED":
       return null;

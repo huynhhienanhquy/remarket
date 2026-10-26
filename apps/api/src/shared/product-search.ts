@@ -3,6 +3,8 @@ import type { Condition, DeliveryMethod, ProductListItem, SortOption } from "@re
 import { prisma } from "../utils/prisma.js";
 import { toProductListItem } from "./dto-mappers.js";
 import type { ProductListRow, ViewerContext } from "./dto-mappers.js";
+import { env } from "../config/env.js";
+import { hasLocalStorageImage, imageVariantPath } from "../services/storage.js";
 
 export interface ProductSearch {
   keyword: string;
@@ -21,6 +23,7 @@ type SearchRow = Omit<ProductListRow, "images" | "seller"> & {
   total: bigint;
   imageUrl: string | null;
   imagePath: string | null;
+  imageInDatabase: boolean;
   sellerName: string;
   sellerAvatar: string | null;
   sellerProvince: string | null;
@@ -45,16 +48,23 @@ export async function searchPublicProducts(input: ProductSearch, viewer: Omit<Vi
     strpos(lower(p.title), lower(${input.keyword})) > 0
     OR strpos(lower(p.description), lower(${input.keyword})) > 0
     OR p."categoryId" IN (SELECT id FROM matching_categories))`);
-  if (input.condition) conditions.push(Prisma.sql`p.condition = ${input.condition}::"Condition"`);
+  if (input.condition) conditions.push(Prisma.sql`p.condition = ${input.condition}::text::"Condition"`);
   if (input.provinceCode) conditions.push(Prisma.sql`p."provinceCode" = ${input.provinceCode}`);
   if (input.minPrice !== null) conditions.push(Prisma.sql`p.price >= ${input.minPrice}::numeric`);
   if (input.maxPrice !== null) conditions.push(Prisma.sql`p.price <= ${input.maxPrice}::numeric`);
   if (input.deliveryMethod === "BOTH") conditions.push(Prisma.sql`p."deliveryMethod" = 'BOTH'`);
-  else if (input.deliveryMethod) conditions.push(Prisma.sql`p."deliveryMethod" IN (${input.deliveryMethod}::"DeliveryMethod", 'BOTH')`);
+  else if (input.deliveryMethod) conditions.push(Prisma.sql`p."deliveryMethod" IN (${input.deliveryMethod}::text::"DeliveryMethod", 'BOTH')`);
   const sort = input.sort === "price_asc" ? Prisma.sql`p.price ASC, p.id ASC`
     : input.sort === "price_desc" ? Prisma.sql`p.price DESC, p.id ASC`
       : Prisma.sql`p."publishedAt" DESC NULLS LAST, p.id DESC`;
+  const imageAvailable = env.storage.driver === "database" ? Prisma.sql`EXISTS (
+    SELECT 1 FROM "StorageObject" object
+    WHERE object."storagePath" = image."storagePath" OR object."storagePath" = image."storagePath" || '.card.webp'
+  )` : Prisma.sql`true`;
 
+  // Keep enum parameters/results as text at the driver boundary. Native enum
+  // OIDs trigger extra metadata round trips on a fresh remote connection.
+  // Database comparisons still use enum types and their existing indexes.
   // Only static SQL identifiers are interpolated; all filters/viewer IDs are parameters.
   const rows = await prisma.$queryRaw<Array<SearchRow | { id: null; total: bigint }>>(Prisma.sql`
     WITH RECURSIVE active_categories AS (
@@ -83,9 +93,10 @@ export async function searchPublicProducts(input: ProductSearch, viewer: Omit<Vi
       SELECT "sellerId", COUNT(*) AS count FROM "Order"
       WHERE status = 'COMPLETED' AND "sellerId" IN (SELECT "sellerId" FROM sellers) GROUP BY "sellerId"
     )
-    SELECT totals.total, p.id, p.title, p.price, p.condition, p.status, p."provinceCode", p."sellerId",
+    SELECT totals.total, p.id, p.title, p.price, p.condition::text AS condition, p.status::text AS status, p."provinceCode", p."sellerId",
       p."publishedAt", p."createdAt", p."isBlocked", p."deletedAt",
       image.url AS "imageUrl", image."storagePath" AS "imagePath",
+      ${imageAvailable} AS "imageInDatabase",
       u."fullName" AS "sellerName", u."avatarUrl" AS "sellerAvatar",
       u."provinceCode" AS "sellerProvince", u."joinedAt" AS "sellerJoinedAt", u."emailVerifiedAt" AS "sellerVerifiedAt",
       reviews.rating, COALESCE(reviews.count, 0) AS "reviewCount", COALESCE(sales.count, 0) AS "completedSalesCount",
@@ -99,6 +110,15 @@ export async function searchPublicProducts(input: ProductSearch, viewer: Omit<Vi
     LEFT JOIN sales ON sales."sellerId" = p."sellerId"
     ORDER BY ${sort}
   `);
+  if (env.storage.driver === "database") await Promise.all(rows.map(async (row) => {
+    if (row.id === null || !row.imagePath || row.imageInDatabase) return;
+    const legacy = await Promise.all([row.imagePath, imageVariantPath(row.imagePath, "card")].map(hasLocalStorageImage));
+    if (!legacy.some(Boolean)) {
+      // A stale metadata reference is not a usable image. Returning null lets
+      // clients render the existing placeholder without two doomed HTTP reads.
+      row.imageUrl = null; row.imagePath = null;
+    }
+  }));
   const items = rows.flatMap((row) => {
     if (row.id === null) return [];
     const product: ProductListRow = {

@@ -3,10 +3,35 @@ vi.mock("../../src/config/env.js", () => ({ env: {
   jwtSecret: "test-only-signing-key-with-more-than-thirty-two-characters",
   storage: { driver: "supabase", signedUrlTtlSeconds: 300, supabaseUrl: "https://storage.example.test", bucket: "private", supabaseServiceRoleKey: "test-only-key" },
 } }));
-import { createStorageImageReadUrl, createStorageReadUrl, deleteStorageObject } from "../../src/services/storage.js";
+import { assertPrivateSupabaseBucket, createStorageImageReadUrl, createStorageReadUrl, deleteStorageObject, hasSupabaseStorageObject, putStorageObject } from "../../src/services/storage.js";
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 describe("private provider image capabilities", () => {
+  it("uploads image bytes to the private bucket without overwriting an object", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const contents = Buffer.from("image");
+    await putStorageObject("users/provider-test/product/image.png", contents, "image/png");
+    expect(fetch).toHaveBeenCalledWith("https://storage.example.test/storage/v1/object/private/users/provider-test/product/image.png", expect.objectContaining({
+      method: "POST", body: contents,
+      headers: expect.objectContaining({ "Content-Type": "image/png", "x-upsert": "false", Authorization: "Bearer test-only-key" }),
+    }));
+  });
+  it("accepts a private bucket and rejects public buckets before migration", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ public: false }))
+      .mockResolvedValueOnce(Response.json({ public: true }));
+    await assertPrivateSupabaseBucket();
+    expect(fetch.mock.calls[0]?.[0]).toBe("https://storage.example.test/storage/v1/bucket/private");
+    await expect(assertPrivateSupabaseBucket()).rejects.toThrow("private Supabase bucket");
+  });
+  it("distinguishes missing objects from authentication failures", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("", { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ code: "NoSuchKey" }, { status: 400 }))
+      .mockResolvedValueOnce(new Response("", { status: 401 }));
+    expect(await hasSupabaseStorageObject("users/provider-test/product/missing.png")).toBe(false);
+    expect(fetch.mock.calls[0]?.[0]).toContain("/object/info/authenticated/private/");
+    expect(await hasSupabaseStorageObject("users/provider-test/product/missing.png")).toBe(false);
+    await expect(hasSupabaseStorageObject("users/provider-test/product/missing.png")).rejects.toThrow("HTTP 401");
+  });
   it("single-flights reads for one deadline, preserves remaining TTL and does not reuse expired grants", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-08T00:00:00Z"));

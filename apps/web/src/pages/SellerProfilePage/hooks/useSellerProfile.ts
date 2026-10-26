@@ -15,7 +15,7 @@ export function useSellerProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { viewer } = useSession();
+  const { viewer, status } = useSession();
   const [reportOpen, setReportOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -25,19 +25,19 @@ export function useSellerProfile() {
   const profile = useQuery({
     queryKey: queryKeys.profile(id),
     queryFn: () => api.profiles.publicProfile(id),
-    enabled: id !== "",
+    enabled: id !== "" && status === "ready",
   });
 
   const products = useQuery({
     queryKey: queryKeys.profileProducts(id, page),
     queryFn: () => api.profiles.products(id, page),
-    enabled: id !== "" && tab === "products",
+    enabled: id !== "" && tab === "products" && status === "ready",
   });
 
   const reviews = useQuery({
     queryKey: queryKeys.userReviews(id, page),
     queryFn: () => api.reviews.publicList(id, page),
-    enabled: id !== "" && tab === "reviews",
+    enabled: id !== "" && tab === "reviews" && status === "ready",
   });
 
   const favorites = useMutation({

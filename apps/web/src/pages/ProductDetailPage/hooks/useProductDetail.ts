@@ -8,6 +8,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { loginPathFor } from "@/config/route/guards";
 import { useToast } from "@/components/common";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { invalidateCart } from "@/helpers/cartCache";
 
 /**
  * Owns the product query and guarded marketplace actions; guest redirects remain unchanged.
@@ -29,7 +30,7 @@ export function useProductDetail() {
   const detail = useQuery({
     queryKey: queryKeys.product(id),
     queryFn: () => api.products.detail(id),
-    enabled: id !== "",
+    enabled: id !== "" && sessionStatus === "ready",
   });
 
   const product = detail.data;
@@ -49,7 +50,7 @@ export function useProductDetail() {
       toast.success("Đã thêm vào giỏ hàng", {
         action: { label: "Xem giỏ hàng", to: "/cart" },
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      void invalidateCart(queryClient);
     },
     onError: (error) =>
       toast.error(isApiError(error) && error.code === "VERSION_CONFLICT" ? "Món đồ đã thay đổi" : "Không thêm được vào giỏ", {
@@ -74,7 +75,7 @@ export function useProductDetail() {
   const purchase = useMutation({
     mutationFn: () => api.cart.add(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      void invalidateCart(queryClient);
       navigate(`/checkout?items=${encodeURIComponent(id)}`);
     },
     onError: (error) => toast.error("Không khởi tạo được đơn hàng", { description: error.message }),

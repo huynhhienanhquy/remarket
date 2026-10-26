@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +21,8 @@ import {
   useAdminList,
 } from "../../features/admin/common";
 import type { Decision } from "../../features/admin/common";
+import { AdminUserProducts } from "../../features/admin/user-products";
+import { AdminSystemChatButton } from "../../features/admin/system-chat-button";
 
 export default function AdminUsers() {
   const [page, setPage] = useState(1);
@@ -29,6 +32,8 @@ export default function AdminUsers() {
   const [advanced, setAdvanced] = useState<Record<string, string>>({});
   const [id, setId] = useState<string>();
   const [decision, setDecision] = useState<Decision | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  useFocusEffect(useCallback(() => { setChatOpen(false); }, []));
   const input = {
     ...advanced,
     page,
@@ -107,7 +112,7 @@ export default function AdminUsers() {
         </View>
       ))}
       <Sheet
-        visible={!!id && !decision}
+        visible={!!id && !decision && !chatOpen}
         title="Thông tin người dùng"
         onClose={() => setId(undefined)}
       >
@@ -122,6 +127,7 @@ export default function AdminUsers() {
           <>
             <Text style={styles.heading}>{user.full_name}</Text>
             <Text style={styles.text}>{user.email}</Text>
+            {user.role === "USER" && <AdminSystemChatButton key={user.id} userId={user.id} active={user.status === "ACTIVE"} onOpen={() => setChatOpen(true)} />}
             <Text style={styles.text}>
               {user.phone ?? "Chưa có số điện thoại"}
             </Text>
@@ -139,6 +145,7 @@ export default function AdminUsers() {
             {user.lock_reason && (
               <Text style={styles.error}>Lý do khóa: {user.lock_reason}</Text>
             )}
+            <AdminUserProducts key={user.id} userId={user.id} onOpenProduct={() => setId(undefined)} />
             <Button
               title={
                 user.status === "ACTIVE"

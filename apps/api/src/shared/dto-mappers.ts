@@ -174,6 +174,12 @@ export type ProductRow = Product & {
   seller: User;
 };
 
+/** Read projections only need the public seller fields used by the mapper. */
+export type ProductDetailRow = Product & {
+  images: ProductImage[];
+  seller: SellerProfile;
+};
+
 export type ProductListRow = Pick<Product,
   "id" | "sellerId" | "title" | "price" | "condition" | "provinceCode" |
   "publishedAt" | "createdAt" | "status" | "isBlocked" | "deletedAt"
@@ -202,7 +208,7 @@ export const ANONYMOUS_VIEWER: ViewerContext = {
   aggregates: new Map(),
 };
 
-function sortedImages(product: ProductRow, includeStoragePath = false): ProductImageDto[] {
+function sortedImages(product: ProductDetailRow, includeStoragePath = false): ProductImageDto[] {
   return [...product.images]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .flatMap((image) => {
@@ -282,7 +288,7 @@ export function toSavedProductListItem(
 }
 
 export function toProductDetail(
-  product: ProductRow,
+  product: ProductDetailRow,
   ctx: ViewerContext,
   categoryPath: string[],
   categoryActive: boolean,
@@ -306,7 +312,7 @@ export function toProductDetail(
 }
 
 export function toOwnProduct(
-  product: ProductRow,
+  product: ProductDetailRow,
   ctx: ViewerContext,
   categoryPath: string[],
   categoryActive: boolean,
@@ -490,6 +496,7 @@ export function toOrderDetail(
 export function toConversationListItem(
   conversation: {
     id: string;
+    systemKey?: string | null;
     updatedAt: Date;
     buyerId: string;
     sellerId: string;
@@ -502,13 +509,17 @@ export function toConversationListItem(
   unreadCount: number,
 ): ConversationListItem {
   const counterparty = conversation.buyerId === viewerId ? conversation.seller : conversation.buyer;
+  const official = Boolean(conversation.systemKey);
+  const systemCounterparty = official && conversation.buyerId === viewerId;
   const last = conversation.messages[0] ?? null;
   return {
     id: conversation.id,
+    ...(official ? { is_system: true } : {}),
     counterparty: {
       id: counterparty.id,
-      name: counterparty.fullName,
-      avatar_url: avatarReadUrl(counterparty),
+      name: systemCounterparty ? "Hệ thống ReMarket" : counterparty.fullName,
+      avatar_url: systemCounterparty ? null : avatarReadUrl(counterparty),
+      ...(systemCounterparty ? { is_system: true } : {}),
     },
     product: conversation.product
       ? {
@@ -536,7 +547,7 @@ export function toMessage(message: {
   content: string;
   createdAt: Date;
   readAt: Date | null;
-}): import("@remarket/shared").Message {
+}, isSystem = false): import("@remarket/shared").Message {
   return {
     id: message.id,
     client_message_id: message.clientMessageId,
@@ -544,6 +555,7 @@ export function toMessage(message: {
     content: message.content,
     created_at: isoRequired(message.createdAt),
     read_at: iso(message.readAt),
+    ...(isSystem ? { is_system: true } : {}),
   };
 }
 

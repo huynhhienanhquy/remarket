@@ -20,7 +20,7 @@ export function buildCheckoutPayload(
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => item.available && !excluded.includes(item.product_id),
+        (item) => item.available && !item.unavailable_reason && !excluded.includes(item.product_id),
       ),
     }))
     .filter((group) => group.items.length);

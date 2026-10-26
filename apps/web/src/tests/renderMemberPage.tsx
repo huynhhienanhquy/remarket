@@ -29,6 +29,7 @@ function show(element: ReactNode, path = "/account", route = path.split("?")[0]!
     <Route path="/verify-email" element={<VerificationTarget />} />
     <Route path="/login" element={<h1>Đăng nhập để tiếp tục</h1>} />
   </Routes></ToastProvider></ReadySession></SessionProvider></MemoryRouter></QueryClientProvider>);
+  return client;
 }
 return { show, cleanup() { for (const client of clients.splice(0)) client.clear(); } };
 }

@@ -19,8 +19,8 @@ export function useOrderDetail(role: "buyer" | "seller") {
   const online = useConnectivity();
 
   const [confirmOpen, setConfirmOpen] = useState<{ action: string; reason: string } | null>(null);
-  const [shipFields, setShipFields] = useState<{ carrier: string; tracking: string } | null>(null);
-  const [deliverChecks, setDeliverChecks] = useState<{ received: boolean; paid: boolean } | null>(null);
+  const [shipFields, setShipFields] = useState<{ carrier: string } | null>(null);
+  const [deliverOpen, setDeliverOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -37,11 +37,11 @@ export function useOrderDetail(role: "buyer" | "seller") {
   const counterparty = order?.counterparty ?? null;
   const myAllowedActions = order?.allowed_actions ?? [];
 
-  const canConfirm = myAllowedActions.includes("confirm");
+  const canConfirm = !isBuyer && myAllowedActions.includes("confirm");
   const canCancel = myAllowedActions.includes("cancel");
-  const canShip = myAllowedActions.includes("ship");
-  const canDeliver = myAllowedActions.includes("deliver");
-  const canComplete = myAllowedActions.includes("complete");
+  const canShip = !isBuyer && myAllowedActions.includes("ship");
+  const canDeliver = !isBuyer && myAllowedActions.includes("deliver");
+  const canComplete = isBuyer && myAllowedActions.includes("complete");
   const reviewBlockReason = order?.review.existing ? null
     : order?.review.reason ?? (viewer?.status === "LOCKED" ? "Tài khoản đang bị hạn chế nên không thể đánh giá."
     : !viewer?.email_verified_at ? "Vui lòng xác minh email trước khi đánh giá."
@@ -107,17 +107,17 @@ export function useOrderDetail(role: "buyer" | "seller") {
   }
 
   function openShip() {
-    setShipFields({ carrier: "", tracking: "" });
+    setShipFields({ carrier: "" });
   }
 
   function openDeliver() {
-    setDeliverChecks({ received: false, paid: false });
+    setDeliverOpen(true);
   }
 
   function closeModals() {
     setConfirmOpen(null);
     setShipFields(null);
-    setDeliverChecks(null);
+    setDeliverOpen(false);
     setActionError(null);
   }
   return {
@@ -126,8 +126,7 @@ export function useOrderDetail(role: "buyer" | "seller") {
     changeCancelReason: (reason: string) => setConfirmOpen((current) => current ? { ...current, reason } : current),
     shipFields,
     changeShipping: (fields: Partial<NonNullable<typeof shipFields>>) => setShipFields((current) => current ? { ...current, ...fields } : current),
-    deliverChecks,
-    changeDelivery: (checks: Partial<NonNullable<typeof deliverChecks>>) => setDeliverChecks((current) => current ? { ...current, ...checks } : current),
+    deliverOpen,
     actionError,
     pendingAction,
     detail,

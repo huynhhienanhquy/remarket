@@ -11,7 +11,7 @@ import { Router } from "express";
 import type { AuthRequest } from "../middleware/auth.js";
 import { authMiddleware, optionalAuth, requireActive, requireVerified } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
-import { eligibleCategoryIds, loadCategoryEligibility } from "../services/category-policy.js";
+import { loadCategoryEligibility } from "../services/category-policy.js";
 import { claimUploads, detachUnusedUploads, lockEligibleUploads } from "../services/product-assets.js";
 import type { CreatePayload, PatchPayload } from "../services/product-input.js";
 import { assertEnumValue, createSchema, ownListQuerySchema, patchSchema, searchQuerySchema, validateAndNormalize } from "../services/product-input.js";
@@ -30,6 +30,7 @@ import {
 } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 import { searchPublicProducts } from "../shared/product-search.js";
+import { readProducts } from "../shared/product-reads.js";
 import { buildProductContext, loadCategoryChain, viewerFrom } from "../shared/viewer.js";
 import { prisma } from "../utils/prisma.js";
 
@@ -130,41 +131,6 @@ async function respondWithDetail(
   return ok(res, toProductDetail(row, ctx, chain.path, chain.active), status);
 }
 
-/** Batched category projection for a page of own listings (no N+1). */
-async function loadCategoryIndex(): Promise<{
-  path(categoryId: string): string[];
-  active(categoryId: string): boolean;
-}> {
-  const rows = await prisma.category.findMany({
-    select: { id: true, parentId: true, name: true, status: true },
-  });
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const pathCache = new Map<string, string[]>();
-
-  const path = (categoryId: string): string[] => {
-    const cached = pathCache.get(categoryId);
-    if (cached) return cached;
-    const leaf = byId.get(categoryId);
-    if (!leaf) return [];
-    const names: string[] = [];
-    const guard = new Set<string>();
-    let cursor: (typeof rows)[number] | undefined = leaf;
-    while (cursor && !guard.has(cursor.id)) {
-      guard.add(cursor.id);
-      names.unshift(cursor.name);
-      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
-    }
-    pathCache.set(categoryId, names);
-    return names;
-  };
-
-  const parents = new Set(rows.flatMap((row) => row.parentId ? [row.parentId] : []));
-  const eligible = eligibleCategoryIds(rows.map((row) => ({ ...row, isLeaf: !parents.has(row.id) })));
-  const active = (categoryId: string) => eligible.has(categoryId);
-
-  return { path, active };
-}
-
 /* ------------------------------------------------------------------ *
  * GET /products — public search (detail-project 9.2)
  * ------------------------------------------------------------------ */
@@ -216,25 +182,22 @@ async function getProductDetail(req: AuthRequest, res: Response): Promise<Respon
   const productId = req.params.id ?? "";
   if (productId === "") throw notFound(NOT_FOUND_MESSAGE);
 
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    include: PRODUCT_INCLUDE,
-  });
-  if (!product || product.deletedAt !== null) throw notFound(NOT_FOUND_MESSAGE);
-
-  const [ctx, chain] = await Promise.all([buildProductContext([product], req), loadCategoryChain(product.categoryId)]);
+  const result = await readProducts({ kind: "detail", id: productId }, viewerFrom(req));
+  const snapshot = result.items[0];
+  if (!snapshot) throw notFound(NOT_FOUND_MESSAGE);
+  const { product, context: ctx, categoryPath, categoryActive, categoryIsLeaf } = snapshot;
   if (!isOwnerOrAdmin(product, ctx)) {
     const visible =
       !product.isBlocked &&
       (BUYABLE_STATUSES as readonly string[]).includes(product.status) &&
       product.seller.status === "ACTIVE" &&
       product.seller.emailVerifiedAt !== null &&
-      chain.active &&
-      chain.isLeaf;
+      categoryActive &&
+      categoryIsLeaf;
     if (!visible) throw notFound("Tin đăng không còn khả dụng.");
   }
 
-  return ok(res, toProductDetail(product, ctx, chain.path, chain.active));
+  return ok(res, toProductDetail(product, ctx, categoryPath, categoryActive));
 }
 
 /* ------------------------------------------------------------------ *
@@ -486,28 +449,14 @@ async function listOwnProducts(req: AuthRequest, res: Response): Promise<Respons
       )
       : undefined;
 
-  const where: Prisma.ProductWhereInput = { sellerId: viewerId };
-  if (status !== undefined) where.status = status;
-
-  const [total, rows, categoryIndex] = await Promise.all([
-    prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      skip: offsetOf(paging),
-      take: paging.page_size,
-      include: PRODUCT_INCLUDE,
-    }),
-    loadCategoryIndex(),
-  ]);
-
-  const ctx = await buildProductContext(rows, req);
+  const result = await readProducts({ kind: "own", sellerId: viewerId, status,
+    offset: offsetOf(paging), limit: paging.page_size }, viewerFrom(req));
   return okList(
     res,
-    rows.map((row) =>
-      toOwnProduct(row, ctx, categoryIndex.path(row.categoryId), categoryIndex.active(row.categoryId)),
+    result.items.map(({ product, context, categoryPath, categoryActive }) =>
+      toOwnProduct(product, context, categoryPath, categoryActive),
     ),
-    pageMeta(paging, total),
+    pageMeta(paging, result.total),
   );
 }
 

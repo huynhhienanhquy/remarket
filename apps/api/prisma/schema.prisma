@@ -366,6 +366,8 @@ model Favorite {
 
 model Conversation {
   id        String   @id @default(uuid())
+  // Set only by the admin endpoint; separates official chat from product threads.
+  systemKey String?  @unique
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   buyerId   String
@@ -382,6 +384,8 @@ model Conversation {
   @@index([sellerId])
   @@index([productId])
   @@index([updatedAt])
+  @@index([buyerId, updatedAt(sort: Desc), id(sort: Desc)])
+  @@index([sellerId, updatedAt(sort: Desc), id(sort: Desc)])
 }
 
 model Message {
@@ -572,6 +576,7 @@ model Notification {
   @@index([readAt])
   @@index([createdAt])
   @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model SupportTicket {

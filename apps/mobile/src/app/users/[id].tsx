@@ -7,6 +7,7 @@ import { api, http } from "../../services/runtime";
 import { useSession, queryClient } from "../../services/session-context";
 import { MarketplaceImage } from "../../components/MarketplaceImage";
 import { ReportSheet } from "../../components/ReportSheet";
+import { MarketplaceFooter } from "../../components/MarketplaceHeader";
 import {
   Screen,
   Button,
@@ -184,6 +185,7 @@ export default function Profile() {
         target={report ? { type: "user", id } : null}
         onClose={() => setReport(false)}
       />
+      <MarketplaceFooter />
     </Screen>
   );
 }

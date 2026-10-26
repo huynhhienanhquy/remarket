@@ -22,6 +22,7 @@ export const queryKeys = {
   notifications: (unread: boolean, page: number) =>
     ["notifications", unread, page] as const,
   unreadCount: ["notifications", "unread-count"] as const,
+  navigationCounts: (viewerId: string) => ["notifications", "navigation-counts", viewerId] as const,
   support: (status: string, page: number) => ["support", "list", status, page] as const,
   ticket: (id: string) => ["support", "detail", id] as const,
   profile: (id: string) => ["profiles", id] as const,

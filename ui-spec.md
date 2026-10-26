@@ -89,9 +89,9 @@ Hàng danh mục dưới header cao 44px, không sticky: “Tất cả danh mụ
 
 Badge số chưa đọc tối đa “99+”, có aria-label đầy đủ; chỉ hiển thị số thật. MVP có thể bỏ badge chat nếu API chưa cung cấp unread count; không dùng số ngẫu nhiên.
 
-Mobile header gồm hàng logo + icon giỏ + thông báo cao 56px và hàng search 48px trên trang khám phá. Những trang tác vụ sâu dùng header gọn 56px với Quay lại + tiêu đề; không lặp search.
+Mobile header gồm hàng logo + các icon Tin nhắn, Thông báo, Giỏ hàng theo thứ tự này, cao 56px và hàng search 48px trên trang khám phá. Các trang tài khoản dùng header gọn với Quay lại + tiêu đề và cùng ba tiện ích; không lặp search. Với khách, các tiện ích yêu cầu tài khoản dẫn đến đăng nhập.
 
-Mobile bottom navigation cao 64px + safe area: Khám phá, Yêu thích, Đăng bán, Tin nhắn, Tài khoản. Mỗi tab gồm icon và label 11–12px. Tab active có text/icon xanh và nền xanh nhạt nhỏ; không dùng nút tròn nổi che nội dung. Trang product detail, checkout, form đăng tin, chat detail và order detail thay bottom nav bằng action/composer riêng khi cần.
+Mobile bottom navigation cao 64px + safe area: Khám phá, Yêu thích, Đăng bán, Tài khoản, Menu. Mỗi mục gồm icon và label 11–12px. Menu là nút mở drawer điều hướng, đóng khi chọn đích hoặc nhấn Escape và trả focus về nút mở. Tab active có text/icon xanh và nền xanh nhạt nhỏ; không dùng nút tròn nổi che nội dung. Trang product detail, checkout, form đăng tin, chat detail và order detail thay bottom nav bằng action/composer riêng khi cần.
 
 Footer chỉ xuất hiện trên trang khám phá và profile công khai: logo, mô tả một câu, link danh mục, “Trung tâm hỗ trợ”. Không render link điều khoản/chính sách trống; chỉ thêm khi có nội dung và route thực. Chat/checkout/admin không có footer marketing.
 
@@ -106,7 +106,7 @@ Dùng header marketplace và container. Desktop có sidebar 220px, gap 32px, con
 
 Mục active nền brand-soft, text brand, font 600. Không thêm menu dashboard cá nhân nếu không có đặc tả dữ liệu.
 
-Mobile sidebar chuyển thành menu tài khoản ở /account; các page con có tiêu đề và nút Quay lại. Không nhét toàn bộ menu thành dãy tab ngang quá dài.
+Mobile sidebar chuyển thành drawer mở từ mục Menu ở thanh điều hướng dưới; /account vẫn có danh sách liên kết tài khoản. Các page con có tiêu đề, nút Quay lại và ba tiện ích Tin nhắn, Thông báo, Giỏ hàng. Không nhét toàn bộ menu thành dãy tab ngang quá dài.
 
 ### 3.3. AuthShell
 

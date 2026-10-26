@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { formatDateTime } from "@remarket/shared";
+import { formatRelative } from "@remarket/shared";
 import { SelectField } from "../components/SelectField";
+import { Sheet } from "../components/Sheet";
+import type { Notification } from "@remarket/shared";
 import { api } from "../services/runtime";
 import { useSession, queryClient } from "../services/session-context";
 import { notificationRoute } from "../services/linking";
@@ -23,17 +27,30 @@ export default function Notifications() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [unread, setUnread] = useState(false);
+  const [selected, setSelected] = useState<Notification | null>(null);
   const action = useAction();
+  const network = useNetInfo();
+  const offline =
+    network.isConnected === false || network.isInternetReachable === false;
   const result = useQuery({
     queryKey: ["notifications", user?.id, page, unread],
     enabled: !!user,
     queryFn: () => api.notifications.list({ page, unread }),
+    refetchInterval: 15_000,
   });
   return (
     <Screen
       title="Thông báo"
       titleCard
       description="Cập nhật về tin đăng, đơn hàng và hoạt động tài khoản của bạn."
+      onRefresh={
+        user
+          ? () => {
+              void result.refetch();
+            }
+          : undefined
+      }
+      refreshing={result.isRefetching}
     >
       {!user ? (
         <LoginPrompt />
@@ -60,7 +77,7 @@ export default function Notifications() {
           />
           <Button
             title="Đánh dấu tất cả đã đọc"
-            disabled={action.pending || !result.data?.meta.unread}
+            disabled={offline || action.pending || !result.data?.meta.unread}
             secondary
             onPress={() => {
               void action.run(async () => {
@@ -72,41 +89,90 @@ export default function Notifications() {
             }}
           />
           {result.data?.items.map((item) => (
-            <View
+            <Pressable
               key={item.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}${item.read_at ? "" : ", chưa đọc"}`}
+              disabled={offline || action.pending}
+              onPress={() => {
+                void action.run(async () => {
+                  if (!item.read_at) await api.notifications.markRead(item.id);
+                  await queryClient.invalidateQueries({
+                    queryKey: ["notifications"],
+                  });
+                  const route = notificationRoute(
+                    item.reference_type,
+                    item.reference_id,
+                    user,
+                  );
+                  if (route)
+                    router.push(route as Parameters<typeof router.push>[0]);
+                  else setSelected(item);
+                });
+              }}
               style={[
                 styles.card,
                 {
                   borderRadius: 16,
-                  backgroundColor: item.read_at ? colors.card : colors.soft,
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  borderColor: item.read_at ? colors.border : colors.green,
                 },
               ]}
             >
-              <Text style={[styles.label, { fontWeight: "600" }]}>
-                {item.title}
-              </Text>
-              <Text style={styles.text}>{item.content}</Text>
-              <Text style={styles.meta}>{formatDateTime(item.created_at)}</Text>
-              <Button
-                title="Xem cập nhật"
-                disabled={action.pending}
-                ghost
-                onPress={() => {
-                  void action.run(async () => {
-                    await api.notifications.markRead(item.id);
-                    await queryClient.invalidateQueries({
-                      queryKey: ["notifications"],
-                    });
-                    const route = notificationRoute(
-                      item.reference_type,
-                      item.reference_id,
-                    );
-                    if (route)
-                      router.push(route as Parameters<typeof router.push>[0]);
-                  });
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  backgroundColor: item.read_at ? colors.subtle : colors.soft,
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
-              />
-            </View>
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={20}
+                  color={item.read_at ? colors.muted : colors.green}
+                />
+              </View>
+              <View style={{ flex: 1, gap: 8 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.label,
+                      { flex: 1, fontWeight: item.read_at ? "500" : "600" },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  {!item.read_at && (
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        marginTop: 6,
+                        backgroundColor: colors.green,
+                      }}
+                    />
+                  )}
+                </View>
+                <Text numberOfLines={2} style={styles.muted}>
+                  {item.content}
+                </Text>
+                <Text style={styles.meta}>
+                  {formatRelative(item.created_at)}
+                </Text>
+              </View>
+            </Pressable>
           ))}
           {result.data?.items.length === 0 && (
             <EmptyState
@@ -122,6 +188,13 @@ export default function Notifications() {
           )}
         </>
       )}
+      <Sheet
+        visible={selected !== null}
+        title={selected?.title ?? "Thông báo"}
+        onClose={() => setSelected(null)}
+      >
+        <Text style={styles.text}>{selected?.content}</Text>
+      </Sheet>
     </Screen>
   );
 }

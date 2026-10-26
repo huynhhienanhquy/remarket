@@ -1376,6 +1376,43 @@
           "response": []
         },
         {
+          "name": "POST /admin/users/{id}/conversation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{id}}/conversation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{id}}",
+                "conversation"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /admin/products",
           "request": {
             "method": "GET",
@@ -3350,7 +3387,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"action\": \"confirm\",\n  \"expected_version\": 1,\n  \"reason\": \"string\",\n  \"carrier\": \"string\",\n  \"tracking_code\": \"string\",\n  \"buyer_confirmed_received\": true,\n  \"buyer_confirmed_paid\": true\n}",
+              "raw": "{\n  \"action\": \"confirm\",\n  \"expected_version\": 1,\n  \"reason\": \"string\",\n  \"carrier\": \"string\",\n  \"buyer_confirmed_received\": true,\n  \"buyer_confirmed_paid\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3597,6 +3634,36 @@
               "path": [
                 "notifications",
                 "unread-count"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /notifications/navigation-counts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/navigation-counts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "navigation-counts"
               ],
               "variable": [],
               "query": []

@@ -22,6 +22,7 @@ import {
 } from "../../components/ui";
 import { ProductGallery } from "../../components/ProductGallery";
 import { ReportSheet } from "../../components/ReportSheet";
+import { MarketplaceFooter } from "../../components/MarketplaceHeader";
 import { deliveryLabel } from "../../services/marketplace";
 
 export default function ProductDetail() {
@@ -64,6 +65,9 @@ export default function ProductDetail() {
                 authenticated(async () => {
                   const cart = await api.cart.add(id);
                   queryClient.setQueryData(["cart", user!.id], cart);
+                  void queryClient.invalidateQueries({
+                    queryKey: ["notifications", "navigation-counts"],
+                  });
                   router.push("/cart");
                 })
               }
@@ -238,6 +242,7 @@ export default function ProductDetail() {
         </>
       )}
       <Feedback error={action.error} />
+      <MarketplaceFooter />
       <ReportSheet
         target={report ? { type: "product", id } : null}
         onClose={() => setReport(false)}

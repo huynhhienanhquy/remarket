@@ -4,6 +4,7 @@ import { MarketplaceImage } from "../components/MarketplaceImage";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { useQuery } from "@tanstack/react-query";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { ApiError } from "@remarket/api-client";
 import { formatVnd, orderShippingFee, addVnd } from "@remarket/shared";
 import type {
@@ -15,6 +16,10 @@ import { api } from "../services/runtime";
 import { useSession, queryClient } from "../services/session-context";
 import { CheckoutIntent } from "../services/checkout-intent";
 import { buildCheckoutPayload } from "../services/checkout-payload";
+import {
+  checkoutSelection,
+  selectedCart,
+} from "../services/checkout-selection";
 import {
   Screen,
   EmptyState,
@@ -30,10 +35,16 @@ export default function CheckoutScreen({
 }: {
   buyNow?: boolean;
 }) {
-  const { product_id } = useLocalSearchParams<{ product_id?: string }>();
+  const { product_id, items } = useLocalSearchParams<{
+    product_id?: string;
+    items?: string;
+  }>();
   const { user } = useSession();
   const router = useRouter();
   const action = useAction();
+  const network = useNetInfo();
+  const offline =
+    network.isConnected === false || network.isInternetReachable === false;
   const result = useQuery({
     queryKey:
       buyNow && product_id
@@ -68,18 +79,20 @@ export default function CheckoutScreen({
     },
     enabled: !!user,
   });
-  const [excluded, setExcluded] = useState<string[]>([]);
   const [deliveries, setDeliveries] = useState<
     Record<string, Partial<CheckoutDeliveryInput>>
   >({});
   const intent = useRef(new CheckoutIntent(randomUUID));
   const [uncertain, setUncertain] = useState(false);
   const [orders, setOrders] = useState<CheckoutResult | null>(null);
-  const selectedGroups = (result.data?.groups ?? [])
+  const cart =
+    result.data &&
+    selectedCart(result.data, product_id ? null : checkoutSelection(items));
+  const selectedGroups = (cart?.groups ?? [])
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => item.available && !excluded.includes(item.product_id),
+        (item) => item.available && !item.unavailable_reason,
       ),
     }))
     .filter((group) => group.items.length);
@@ -104,11 +117,10 @@ export default function CheckoutScreen({
   );
   useEffect(() => {
     intent.current.clear();
-    setExcluded([]);
     setDeliveries({});
     setUncertain(false);
     setOrders(null);
-  }, [user?.id, product_id]);
+  }, [user?.id, product_id, items]);
   if (orders)
     return (
       <Screen title="Đặt hàng thành công">
@@ -132,15 +144,11 @@ export default function CheckoutScreen({
     );
   return (
     <Screen
-      title={buyNow ? "Thanh toán" : "Giỏ hàng"}
+      title="Thanh toán"
       titleCard
-      description={
-        buyNow
-          ? "Kiểm tra món đồ và thông tin giao nhận trước khi đặt hàng."
-          : "Chọn món đồ và kiểm tra thông tin theo từng người bán."
-      }
+      description="Kiểm tra món đồ và thông tin giao nhận trước khi đặt hàng."
       footer={
-        user && (uncertain || !!result.data?.total_items) ? (
+        user && (uncertain || !!cart?.total_items) ? (
           <View
             style={{
               gap: 8,
@@ -164,11 +172,12 @@ export default function CheckoutScreen({
               }
               disabled={
                 action.pending ||
+                offline ||
+                (!uncertain && !!result.error) ||
                 (!uncertain &&
-                  !result.data?.groups.some((group) =>
+                  !cart?.groups.some((group) =>
                     group.items.some(
-                      (item) =>
-                        item.available && !excluded.includes(item.product_id),
+                      (item) => item.available && !item.unavailable_reason,
                     ),
                   ))
               }
@@ -177,12 +186,7 @@ export default function CheckoutScreen({
                   const existingAttempt = intent.current.current;
                   const payload =
                     existingAttempt?.payload ??
-                    buildCheckoutPayload(
-                      result.data!,
-                      excluded,
-                      deliveries,
-                      user,
-                    );
+                    buildCheckoutPayload(cart!, [], deliveries, user);
                   const request =
                     existingAttempt ?? intent.current.getOrCreate(payload);
                   try {
@@ -225,21 +229,21 @@ export default function CheckoutScreen({
               void result.refetch();
             }}
           />
-          {result.data?.total_items === 0 && (
+          {cart?.total_items === 0 && (
             <EmptyState
-              title="Giỏ hàng đang trống"
-              description="Khám phá và chọn món đồ bạn yêu thích."
+              title="Không có món đồ khả dụng"
+              description="Giỏ hàng trống hoặc những món đã chọn không còn khả dụng."
               action={
                 <Button
-                  title="Khám phá sản phẩm"
-                  onPress={() => router.push("/")}
+                  title="Quay lại giỏ hàng"
+                  onPress={() => router.navigate("/cart")}
                 />
               }
             />
           )}
-          {result.data?.groups.map((group) => {
+          {cart?.groups.map((group) => {
             const selected = group.items.filter(
-              (item) => item.available && !excluded.includes(item.product_id),
+              (item) => item.available && !item.unavailable_reason,
             );
             const methods = (["COD", "MEETUP"] as const).filter((method) =>
               selected.every(
@@ -272,47 +276,6 @@ export default function CheckoutScreen({
                       {item.title} · {formatVnd(item.price)}
                     </Text>
                     <Text style={styles.muted}>{item.unavailable_reason}</Text>
-                    {(!buyNow || !product_id) && (
-                      <View style={styles.row}>
-                        <Button
-                          title={
-                            item.available &&
-                            !excluded.includes(item.product_id)
-                              ? "Đã chọn"
-                              : "Chọn"
-                          }
-                          secondary
-                          disabled={
-                            uncertain ||
-                            action.pending ||
-                            !item.available ||
-                            (buyNow && !!product_id)
-                          }
-                          onPress={() =>
-                            setExcluded((ids) =>
-                              ids.includes(item.product_id)
-                                ? ids.filter((id) => id !== item.product_id)
-                                : [...ids, item.product_id],
-                            )
-                          }
-                        />
-                        <Button
-                          title="Bỏ khỏi giỏ"
-                          secondary
-                          disabled={
-                            uncertain ||
-                            action.pending ||
-                            (buyNow && !!product_id)
-                          }
-                          onPress={() => {
-                            void action.run(async () => {
-                              await api.cart.remove(item.product_id);
-                              await result.refetch();
-                            });
-                          }}
-                        />
-                      </View>
-                    )}
                   </View>
                 ))}
                 {selected.length > 0 && (
@@ -394,6 +357,14 @@ export default function CheckoutScreen({
             </Text>
           )}
           <Feedback error={action.error} />
+          {!product_id && !uncertain && (
+            <Button
+              title="Quay lại giỏ hàng"
+              ghost
+              disabled={action.pending}
+              onPress={() => router.navigate("/cart")}
+            />
+          )}
         </>
       )}
     </Screen>

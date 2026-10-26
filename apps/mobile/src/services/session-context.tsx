@@ -17,6 +17,8 @@ import { ApiError } from "@remarket/api-client";
 import { session, SOCKET_URL } from "./runtime";
 import { registerPush } from "./push";
 import { notificationRoute } from "./linking";
+import { mergeMessage, mergeReadReceipt } from "@remarket/shared";
+import type { Message, MessageHistory, ConversationReadEvent } from "@remarket/shared";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,8 +115,25 @@ export function Providers({ children }: { children: ReactNode }) {
     socket.on("connect_error", (error: Error) => {
       if (error.message === "UNAUTHORIZED") void recover();
     });
-    socket.onAny((event: string) => {
-      void queryClient.invalidateQueries();
+    socket.onAny((event: string, payload?: Partial<ConversationReadEvent> & { message?: Message }) => {
+      if (event === "message:created" && payload?.conversation_id && payload.message) {
+        const key = ["chat", "messages", payload.conversation_id, viewerId];
+        void queryClient.cancelQueries({ queryKey: key }).then(() => {
+          if (disposed) return;
+          queryClient.setQueryData<MessageHistory>(key, (history) => mergeMessage(history, payload.message!));
+          if (!queryClient.getQueryData(key)) void queryClient.invalidateQueries({ queryKey: key });
+        });
+        void queryClient.invalidateQueries({ queryKey: ["chat", "inbox"] });
+      } else if (event.startsWith("notification")) {
+        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      } else if (event === "conversation:read") {
+        if (payload?.conversation_id && payload.last_message_id && payload.reader_id && payload.read_at) {
+          queryClient.setQueryData<MessageHistory>(["chat", "messages", payload.conversation_id, viewerId],
+            (history) => mergeReadReceipt(history, payload as ConversationReadEvent));
+        }
+        void queryClient.invalidateQueries({ queryKey: ["chat", "inbox"] });
+        void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      } else void queryClient.invalidateQueries();
       if (event === "email.verified")
         void session.updateIdentity().catch(() => undefined);
     });
@@ -143,20 +162,21 @@ export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const Notifications = nativeNotifications;
     if (!Notifications) return;
-    const open = (response: NotificationResponse) => {
+    const open = async (response: NotificationResponse) => {
       const data = response.notification.request.content.data;
       if (!data) return;
-      const route = notificationRoute(data.reference_type, data.reference_id);
+      if (session.getSnapshot().loading) await session.restore();
+      const route = notificationRoute(data.reference_type, data.reference_id, session.getSnapshot().user);
       if (route) router.push(route as Parameters<typeof router.push>[0]);
     };
     const listener =
-      Notifications.addNotificationResponseReceivedListener(open);
+      Notifications.addNotificationResponseReceivedListener((response) => { void open(response).catch(() => undefined); });
     const received = Notifications.addNotificationReceivedListener(() => {
       void queryClient.invalidateQueries();
     });
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
-        open(response);
+        void open(response).catch(() => undefined);
         void Notifications.clearLastNotificationResponseAsync();
       }
     });

@@ -6,6 +6,7 @@ import { api } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { invalidateCart } from "@/helpers/cartCache";
 
 /**
  * Owns cart selection and totals; only available items enter the existing checkout URL.
@@ -24,7 +25,7 @@ export function useCart() {
 
   const removeItem = useMutation({
     mutationFn: (productId: string) => api.cart.remove(productId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.cart }),
+    onSuccess: () => invalidateCart(queryClient),
   });
 
   const groups = useMemo(() => cart.data?.groups ?? [], [cart.data?.groups]);

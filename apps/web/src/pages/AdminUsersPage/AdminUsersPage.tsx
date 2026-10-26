@@ -2,6 +2,7 @@ import type { AdminUserItem, UserStatus } from "@remarket/shared";
 import { USER_STATUS_LABELS, formatDate, formatDateTime } from "@remarket/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
@@ -10,6 +11,7 @@ import { RowAction } from "../../components/admin/RowAction/RowAction";
 import type { DataTableColumn } from "../../components/common";
 import {
     ApiImage,
+    Button,
     ConfirmDialog,
     Drawer,
     EmptyState,
@@ -27,6 +29,7 @@ import { errorDescription } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
 import { api } from "../../services/api";
 import { readEnumParam, readPage } from "../../utils/adminParams";
+import { AdminUserProducts } from "./AdminUserProducts";
 
 const USER_STATUSES = ["ACTIVE", "LOCKED"] as const;
 
@@ -45,6 +48,7 @@ function UserIdentity({ user }: { user: AdminUserItem }) {
 }
 
 export function AdminUsersPage() {
+  const navigate = useNavigate();
   const { params, apply } = useAdminParams();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -74,6 +78,14 @@ export function AdminUsersPage() {
     enabled: selectedId !== null,
   });
   const selected = selectedQuery.data ?? query.data?.items.find((user) => user.id === selectedId) ?? null;
+  const systemChat = useMutation({
+    mutationFn: (id: string) => api.admin.openSystemConversation(id),
+    onSuccess: ({ conversation_id }) => {
+      const query = new URLSearchParams({ return_to: `/admin/users?${params.toString()}` });
+      navigate(`/messages/${conversation_id}?${query.toString()}`);
+    },
+    onError: (error) => toast.error("Không thể mở tin nhắn hệ thống", { description: errorDescription(error) }),
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -130,6 +142,10 @@ export function AdminUsersPage() {
       <Drawer open={selectedId !== null} onClose={() => apply({ selected: null }, { replace: true })} title="Chi tiết người dùng" footer={selected?.role === "USER" ? <button type="button" className={selected.status === "ACTIVE" ? "min-h-[44px] rounded-control bg-danger px-4 t-label text-white" : "min-h-[44px] rounded-control bg-brand px-4 t-label text-white"} onClick={() => setAction(selected.status === "ACTIVE" ? "lock" : "unlock")}>{selected.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa tài khoản"}</button> : undefined}>
         {selectedQuery.isPending ? <p className="t-body text-muted">Đang tải người dùng…</p> : selectedQuery.isError ? <QueryErrorAlert error={selectedQuery.error} onRetry={() => selectedQuery.refetch()} /> : selected && <div className="space-y-6">
           <UserIdentity user={selected} />
+          {selected.role === "USER" && <div className="space-y-2">
+            <Button loading={systemChat.isPending} disabled={selected.status !== "ACTIVE"} onClick={() => systemChat.mutate(selected.id)}>Nhắn tin hệ thống</Button>
+            <p className="t-meta text-muted">{selected.status === "ACTIVE" ? "Người nhận sẽ thấy tin nhắn từ Hệ thống ReMarket." : "Tài khoản đang bị khóa nên chưa thể nhận tin nhắn mới."}</p>
+          </div>}
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div><dt className="t-meta text-muted">Vai trò</dt><dd className="mt-1 t-body text-ink">{selected.role === "ADMIN" ? "Quản trị viên" : "Người dùng"}</dd></div>
             <div><dt className="t-meta text-muted">Trạng thái</dt><dd className="mt-1"><StatusBadge label={USER_STATUS_LABELS[selected.status].label} tone={USER_STATUS_LABELS[selected.status].tone} /></dd></div>
@@ -141,6 +157,7 @@ export function AdminUsersPage() {
             <div><dt className="t-meta text-muted">Xác minh email</dt><dd className="mt-1 t-body text-ink">{selected.email_verified_at ? formatDateTime(selected.email_verified_at) : "Chưa xác minh"}</dd></div>
           </dl>
           {selected.status === "LOCKED" && <div className="rounded-card bg-danger-bg p-4"><p className="t-label text-danger">Lý do khóa</p><p className="mt-1 t-body text-ink">{selected.lock_reason ?? "Không có lý do"}</p><p className="mt-2 t-meta text-muted">Thời gian: {formatDateTime(selected.locked_at)}</p></div>}
+          <AdminUserProducts key={selected.id} userId={selected.id} />
         </div>}
       </Drawer>
 

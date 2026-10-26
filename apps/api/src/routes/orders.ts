@@ -70,7 +70,6 @@ const orderActionSchema = z
     expected_version: z.number().int().min(1),
     reason: z.string().trim().max(500, "Lý do tối đa 500 ký tự.").optional(),
     carrier: z.string().trim().max(100, "Đơn vị vận chuyển tối đa 100 ký tự.").optional(),
-    tracking_code: z.string().trim().max(100, "Mã vận đơn tối đa 100 ký tự.").optional(),
     buyer_confirmed_received: z.boolean().optional(),
     buyer_confirmed_paid: z.boolean().optional(),
   })
@@ -152,14 +151,17 @@ function counterpartySummary(
 type OrderDetailRow = NonNullable<Awaited<ReturnType<typeof loadOrderRow>>>;
 
 async function buildDetail(row: OrderDetailRow, viewer: AuthUser): Promise<OrderDetail> {
-  const openTickets = await hasOpenOrderTicket(row.id);
+  const counterpartyId = row.buyerId === viewer.id ? row.sellerId : row.buyerId;
+  const [openTickets, aggregates] = await Promise.all([
+    hasOpenOrderTicket(row.id),
+    loadSellerAggregates([counterpartyId]),
+  ]);
   const hasOpenTicket = openTickets > 0;
   const base = toOrderDetail(row, viewer, {
     hasOpenTicket,
     existingReview: row.review,
     completionReason: completionBlockReason(hasOpenTicket),
   });
-  const aggregates = await loadSellerAggregates([base.counterparty.id]);
   return { ...base, counterparty: counterpartySummary(base, row, aggregates) };
 }
 

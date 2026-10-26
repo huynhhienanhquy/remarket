@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
 import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
 
@@ -17,7 +18,7 @@ describe.skipIf(!enabled)("single-snapshot product search on PostgreSQL", () => 
     await prisma.user.deleteMany({ where: { id: { in: [seller, buyer] } } });
     await prisma.category.deleteMany({ where: { id: leaf } });
     await prisma.category.deleteMany({ where: { id: root } });
-    await Promise.all([prisma.$disconnect(), backgroundPrisma.$disconnect()]);
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
   });
   it("preserves filters, ordering, exact totals, favorites and immediate moderation visibility", async () => {
     await prisma.user.createMany({ data: [seller, buyer].map((id) => ({ id, fullName: marker, email: `${id}@example.test`, passwordHash: "test-only", emailVerifiedAt: new Date() })) });

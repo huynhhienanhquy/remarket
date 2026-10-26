@@ -1,7 +1,7 @@
 import type { Product, Order, SupportTicket } from "@prisma/client";
 import type { ProductCapabilities, ProductAction, OrderAction, SupportAction } from "@remarket/shared";
 import { REVIEW_LIMITS } from "@remarket/shared";
-import type { ProductRow, ViewerContext, OrderRow, OrderViewer } from "../shared/dto-mappers.js";
+import type { ProductDetailRow, ViewerContext, OrderRow, OrderViewer } from "../shared/dto-mappers.js";
 
 
 /**
@@ -9,7 +9,7 @@ import type { ProductRow, ViewerContext, OrderRow, OrderViewer } from "../shared
  * mutation service, which re-checks authorization on every write.
  */
 export function productCapabilities(
-  product: ProductRow,
+  product: ProductDetailRow,
   ctx: ViewerContext,
   categoryActive: boolean,
 ): ProductCapabilities {
@@ -107,11 +107,7 @@ export function orderAllowedActions(
         add("cancel");
         break;
       case "CONFIRMED":
-        if (order.deliveryMethod === "MEETUP") add("deliver");
         add("cancel");
-        break;
-      case "SHIPPING":
-        if (order.deliveryMethod === "COD") add("deliver");
         break;
       case "DELIVERED":
         if (!hasOpenTicket) add("complete");
@@ -134,6 +130,7 @@ export function orderAllowedActions(
         break;
       case "CONFIRMED":
         if (order.deliveryMethod === "COD") add("ship");
+        if (order.deliveryMethod === "MEETUP") add("deliver");
         add("cancel");
         break;
       case "SHIPPING":

@@ -12,6 +12,7 @@ vi.mock("../../src/config/env.js", async (importOriginal) => {
 });
 import { createApp } from "../../src/app.js";
 import { prisma } from "../../src/utils/prisma.js";
+import { disconnectDatabaseClient } from "../../src/utils/database-client.js";
 import { backgroundPrisma } from "../../src/utils/background-prisma.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
 import { createPrivateStorageUrl, deleteStorageObject, getLegacyLocalStoragePath, imageVariantPath, importLocalStorageObject } from "../../src/services/storage.js";
@@ -30,7 +31,7 @@ describe.skipIf(!enabled)("shared image storage across independent APIs", () => 
     await prisma.product.deleteMany({ where: { id: productId } });
     await prisma.user.deleteMany({ where: { id: sellerId } });
     await prisma.category.deleteMany({ where: { id: categoryId } });
-    await Promise.all([prisma.$disconnect(), backgroundPrisma.$disconnect(), otherClient.$disconnect()]);
+    await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma), otherClient.$disconnect()]);
   });
 
   it("uploads on API A and serves originals, thumbnails and published images on API B without local files", async () => {

@@ -56,17 +56,20 @@ Normal deployments keep email enabled and require SMTP.
 - Node.js 22, pnpm 11.9, PostgreSQL 16.
 - API: `apps/api`; web: `apps/web`; shared contracts: `packages/shared`.
 - Copy `.env.example` to `.env` and replace every sample secret. Production boot fails until the JWT key, web origins/public URL, SMTP settings and Supabase Storage settings are complete.
-- Development defaults to `STORAGE_DRIVER=database`: image bytes and WebP derivatives are shared through the same PostgreSQL database even when each machine runs its own API. `local` is opt-in for one API host only. Production requires `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, a server-only service-role key and a private `STORAGE_BUCKET`.
+- Development and production default to `STORAGE_DRIVER=supabase`: originals and WebP derivatives go to a private bucket, while application metadata stays in PostgreSQL. Set `SUPABASE_URL`, a server-only `SUPABASE_SERVICE_ROLE_KEY` and `STORAGE_BUCKET`. Never expose the service-role key through web/mobile environment variables. `database` remains an explicit legacy option; `local` is opt-in for one API host only. Production requires Supabase.
 
-For multiple development machines, apply `20261010120000_shared_image_storage`
-with `prisma:deploy`, run `prisma:generate`, then restart each updated API with
-`STORAGE_DRIVER=database`. Run `pnpm --filter @remarket/api storage:sync` on each
-machine holding older files in `apps/api/uploads`. This copies originals and
-derivatives without overwriting shared objects or deleting local files. Missing
-files must be recovered from the machine that uploaded them; metadata alone
-cannot reconstruct image bytes. Authorized image reads also backfill available
-local files lazily. Database storage increases database size and read traffic;
-use the existing private Supabase driver for production object storage.
+The current local target is project `mokuyrnkgsmqicvokrsq`, bucket `remarket-private`.
+Before switching existing images, stop API/worker writers using the old driver,
+configure Supabase and run `pnpm --filter @remarket/api storage:sync --dry-run`,
+then `pnpm --filter @remarket/api storage:sync`. The command checks that the bucket
+exists and is private. It copies originals and derivatives from `StorageObject`
+first, falling back to `apps/api/uploads`, and generates missing WebP derivatives.
+Existing bucket objects are never overwritten; paths, asset metadata, database
+bytes and local files are retained. A rerun resumes partial copies. Missing or
+failed assets return exit code 1; recover missing bytes from the original upload
+machine and rerun there. Start API/worker with the same Supabase configuration
+after a successful sync. This switch needs no new database migration. Legacy
+`STORAGE_DRIVER=database` sync remains available for existing installations.
 
 The Prisma datasource uses `DATABASE_URL` for application traffic and `DIRECT_URL` for migration traffic by default. A persistent API may explicitly set `DATABASE_USE_DIRECT_URL=true` to reuse its verified direct/session-pooler connection; `DIRECT_URL` must point to the same database. `DATABASE_CONNECTION_LIMIT` defaults to 5 for the HTTP pool (an explicit URL `connection_limit` takes precedence). Jobs/outbox/realtime use a separate client with `BACKGROUND_DATABASE_CONNECTION_LIMIT=1`; this overrides the inherited URL's limit. Optional `BACKGROUND_DATABASE_URL` must point to the same logical database/schema, otherwise it defaults to the selected API URL. Budget the sum of HTTP and background limits across API instances and any dedicated worker against the provider's limit. The current local HTTP limit stays 2, so the API's combined budget is 3. Keep the default transaction-pooler connection for serverless deployments. Use separate test, staging and production databases. Never run a reset against staging or production.
 

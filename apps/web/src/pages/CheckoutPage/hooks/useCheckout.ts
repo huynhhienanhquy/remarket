@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orderShippingFee, addVnd, validateShippingFee, validatePhone } from "@remarket/shared";
 import { api } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
+import { invalidateCart } from "@/helpers/cartCache";
 import { useSession } from "@/contexts/SessionContext";
 import { isApiError } from "@/helpers/errors";
 import type { CheckoutPayload, CheckoutPriceChangedDetails } from "@remarket/shared";
@@ -134,7 +135,7 @@ export function useCheckout() {
   const checkout = useMutation({
     mutationFn: ({ payload, key }: { payload: CheckoutPayload; key: string }) => api.checkout.create(payload, key),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      void invalidateCart(queryClient);
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       navigate(`/orders/${result.orders[0]?.id ?? ""}`);
@@ -192,7 +193,7 @@ export function useCheckout() {
 
   function handlePriceChangedRefresh() {
     setPriceChangedAlert(null);
-    queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+    void invalidateCart(queryClient);
   }
   return {
     online,

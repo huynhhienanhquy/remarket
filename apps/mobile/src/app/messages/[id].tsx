@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { randomUUID } from "expo-crypto";
 import type { Message } from "@remarket/shared";
-import { api } from "../../services/runtime";
+import { mergeMessage } from "@remarket/shared";
+import type { MessageHistory } from "@remarket/shared";
+import { api, session } from "../../services/runtime";
 import {
   useSession,
   useRealtimeSocket,
@@ -44,6 +46,7 @@ export default function Conversation() {
   const socket = useRealtimeSocket();
   const [content, setContent] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [sending, setSending] = useState<Message | null>(null);
   const [failed, setFailed] = useState<{
     content: string;
     client_message_id: string;
@@ -55,6 +58,7 @@ export default function Conversation() {
   useEffect(() => {
     setContent("");
     setFailed(null);
+    setSending(null);
     setFieldError(null);
     lastRead.current = "";
     visible.current = [];
@@ -88,7 +92,7 @@ export default function Conversation() {
       .then(() => {
         lastRead.current = newest.id;
         void queryClient.invalidateQueries({ queryKey: ["chat", "inbox"] });
-        void queryClient.invalidateQueries({ queryKey: ["chat", "unread"] });
+        void queryClient.invalidateQueries({ queryKey: ["notifications", "navigation-counts"] });
       })
       .catch(() => undefined)
       .finally(() => {
@@ -123,15 +127,24 @@ export default function Conversation() {
     setFieldError(error);
     if (error) return;
     void action.run(async () => {
+      setSending({ id: entry.client_message_id, client_message_id: entry.client_message_id, sender_id: user!.id,
+        content: entry.content, created_at: new Date().toISOString(), read_at: null });
+      setContent("");
       try {
-        await api.chat.send(id, entry);
+        const { message } = await api.chat.send(id, entry);
+        const key = ["chat", "messages", id, user?.id];
+        await queryClient.cancelQueries({ queryKey: key });
+        if (session.getSnapshot().user?.id !== message.sender_id) return;
+        queryClient.setQueryData<MessageHistory>(key, (history) => mergeMessage(history, message));
       } catch (error) {
         setFailed(canRetryMessage(error) ? entry : null);
+        setContent((draft) => draft || entry.content);
         throw error;
+      } finally {
+        setSending(null);
       }
       setFailed(null);
-      setContent("");
-      await queryClient.invalidateQueries({ queryKey: ["chat"] });
+      void queryClient.invalidateQueries({ queryKey: ["chat", "inbox"] });
     });
   };
   if (!user)
@@ -142,7 +155,9 @@ export default function Conversation() {
     );
   const items = Array.from(
     new Map(
-      (messages.data?.pages.flatMap((page) => page.items) ?? []).map((item) => [
+      [...(messages.data?.pages.flatMap((page) => page.items) ?? []),
+        ...(sending && !messages.data?.pages.some((page) => page.items.some((item) =>
+          item.sender_id === sending.sender_id && item.client_message_id === sending.client_message_id)) ? [sending] : [])].map((item) => [
         item.id,
         item,
       ]),
@@ -159,9 +174,12 @@ export default function Conversation() {
     >
       <View style={{ padding: 16, gap: 6 }}>
         {detail.data && (
-          <MenuRow
+          detail.data.counterparty.is_system ? <View style={{ gap: 4 }}>
+            <Text accessibilityRole="header" style={styles.heading}>Hệ thống ReMarket</Text>
+            <Text style={styles.muted}>Kênh nhắn tin chính thức của ReMarket</Text>
+          </View> : <MenuRow
             title={detail.data.counterparty.name}
-            description={detail.data.product?.title}
+            description={detail.data.is_system ? "Kênh nhắn tin chính thức của ReMarket" : detail.data.product?.title}
             icon="person-circle-outline"
             onPress={() =>
               router.push(`/users/${detail.data!.counterparty.id}`)
@@ -223,9 +241,11 @@ export default function Conversation() {
               },
             ]}
           >
+            {(item.is_system || (item.sender_id === user.id && detail.data?.is_system && user.role === "ADMIN")) && <Text style={[styles.meta, { color: colors.green, fontWeight: "600" }]}>Hệ thống ReMarket</Text>}
             <Text style={styles.text}>{item.content}</Text>
             <Text style={styles.meta}>
               {new Date(item.created_at).toLocaleTimeString("vi-VN")}{" "}
+              {item.id === sending?.id ? "· Đang gửi" : ""}
               {item.sender_id === user.id && item.read_at ? "· Đã đọc" : ""}
             </Text>
           </View>
@@ -248,7 +268,6 @@ export default function Conversation() {
           placeholder="Nhập tin nhắn…"
           maxLength={5000}
           value={content}
-          editable={!action.pending}
           onChangeText={(value) => {
             setContent(value);
             setFieldError(null);

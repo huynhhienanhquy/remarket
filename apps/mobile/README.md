@@ -10,6 +10,10 @@ và bộ lọc dạng bảng trượt. Card và gallery dùng ảnh 4:3, lưới
 trị dùng cùng màu teal, typography và cách phân nhóm với web. Thanh mua hàng
 và nút lưu tin cố định có safe area.
 Xem [thay đổi UI và kiểm tra ngày 21/10](../../docs/mobile-ui-parity-2026-10-21.md).
+Xem [đồng bộ với web mobile ngày 25/10](../../docs/mobile-web-parity-2026-10-25.md):
+thanh điều hướng 5 mục và Menu dùng chung; header Tin nhắn/Thông báo/Giỏ hàng;
+giỏ riêng trước checkout, giữ món đã chọn; đơn mua/bán theo route; thông báo
+mở đúng khu vực tài khoản/quản trị và footer danh mục trên các trang công khai.
 Xem [đối chiếu chức năng và kết quả kiểm tra](../../docs/mobile-web-parity-2026-10-15.md).
 
 ## Chạy development

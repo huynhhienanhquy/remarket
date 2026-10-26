@@ -15,6 +15,11 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Transform the entry and common landing screens during server startup.
+    // Otherwise the first localhost visitor pays the entire import waterfall.
+    warmup: {
+      clientFiles: ["./src/main.tsx", "./src/pages/HomePage/HomePage.tsx", "./src/pages/SearchPage/SearchPage.tsx"],
+    },
     proxy: {
       "/socket.io": { target: devApiTarget, changeOrigin: true, ws: true },
       "/api": {

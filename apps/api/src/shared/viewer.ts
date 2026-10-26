@@ -30,6 +30,8 @@ export async function buildProductContext(
   const base = viewerFrom(req);
   const viewerId = base.viewerId;
 
+  if (products.length === 0) return { ...base, favorited: new Set(), aggregates: new Map() };
+
   const [favoriteRows, aggregates] = await Promise.all([
     viewerId
       ? prisma.favorite.findMany({
@@ -67,7 +69,7 @@ export async function loadCategoryChain(categoryId: string): Promise<CategoryCha
       FROM "Category" c
       JOIN chain ON c.id = chain."parentId"
     )
-    SELECT id, "parentId", name, status,
+    SELECT id, "parentId", name, status::text AS status,
       NOT EXISTS (SELECT 1 FROM "Category" child WHERE child."parentId" = chain.id) AS "isLeaf"
     FROM chain
     ORDER BY name

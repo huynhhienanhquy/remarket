@@ -29,6 +29,7 @@ export function communicationEndpoints(http: HttpTransport) {
   };
 
   const notifications: NotificationsApi = {
+    navigationCounts: () => http.get("/notifications/navigation-counts"),
     list: (query) =>
       http.get("/notifications", {
         page: query.page,
