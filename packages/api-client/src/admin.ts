@@ -3,6 +3,7 @@ import type { HttpTransport } from "./transport.js";
 
 export function adminEndpoints(http: HttpTransport): AdminApi {
   return {
+    navigationCounts: () => http.get("/admin/navigation-counts"),
     emailVerifications: (query) =>
       http.get("/admin/email-verifications", { ...query }),
     approveEmailVerification: (id) =>

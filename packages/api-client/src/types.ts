@@ -1,5 +1,6 @@
 import type {
   AdminDashboard,
+  AdminNavigationCounts,
   AdminOrderCancelInput,
   AdminOrderCancelResult,
   AdminProductItem,
@@ -278,6 +279,7 @@ export interface ProfilesApi {
 }
 
 export interface AdminApi {
+  navigationCounts(): Promise<AdminNavigationCounts>;
   emailVerifications(query: {
     status?: "PENDING" | "APPROVED" | "ALL";
     page?: number;

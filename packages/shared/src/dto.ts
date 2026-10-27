@@ -30,6 +30,14 @@ export interface NavigationCounts {
   cart: number;
 }
 
+/** Global admin queues, independent of list filters and pagination. */
+export interface AdminNavigationCounts {
+  pending_products: number;
+  pending_email_verifications: number;
+  pending_reports: number;
+  open_tickets: number;
+}
+
 /* ------------------------------------------------------------------ *
  * Envelope (detail-project 14)
  * ------------------------------------------------------------------ */

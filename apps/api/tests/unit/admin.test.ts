@@ -51,6 +51,34 @@ describe("admin date bounds", () => {
 });
 
 describe("admin HTTP contracts with isolated persistence", () => {
+  it("returns global pending queue counts without loading queue rows", async () => {
+    client.user.count.mockResolvedValue(2);
+    client.report.count.mockResolvedValue(104);
+    client.supportTicket.count.mockResolvedValue(3);
+    client.product.count.mockResolvedValue(5);
+    const response = await request(createApp()).get("/api/v1/admin/navigation-counts").set("Authorization", authorization()).expect(200);
+    expect(response.body.data).toEqual({ pending_email_verifications: 2, pending_reports: 104, open_tickets: 3, pending_products: 5 });
+    expect(client.user.count).toHaveBeenCalledWith({ where: { emailVerificationRequestedAt: { not: null }, emailVerifiedAt: null } });
+    expect(client.report.count).toHaveBeenCalledWith({ where: { status: "PENDING" } });
+    expect(client.supportTicket.count).toHaveBeenCalledWith({ where: { status: "OPEN" } });
+    expect(client.product.count).toHaveBeenCalledWith({ where: { status: "PENDING", deletedAt: null } });
+    expect(client.product.findMany).not.toHaveBeenCalled();
+    expect(client.user.findMany).not.toHaveBeenCalled();
+    expect(client.supportTicket.findMany).not.toHaveBeenCalled();
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+  it("protects admin queue counts from anonymous, member and locked accounts", async () => {
+    const app = createApp();
+    await request(app).get("/api/v1/admin/navigation-counts").expect(401);
+    client.user.findUnique.mockResolvedValue({ ...admin, role: "USER" });
+    await request(app).get("/api/v1/admin/navigation-counts").set("Authorization", authorization()).expect(403);
+    client.user.findUnique.mockResolvedValue({ ...admin, status: "LOCKED" });
+    await request(app).get("/api/v1/admin/navigation-counts").set("Authorization", authorization()).expect(403);
+    expect(client.report.count).not.toHaveBeenCalled();
+    expect(client.product.count).not.toHaveBeenCalled();
+    expect(client.supportTicket.count).not.toHaveBeenCalled();
+    expect(client.user.count).not.toHaveBeenCalled();
+  });
   const leaf = { id: "leaf", name: "Danh mục", parentId: null, parent: null, status: "ACTIVE", _count: { children: 0 } };
   const pending = {
     id: "listing", sellerId: "seller", seller: { ...admin, id: "seller", role: "USER", avatarUrl: null, provinceCode: null, joinedAt: new Date() },

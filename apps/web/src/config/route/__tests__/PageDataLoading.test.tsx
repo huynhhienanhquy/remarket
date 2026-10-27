@@ -80,11 +80,11 @@ describe("only the current page loads its data", () => {
     expect(context.requests("POST", "/auth/bootstrap")).toHaveLength(1);
   });
 
-  it("does not fetch the email approval queue from the admin menu", async () => {
+  it("loads compact admin counts without fetching the individual queues", async () => {
     context.viewer = { ...member, role: "ADMIN" };
     show("/admin/users");
     await settled("/admin/users");
-    expect(reads()).toEqual(["/admin/users"]);
+    expect(reads().sort()).toEqual(["/admin/users", "/admin/navigation-counts"].sort());
   });
 
   it("aborts the old page request on navigation and keeps subsequent page loads isolated", async () => {

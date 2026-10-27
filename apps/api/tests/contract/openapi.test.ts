@@ -15,6 +15,7 @@ const requiredOperations: Array<[string, HttpMethod]> = [
   ["/auth/verify-email", "post"], ["/auth/resend-verification", "post"],
   ["/auth/email-verification-request", "get"], ["/auth/email-verification-request", "post"],
   ["/admin/email-verifications", "get"], ["/admin/email-verifications/{id}/approve", "post"],
+  ["/admin/navigation-counts", "get"],
   ["/auth/forgot-password", "post"], ["/auth/reset-password", "post"],
   ["/auth/profile", "patch"], ["/auth/avatar", "patch"], ["/categories", "get"],
   ["/provinces", "get"], ["/products", "get"], ["/products", "post"],

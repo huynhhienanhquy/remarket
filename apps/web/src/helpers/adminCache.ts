@@ -4,7 +4,11 @@ type AdminResource = "dashboard" | "products" | "reports" | "reviews" | "users" 
 
 /** Invalidate the complete resource, including its list and detail queries. */
 export function invalidateAdminResources(client: QueryClient, ...resources: AdminResource[]) {
-  return Promise.all([...new Set(resources)].map((resource) => client.invalidateQueries({ queryKey: ["admin", resource] })));
+  const invalidations = [...new Set(resources)].map((resource) => client.invalidateQueries({ queryKey: ["admin", resource] }));
+  if (resources.includes("products") || resources.includes("reports") || resources.includes("tickets")) {
+    invalidations.push(client.invalidateQueries({ queryKey: ["admin", "navigation-counts"] }));
+  }
+  return Promise.all(invalidations);
 }
 
 /** Patch visible rows immediately; callers then invalidate affected resources. */

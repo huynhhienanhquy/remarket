@@ -2245,6 +2245,33 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
         }
       ]
     },
+    "AdminNavigationCounts": {
+      "type": "object",
+      "required": [
+        "pending_products",
+        "pending_email_verifications",
+        "pending_reports",
+        "open_tickets"
+      ],
+      "properties": {
+        "pending_email_verifications": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending_products": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending_reports": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_tickets": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "AdminDashboard": {
       "type": "object",
       "required": [
@@ -4639,6 +4666,26 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
             "properties": {
               "data": {
                 "$ref": "#/components/schemas/SupportTicketDetail"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/admin/navigation-counts",
+      "method": "GET",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/AdminNavigationCounts"
               }
             }
           }

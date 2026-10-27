@@ -92,6 +92,7 @@ x-operation-error-codes:
   replySupportTicket: *RestrictedMutationErrors
   closeSupportTicket: *RestrictedMutationErrors
   adminDashboard: *AdminOperationErrors
+  adminNavigationCounts: *AdminOperationErrors
   adminUsers: *AdminOperationErrors
   adminLockUser: *AdminOperationErrors
   adminOpenSystemConversation: *ActiveMutationErrors
@@ -519,6 +520,23 @@ paths:
   /support/tickets/{id}/close:
     post: { tags: [Trust], operationId: closeSupportTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/SupportTicketSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
 
+  /admin/navigation-counts:
+    get:
+      tags: [Admin]
+      operationId: adminNavigationCounts
+      security: [{ bearerAuth: [] }]
+      description: Global pending product, email verification and report counts, and OPEN support tickets, independent of page filters.
+      responses:
+        '200':
+          description: Admin queue counts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AdminNavigationCounts' }
   /admin/dashboard:
     get: { tags: [Admin], operationId: adminDashboard, security: [{ bearerAuth: [] }], parameters: [{ name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }], responses: { '200': { $ref: '#/components/responses/AdminDashboardSuccess' } } }
   /admin/users:
@@ -2142,6 +2160,15 @@ components:
             assigned_admin_name: { type: string, nullable: true }
             messages: { type: array, items: { $ref: '#/components/schemas/SupportMessage' } }
             allowed_actions: { type: array, items: { type: string, enum: [reply, close, reopen, resolve, progress] } }
+    AdminNavigationCounts:
+      type: object
+      required: [pending_products, pending_email_verifications, pending_reports, open_tickets]
+      additionalProperties: false
+      properties:
+        pending_email_verifications: { type: integer, minimum: 0 }
+        pending_products: { type: integer, minimum: 0 }
+        pending_reports: { type: integer, minimum: 0 }
+        open_tickets: { type: integer, minimum: 0 }
     AdminDashboard:
       type: object
       required: [total_users, new_users_in_period, pending_products, products_by_status, blocked_products, completed_orders_in_period, completed_order_value_in_period, pending_reports, unresolved_tickets, pending_products_queue, open_tickets_queue]

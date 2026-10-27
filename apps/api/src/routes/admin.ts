@@ -1,5 +1,6 @@
 ﻿import type { AdminDashboard } from "@remarket/shared";
 import { Router } from "express";
+import type { AdminNavigationCounts } from "@remarket/shared";
 import { z } from "zod";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { prisma } from "../utils/prisma.js";
@@ -26,6 +27,23 @@ import { adminEmailVerificationsRouter } from "./adminEmailVerifications.js";
  */
 
 const router = Router();
+
+// Counts only: shared navigation must not load the individual queue pages.
+router.get("/navigation-counts", asyncHandler(async (_req, res) => {
+  const [pendingEmails, pendingReports, openTickets, pendingProducts] = await Promise.all([
+    prisma.user.count({ where: { emailVerificationRequestedAt: { not: null }, emailVerifiedAt: null } }),
+    prisma.report.count({ where: { status: "PENDING" } }),
+    prisma.supportTicket.count({ where: { status: "OPEN" } }),
+    prisma.product.count({ where: { status: "PENDING", deletedAt: null } }),
+  ]);
+  const counts: AdminNavigationCounts = {
+    pending_email_verifications: pendingEmails,
+    pending_reports: pendingReports,
+    open_tickets: openTickets,
+    pending_products: pendingProducts,
+  };
+  ok(res, counts);
+}));
 
 const dashboardQuerySchema = z
   .object({

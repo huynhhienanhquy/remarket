@@ -6,6 +6,7 @@ export const queryKeys = {
   viewer: ["session", "viewer"] as const,
   emailVerification: (viewerId: string) => ["email-verification", viewerId] as const,
   adminEmailVerifications: (query: unknown) => ["admin", "email-verifications", query] as const,
+  adminNavigationCounts: ["admin", "navigation-counts"] as const,
   categories: ["categories"] as const,
   provinces: ["provinces"] as const,
   products: (query: unknown) => ["products", "list", query] as const,
