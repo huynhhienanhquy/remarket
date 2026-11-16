@@ -1,7 +1,13 @@
 import { useChatThread } from "../hooks/useChatThread";
 import { Link } from "react-router-dom";
 import { PRODUCT_STATUS_LABELS, formatDate, formatDateTime, formatVnd } from "@remarket/shared";
-import { ApiImage, Button, EmptyState, FormField, InlineAlert, StatusBadge, Textarea } from "@/components/common";
+import { ApiImage } from "../../../components/common/ApiImage/ApiImage";
+import { Button } from "../../../components/common/Button/Button";
+import { EmptyState } from "../../../components/common/EmptyState/EmptyState";
+import { FormField } from "../../../components/common/FormField/FormField";
+import { InlineAlert } from "../../../components/common/InlineAlert/InlineAlert";
+import { StatusBadge } from "../../../components/common/StatusBadge/StatusBadge";
+import { Textarea } from "../../../components/common/Input/Input";
 import { ListLoading, OfflineNotice, QueryFailure } from "@/components/common/PageFeedback/PageFeedback";
 
 export function ChatThread({ id, embedded = false }: { id: string; embedded?: boolean }) {

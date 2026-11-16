@@ -8,7 +8,10 @@ import {
 } from "@remarket/shared";
 import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
-import { Icon, MarketplaceImage, Pagination, StatusBadge } from "../../components/common";
+import { Icon } from "../../components/common/Icon/Icon";
+import { MarketplaceImage } from "../../components/common/MarketplaceImage/MarketplaceImage";
+import { Pagination } from "../../components/common/Pagination/Pagination";
+import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
 import { AccountEmptyState, AccountFilters, AccountPageHeader } from "../../components/AccountPageHeader/AccountPageHeader";
 import { ListLoading, OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
 import { urlPage } from "../../utils/urlPage";

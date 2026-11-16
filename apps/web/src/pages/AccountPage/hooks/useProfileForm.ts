@@ -6,7 +6,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors } from "@/helpers/errors";
-import { useToast } from "@/components/common";
+import { useToast } from "../../../components/common/Toast/Toast";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
 /**

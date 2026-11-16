@@ -36,16 +36,16 @@ export function AuthShell() {
 
         {/* Form column */}
         <div className="flex flex-col px-4 py-8 sm:px-6 lg:px-10 lg:py-12">
-          <div className="mb-8 lg:hidden">
+          <div className="mx-auto mb-5 w-full max-w-[420px] lg:hidden">
             <Logo />
           </div>
-          <main className="mx-auto w-full max-w-[420px] flex-1">
+          <main className="mx-auto w-full max-w-[420px] rounded-modal border border-line bg-surface p-5 shadow-subtle sm:p-6 lg:p-8">
             <Outlet />
           </main>
-          <div className="mx-auto mt-10 w-full max-w-[420px]">
+          <div className="mx-auto mt-4 w-full max-w-[420px]">
             <Link
               to={homeLink}
-              className="inline-flex t-label text-brand hover:underline"
+              className="inline-flex min-h-touch items-center t-label text-brand hover:underline"
             >
               ← Quay lại khám phá
             </Link>

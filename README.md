@@ -47,6 +47,29 @@ không tạo người dùng, sản phẩm hay giao dịch. Tạo admin bằng `a
 Schema/migrations nằm trong `apps/api/prisma`. Chạy các lệnh Prisma qua
 `pnpm --filter @remarket/api` để dùng đúng schema và phiên bản của API.
 
+## Trợ lý ReMarket trên web
+
+Sau khi chạy migration, đặt `AI_USER_CHAT_ENABLED=true` và `OPENAI_API_KEY` trong
+`apps/api/.env` hoặc cấu hình môi trường của API, rồi khởi động lại API. Đăng nhập
+và mở **Trợ lý ReMarket** ở góc dưới trang marketplace.
+
+Thử “Tìm iPhone 13 dưới 8 triệu ở TP.HCM”, sau đó “Chỉ lấy dưới 7 triệu”
+hoặc “Bỏ giới hạn địa điểm”. Với câu hỏi về ReMarket, thử “Xác minh email thế nào?”.
+Bạn có thể mở lại hoặc xóa phiên trong popup.
+
+Trợ lý cũng tra số liệu của tài khoản đang đăng nhập. Thử “Tháng này tôi bán
+được bao nhiêu món?”, “Tháng trước tôi chi bao nhiêu?” hoặc “Tôi có bao nhiêu tin
+chờ duyệt?”. Mốc ngày tính theo giờ Việt Nam. Tiền bán là tiền hàng của đơn đã
+hoàn tất, chưa gồm phí giao. Chi tiêu mua gồm phí giao của đơn đã hoàn tất.
+
+`AI_DAILY_BUDGET_USD` giới hạn chi phí ước tính theo ngày UTC. Khi đổi `AI_MODEL`,
+cập nhật `AI_INPUT_USD_PER_MILLION` và `AI_OUTPUT_USD_PER_MILLION` cho cùng mô hình.
+PostgreSQL giữ lịch sử khi API khởi động lại. Việc nối lại hoặc dừng một stream
+đang chạy cần đến đúng tiến trình API, nên pilot dùng một instance.
+
+Chạy `node apps/api/scripts/verify-isolated.mjs --marketplace-ai-only` để kiểm tra
+với một schema PostgreSQL tạm và OpenAI giả lập. [Kế hoạch tích hợp AI](docs/ai-integration-plan.md)
+
 ## Ảnh dùng chung giữa nhiều máy
 
 Local và production mặc định dùng `STORAGE_DRIVER=supabase`. Ảnh gốc và các bản

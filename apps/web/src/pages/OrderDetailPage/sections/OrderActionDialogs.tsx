@@ -1,5 +1,6 @@
 import type { useOrderDetail } from "../hooks/useOrderDetail";
-import { Button, ConfirmDialog, Dialog } from "../../../components/common";
+import { Button } from "../../../components/common/Button/Button";
+import { ConfirmDialog, Dialog } from "../../../components/common/Dialog/Dialog";
 type Model = Pick<ReturnType<typeof useOrderDetail>, "order" | "confirmOpen" | "changeCancelReason" | "shipFields" | "changeShipping" | "deliverOpen" | "pendingAction" | "handleAction" | "closeModals">;
 export function OrderActionDialogs({ model }: { model: Model }) {
   const { order, confirmOpen, changeCancelReason, shipFields, changeShipping, deliverOpen, pendingAction, handleAction, closeModals } = model;

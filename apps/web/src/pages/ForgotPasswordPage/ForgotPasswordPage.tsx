@@ -5,7 +5,10 @@ import { validateEmail } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
 import { safeReturnTo } from "../../config/route/guards";
 import { api } from "../../services/api";
-import { Button, FormField, InlineAlert, Input } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { FormField } from "../../components/common/FormField/FormField";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Input } from "../../components/common/Input/Input";
 import { EMAIL_ENABLED } from "../../config/environment";
 import { isApiError } from "../../helpers/errors";
 

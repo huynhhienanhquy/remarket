@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
-import { ToastProvider } from "@/components/common";
+import { ToastProvider } from "../components/common/Toast/Toast";
 import { createQueryClient } from "@/config/queryClient";
 import { SupportTicketPage } from "@/pages/SupportTicketPage/SupportTicketPage";
 

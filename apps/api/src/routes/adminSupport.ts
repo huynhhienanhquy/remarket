@@ -29,6 +29,7 @@ const router = Router();
 const listQuery = z
   .object({
     status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ALL"]).optional(),
+    q: z.string().trim().max(100).optional(),
     type: z.enum(["ACCOUNT", "ORDER_PROBLEM", "PRODUCT", "OTHER", "ALL"]).optional(),
     assigned_admin_id: z.string().trim().min(1).max(64).optional(),
     from: z.string().optional(),
@@ -46,6 +47,10 @@ router.get(
     const paging = parsePaging(req.query);
 
     const where: Prisma.SupportTicketWhereInput = {};
+    if (query.q) where.OR = [
+      { code: { contains: query.q, mode: "insensitive" } },
+      { user: { fullName: { contains: query.q, mode: "insensitive" } } },
+    ];
     if (query.status !== undefined && query.status !== "ALL") where.status = query.status;
     if (query.type !== undefined && query.type !== "ALL") where.type = query.type;
     if (query.assigned_admin_id !== undefined) {

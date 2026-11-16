@@ -1,6 +1,5 @@
 import { useId } from "react";
 import type { FormEvent } from "react";
-import { inputClasses } from "../Input/Input";
 import { SearchIcon, XIcon } from "../Icon/Icon";
 
 export interface SearchInputProps {
@@ -15,7 +14,7 @@ export interface SearchInputProps {
 }
 
 const ICON_BUTTON =
-  "flex h-11 w-11 shrink-0 items-center justify-center rounded-control transition-colors";
+  "flex h-touch w-touch shrink-0 items-center justify-center rounded-control transition-colors";
 
 export function SearchInput({
   value,
@@ -38,8 +37,8 @@ export function SearchInput({
       <label htmlFor={inputId} className="sr-only">
         {label}
       </label>
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+      <div className="flex min-h-12 items-center gap-2 rounded-card border border-input-line bg-page py-px pl-3 pr-0.5 focus-within:border-brand">
+        <SearchIcon className="pointer-events-none shrink-0 text-muted" />
         {/* The UA cancel button is hidden: the X below carries the
             "Xóa tìm kiếm" label and the 44px target (ui-spec 2.2). */}
         <input
@@ -50,12 +49,9 @@ export function SearchInput({
           placeholder={placeholder}
           autoComplete="off"
           onChange={(event) => onValueChange(event.target.value)}
-          className={[
-            inputClasses(false),
-            "pl-10 pr-28 [&::-webkit-search-cancel-button]:appearance-none",
-          ].join(" ")}
+          className="min-h-touch min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-muted focus-visible:outline-offset-0 [&::-webkit-search-cancel-button]:appearance-none"
         />
-        <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+        <div className="flex shrink-0 items-center">
           {value !== "" && (
             <button
               type="button"

@@ -6,7 +6,7 @@ import { queryKeys } from "@/config/queryClient";
 import { isApiError } from "@/helpers/errors";
 import { useSession } from "@/contexts/SessionContext";
 import { loginPathFor } from "@/config/route/guards";
-import { useToast } from "@/components/common";
+import { useToast } from "../../../components/common/Toast/Toast";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { invalidateCart } from "@/helpers/cartCache";
 

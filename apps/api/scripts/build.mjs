@@ -9,7 +9,7 @@ const distRoot = path.join(apiRoot, "dist");
 await rm(distRoot, { recursive: true, force: true });
 
 const tscPath = path.join(apiRoot, "node_modules", "typescript", "lib", "tsc.js");
-const compiled = spawnSync(process.execPath, [tscPath, "-p", path.join(apiRoot, "tsconfig.json")], {
+const compiled = spawnSync(process.execPath, [tscPath, "-p", path.join(apiRoot, "tsconfig.build.json")], {
   cwd: apiRoot,
   stdio: "inherit",
 });

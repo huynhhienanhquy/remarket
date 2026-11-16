@@ -2,7 +2,8 @@ import { useDismiss } from "@/hooks/useDismiss";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSession } from "@/contexts/SessionContext";
-import { ApiImage, ChevronRightIcon } from "@/components/common";
+import { ApiImage } from "../../common/ApiImage/ApiImage";
+import { ChevronRightIcon } from "../../common/Icon/Icon";
 
 /* ------------------------------------------------------------------ */
 /* Account menu                                                        */

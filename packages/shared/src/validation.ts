@@ -1,16 +1,7 @@
 import { CONDITION_LABELS, DELIVERY_LABELS } from "./labels.js";
 import { normalizeVndInput, validatePrice, validateShippingFee } from "./money.js";
-import { CONDITIONS, DELIVERY_METHODS, REPORT_REASONS } from "./enums.js";
+import { CONDITIONS, DELIVERY_METHODS } from "./enums.js";
 import type { Condition, DeliveryMethod, ReportReason } from "./enums.js";
-
-/**
- * Client-side validation mirrors backend limits (detail-project 4, 6, 11.4)
- * so the form can give instant feedback; the server stays authoritative.
- */
-
-export interface FieldErrors {
-  [field: string]: string;
-}
 
 export const AUTH_LIMITS = {
   fullNameMax: 100,
@@ -214,14 +205,6 @@ export function validateReportDescription(
   return null;
 }
 
-export function isReportReason(value: string): value is ReportReason {
-  return (REPORT_REASONS as readonly string[]).includes(value);
-}
-
-export function isCondition(value: string): value is Condition {
-  return (CONDITIONS as readonly string[]).includes(value);
-}
-
 /** Normalizes the price range filter; returns null when incomplete/invalid. */
 export function normalizePriceFilter(
   from: string,
@@ -250,4 +233,3 @@ export function conditionLabel(condition: Condition): string {
 export function deliveryLabel(method: DeliveryMethod): string {
   return DELIVERY_LABELS[method];
 }
-

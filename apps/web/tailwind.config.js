@@ -1,33 +1,33 @@
+import tokens from "../../packages/shared/ui-tokens.json";
+
+const { color, radius, layout } = tokens;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        page: "#F5F7FA",
-        surface: "#FFFFFF",
-        "surface-subtle": "#EFF3F6",
-        ink: "#18313B",
-        muted: "#5D6C7A",
-        brand: {
-          DEFAULT: "#0F766E",
-          hover: "#115E59",
-          soft: "#E8F6F3",
-        },
-        line: "#E1E8EE",
-        "input-line": "#8797A5",
-        accent: "#B45309",
-        "warning-bg": "#FFF4DA",
-        danger: {
-          DEFAULT: "#B42318",
-          bg: "#FEF0EE",
-        },
-        info: {
-          DEFAULT: "#245EA8",
-          bg: "#ECF3FF",
-        },
-        focus: "#245EA8",
+        page: color.page,
+        surface: color.surface,
+        "surface-subtle": color.subtle,
+        ink: color.ink,
+        muted: color.muted,
+        brand: { DEFAULT: color.brand, hover: color.brandHover, soft: color.brandSoft },
+        line: color.line,
+        "input-line": color.inputLine,
+        accent: color.accent,
+        "warning-bg": color.warningBg,
+        danger: { DEFAULT: color.danger, bg: color.dangerBg },
+        info: { DEFAULT: color.info, bg: color.infoBg },
+        focus: color.info,
       },
+      spacing: {
+        "mobile-header": layout.header + "px",
+        "mobile-nav": layout.tabBar + "px",
+        touch: layout.touchTarget + "px",
+      },
+      maxWidth: { marketplace: layout.maxWidth + "px" },
       fontFamily: {
         sans: [
           "system-ui",
@@ -40,9 +40,9 @@ export default {
         ],
       },
       borderRadius: {
-        control: "8px",
-        card: "12px",
-        modal: "16px",
+        control: radius.control + "px",
+        card: radius.card + "px",
+        modal: radius.modal + "px",
       },
       zIndex: {
         section: "10",
@@ -55,7 +55,7 @@ export default {
       boxShadow: {
         pop: "0 4px 16px rgba(23, 37, 29, 0.08)",
         "card-hover": "0 4px 12px rgba(23, 37, 29, 0.08)",
-        subtle: "0 2px 8px rgba(24, 49, 59, 0.03)",
+        subtle: "0 2px 8px rgba(23, 37, 29, 0.04)",
       },
       transitionDuration: {
         DEFAULT: "150ms",

@@ -19,7 +19,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     const rows: CategoryRow[] = await prisma.category.findMany({
       where: { status: "ACTIVE" },
-      orderBy: [{ name: "asc" }, { id: "asc" }],
+      orderBy: [{ sortIndex: "asc" }, { name: "asc" }, { id: "asc" }],
     });
 
     const byParent = new Map<string | null, CategoryRow[]>();

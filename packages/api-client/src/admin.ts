@@ -3,12 +3,15 @@ import type { HttpTransport } from "./transport.js";
 
 export function adminEndpoints(http: HttpTransport): AdminApi {
   return {
+    summary: (section) => http.get(`/admin/summary/${section}`),
+    categorySummary: (id) => http.get(`/admin/categories/${id}/summary`),
     navigationCounts: () => http.get("/admin/navigation-counts"),
     emailVerifications: (query) =>
       http.get("/admin/email-verifications", { ...query }),
     approveEmailVerification: (id) =>
       http.post(`/admin/email-verifications/${id}/approve`, {}),
     dashboard: (from, to) => http.get("/admin/dashboard", { from, to }),
+    createUser: (input) => http.post("/admin/users", input),
     users: (query) => http.get("/admin/users", { ...query }),
     user: (id) => http.get(`/admin/users/${id}`),
     openSystemConversation: (id) => http.post(`/admin/users/${id}/conversation`, {}),

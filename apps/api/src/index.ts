@@ -14,35 +14,43 @@ const app = createApp();
 const server = createServer(app);
 const realtime = attachRealtime(server);
 const [, stopRealtimeRelay] = await Promise.all([warmHttpDatabasePool(), startRealtimeRelay()]);
+let stopJobs: () => void = () => undefined;
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Không thể khởi động API vì cổng ${env.port} đang được sử dụng. Dừng phiên API cũ bằng Ctrl+C rồi chạy lại pnpm dev.`);
+  } else {
+    console.error("Không thể mở cổng API:", error.message);
+  }
+  void shutdown("HTTP server error", 1);
+});
 server.listen(env.port, "0.0.0.0", () => {
   console.log(`ReMarket API listening on http://localhost:${env.port}`);
   console.log(`  health:  http://localhost:${env.port}/health/ready`);
   console.log(`  api:     http://localhost:${env.port}/api/v1`);
+  if (env.runJobs) {
+    stopJobs = startJobRunner(env.workerIntervalMs, env.outboxIntervalMs, env.mobilePushIntervalMs);
+  }
 });
-const stopJobs = env.runJobs
-  ? startJobRunner(env.workerIntervalMs, env.outboxIntervalMs, env.mobilePushIntervalMs)
-  : () => undefined;
 
 let shuttingDown = false;
 
-async function shutdown(signal: string): Promise<void> {
+async function shutdown(signal: string, exitCode = 0): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   stopJobs();
   stopRealtimeRelay();
   console.log(`${signal} received, shutting down...`);
+  // Bound cleanup even when a socket or database connection cannot close.
+  setTimeout(() => process.exit(1), 10_000).unref();
 
   await realtime.close();
   server.close(async () => {
     try {
       await Promise.all([disconnectDatabaseClient(prisma), disconnectDatabaseClient(backgroundPrisma)]);
     } finally {
-      process.exit(0);
+      process.exit(exitCode);
     }
   });
-
-  // Do not hang forever on a stuck keep-alive connection.
-  setTimeout(() => process.exit(1), 10_000).unref();
 }
 
 process.on("SIGINT", () => void shutdown("SIGINT"));

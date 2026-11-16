@@ -43,8 +43,7 @@ export default function CheckoutScreen({
   const router = useRouter();
   const action = useAction();
   const network = useNetInfo();
-  const offline =
-    network.isConnected === false || network.isInternetReachable === false;
+  const offline = network.isConnected === false;
   const result = useQuery({
     queryKey:
       buyNow && product_id

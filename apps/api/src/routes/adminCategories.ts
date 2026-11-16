@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import type { AdminCategorySummary, CategoryPresentationInput } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import type { AuthRequest } from "../middleware/auth.js";
@@ -32,10 +33,27 @@ const categoryListQuery = z.object({
 router.get("/tree", asyncHandler(async (_req, res) => {
   const roots = await prisma.category.findMany({
     where: { parentId: null },
-    include: { children: { orderBy: [{ name: "asc" }, { id: "asc" }] } },
-    orderBy: [{ name: "asc" }, { id: "asc" }],
+    include: { children: { orderBy: [{ sortIndex: "asc" }, { name: "asc" }, { id: "asc" }] } },
+    orderBy: [{ sortIndex: "asc" }, { name: "asc" }, { id: "asc" }],
   });
   ok(res, roots.map(toCategoryNode));
+}));
+
+router.get("/:id/summary", asyncHandler(async (req, res) => {
+  const id = z.string().uuid().parse(req.params.id);
+  const category = await prisma.category.findUnique({ where: { id }, select: { id: true, children: { select: { id: true } } } });
+  if (!category) throw notFound("Không tìm thấy danh mục.");
+  const categoryId = { in: [id, ...category.children.map(child => child.id)] };
+  const [active_products, pending_products, completed_orders] = await Promise.all([
+    prisma.product.count({ where: { categoryId, deletedAt: null, status: "ACTIVE", isBlocked: false } }),
+    prisma.product.count({ where: { categoryId, deletedAt: null, status: "PENDING" } }),
+    prisma.order.count({ where: {
+      status: "COMPLETED",
+      completedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+      items: { some: { product: { categoryId } } },
+    } }),
+  ]);
+  ok(res, { active_products, pending_products, completed_orders } satisfies AdminCategorySummary);
 }));
 
 // Pagination counts root groups and keeps each two-level subtree intact.
@@ -54,8 +72,8 @@ router.get("/", asyncHandler(async (req, res) => {
   const [roots, total] = await Promise.all([
     prisma.category.findMany({
       where,
-      include: { children: { orderBy: [{ name: "asc" }, { id: "asc" }] } },
-      orderBy: [{ name: "asc" }, { id: "asc" }],
+      include: { children: { orderBy: [{ sortIndex: "asc" }, { name: "asc" }, { id: "asc" }] } },
+      orderBy: [{ sortIndex: "asc" }, { name: "asc" }, { id: "asc" }],
       skip: offsetOf(paging),
       take: paging.page_size,
     }),
@@ -186,11 +204,30 @@ async function assertNewParent(
   }
 }
 
+const categoryPresentation = {
+  icon: z.string().trim().regex(/^[a-z][a-z0-9_]*$/).max(64).nullable().optional(),
+  sort_index: z.number().int().min(0).max(99999).optional(),
+  description: z.string().trim().max(1000).nullable().optional(),
+  accept_new_listings: z.boolean().optional(),
+  show_on_home: z.boolean().nullable().optional(),
+};
+
+function presentationFields(input: CategoryPresentationInput) {
+  return {
+    icon: input.icon,
+    sortIndex: input.sort_index,
+    description: input.description,
+    acceptNewListings: input.accept_new_listings,
+    showOnHome: input.show_on_home,
+  };
+}
+
 const createBody = z
   .object({
     name: z.string().trim().min(1).max(100),
     slug: z.string().trim().min(1).max(120).optional(),
     parent_id: z.string().trim().min(1).max(64).nullable().optional(),
+    ...categoryPresentation,
   })
   .strict();
 
@@ -210,7 +247,7 @@ router.post(
         parentId = body.parent_id;
       }
       const created = await tx.category.create({
-        data: { name: body.name, slug, parentId },
+        data: { name: body.name, slug, parentId, ...presentationFields(body) },
       });
       await writeAudit(tx, {
         actorId: actor.id,
@@ -219,7 +256,7 @@ router.post(
         entityType: "category",
         entityId: created.id,
         reason: null,
-        metadata: { slug: created.slug, parent_id: created.parentId },
+        metadata: { slug: created.slug, parent_id: created.parentId, sort_index: created.sortIndex },
       });
       return created;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -234,6 +271,7 @@ const updateBody = z
     slug: z.string().trim().min(1).max(120).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     parent_id: z.string().trim().min(1).max(64).nullable().optional(),
+    ...categoryPresentation,
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
@@ -283,7 +321,7 @@ router.patch(
 
       const saved = await tx.category.update({
         where: { id: existing.id },
-        data: { name, slug, status, parentId },
+        data: { name, slug, status, parentId, ...presentationFields(body) },
       });
       await writeAudit(tx, {
         actorId: actor.id,
@@ -292,7 +330,7 @@ router.patch(
         entityType: "category",
         entityId: saved.id,
         reason: null,
-        metadata: { status: saved.status, parent_id: saved.parentId },
+        metadata: { status: saved.status, parent_id: saved.parentId, sort_index: saved.sortIndex, accept_new_listings: saved.acceptNewListings, show_on_home: saved.showOnHome },
       });
       return saved;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

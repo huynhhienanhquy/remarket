@@ -7,7 +7,7 @@ import { API_ERROR_CODES } from "@remarket/shared";
 import { env } from "./config/env.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { errorHandler, asyncHandler, AppError } from "./middleware/errorHandler.js";
-import { authMiddleware, requireRole } from "./middleware/auth.js";
+import { authMiddleware, requireActive, requireRole } from "./middleware/auth.js";
 import { prisma } from "./utils/prisma.js";
 import { collectWorkerMetrics, workerSnapshot } from "./jobs/runner.js";
 import { createGlobalRateLimit } from "./middleware/rate-limit.js";
@@ -30,6 +30,7 @@ import { usersRouter } from "./routes/profiles.js";
 import { adminRouter } from "./routes/admin.js";
 import { nativeAuthOnly } from "./services/auth-transport.js";
 import { mobileRouter } from "./routes/mobile.js";
+import { aiRouter } from "./routes/ai.js";
 
 /**
  * Express app (detail-project 3). Middleware order matters:
@@ -131,6 +132,7 @@ export function createApp(options: { webRoot?: string } = {}): express.Express {
   api.use("/reports", authMiddleware, reportsRouter);
   api.use("/notifications", authMiddleware, notificationsRouter);
   api.use("/support", authMiddleware, supportRouter);
+  api.use("/ai", authMiddleware, requireActive, aiRouter);
   // Own listing management sits behind its own mount (detail-project 9.4).
   api.use("/account/products", authMiddleware, accountProductsRouter);
 

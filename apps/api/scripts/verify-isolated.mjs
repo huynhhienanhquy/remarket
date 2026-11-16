@@ -83,7 +83,9 @@ try {
   // normal prisma:deploy keeps its deployment lock.
   await run("prisma/build/index.js", ["migrate", "deploy", "--schema", "prisma/schema.prisma"], apiDir, { PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1" });
   if (process.argv.includes("--query-plans")) await run("tsx/cli", ["scripts/verify-query-plans.ts"]);
-  const targets = process.argv.includes("--product-reads-only")
+  const targets = process.argv.includes("--marketplace-ai-only")
+    ? ["tests/integration/marketplace-ai.test.ts"]
+    : process.argv.includes("--product-reads-only")
     ? ["tests/integration/product-reads.test.ts", "tests/integration/navigation.test.ts", "tests/integration/product-search.test.ts", "tests/integration/image-availability.test.ts"]
     : process.argv.includes("--system-chat-only")
     ? ["tests/integration/system-chat.test.ts"]

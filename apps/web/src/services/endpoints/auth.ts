@@ -72,5 +72,3 @@ export function createAuthEndpoints(transport = http): AuthApi {
     uploadAvatar: (storagePath) => transport.patch("/auth/avatar", { storage_path: storagePath }),
   };
 }
-
-export const auth = createAuthEndpoints();

@@ -1,19 +1,32 @@
 import type { AdminProductItem, CategoryNode, ProductStatus } from "@remarket/shared";
-import { CONDITION_LABELS, DELIVERY_LABELS, PRODUCT_STATUS_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
+import { CONDITION_LABELS, DELIVERY_LABELS, PRODUCT_STATUS_LABELS, formatDateTime, formatVnd, provinceLabel } from "@remarket/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
+import { AdminPagination } from "../../components/admin/AdminPagination/AdminPagination";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
+import { AdminAvatar, AdminPill } from "../../components/admin/AdminSummary/AdminSummary";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
-import type { DataTableColumn } from "../../components/common";
-import { ApiImage, ConfirmDialog, Drawer, EmptyState, Input, Pagination, SearchInput, SectionCard, Select, StatusBadge, Tabs, useToast } from "../../components/common";
+import type { DataTableColumn } from "../../components/common/DataTable/DataTable";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { ConfirmDialog } from "../../components/common/Dialog/Dialog";
+import { Drawer } from "../../components/common/Drawer/Drawer";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { Icon } from "../../components/common/Icon/Icon";
+import { Input, Select } from "../../components/common/Input/Input";
+import { SearchInput } from "../../components/common/SearchInput/SearchInput";
+import { SectionCard } from "../../components/common/SectionCard/SectionCard";
+import { Tabs } from "../../components/common/Tabs/Tabs";
+import { useToast } from "../../components/common/Toast/Toast";
 import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription, isVersionConflict } from "../../helpers/adminErrors";
 import { isApiError } from "../../helpers/errors";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { useAdminQueueCounts } from "../../hooks/useAdminSummary";
+import { exportAdminCsv } from "../../helpers/exportAdminCsv";
 import { api, apiForQuery } from "../../services/api";
 import { readPage } from "../../utils/adminParams";
 
@@ -34,13 +47,14 @@ function flattenCategories(nodes: CategoryNode[]): CategoryNode[] {
 
 function ProductStatusView({ product }: { product: AdminProductItem }) {
   const meta = PRODUCT_STATUS_LABELS[product.status];
-  return <div className="flex flex-wrap gap-1"><StatusBadge label={meta.label} tone={meta.tone} size="sm" />{product.is_blocked && <StatusBadge label="Bị hạn chế" tone="danger" size="sm" />}</div>;
+  return <div className="flex flex-wrap gap-1"><AdminPill tone={meta.tone} dot>{meta.label}</AdminPill>{product.is_blocked && <AdminPill tone="danger">Bị hạn chế</AdminPill>}</div>;
 }
 
 export function AdminProductsPage() {
   const { params, apply } = useAdminParams();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const pending = useAdminQueueCounts()?.pending_products;
   const page = readPage(params);
   const tab = TABS.some((item) => item.value === params.get("status")) ? params.get("status")! : "PENDING";
   const selectedId = params.get("selected");
@@ -87,12 +101,21 @@ export function AdminProductsPage() {
   });
 
   const columns: Array<DataTableColumn<AdminProductItem>> = [
-    { key: "title", header: "Tin đăng", render: (product) => <div className="flex min-w-[260px] items-center gap-3">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-12 w-16 shrink-0 rounded-xl bg-surface-subtle" />}<div><p className="line-clamp-2 t-label text-ink">{product.title}</p><p className="t-meta text-brand">{formatVnd(product.price)}</p></div></div> },
-    { key: "seller", header: "Người bán", render: (product) => product.seller.name, hideOnMobile: true },
-    { key: "category_name", header: "Danh mục", hideOnMobile: true },
+    { key: "title", header: "Tin đăng", width: "34%", render: (product) => (
+      <div className="flex items-center gap-3.5">
+        {product.image_url ? <ApiImage src={product.image_url} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" /> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"><Icon name="image" size={20} /></span>}
+        <div className="min-w-0">
+          <p className="line-clamp-2 font-semibold">{product.title}</p>
+          <p className="mt-0.5 font-medium text-brand">{formatVnd(product.price)}</p>
+          <p className="mt-0.5 truncate text-[11px] text-muted" title={product.id}>ID: {product.id.slice(0, 8)} · {provinceLabel(product.province_code) ?? product.province_code}</p>
+        </div>
+      </div>
+    ) },
+    { key: "seller", header: "Người bán", width: "18%", render: (product) => <div className="flex items-center gap-2"><AdminAvatar name={product.seller.name} src={product.seller.avatar_url} small />{product.seller.name}</div>, hideOnMobile: true },
+    { key: "category_name", header: "Danh mục", render: (product) => <span className="rounded-md bg-brand-soft px-2 py-1">{product.category_name}</span>, hideOnMobile: true },
     { key: "status", header: "Trạng thái", render: (product) => <ProductStatusView product={product} /> },
-    { key: "updated_at", header: "Cập nhật", render: (product) => formatDateTime(product.updated_at), hideOnMobile: true },
-    { key: "id", header: "Thao tác", render: (product) => <RowAction onClick={() => apply({ selected: product.id })}>Xem xét</RowAction> },
+    { key: "updated_at", header: "Cập nhật", render: (product) => <time className="text-muted" dateTime={product.updated_at}>{formatDateTime(product.updated_at)}</time>, hideOnMobile: true },
+    { key: "id", header: "Thao tác", render: (product) => <RowAction className="admin-product-review" onClick={() => apply({ selected: product.id })}>Xem xét</RowAction> },
   ];
 
   const footer = selected ? <>
@@ -100,22 +123,35 @@ export function AdminProductsPage() {
     {selected.status === "PENDING" && !selected.is_blocked && <><button type="button" className="min-h-[44px] rounded-control border border-danger px-4 t-label text-danger" onClick={() => setAction("reject")}>Từ chối</button><button type="button" className="min-h-[44px] rounded-control bg-brand px-4 t-label text-white" onClick={() => setAction("approve")}>Duyệt tin</button></>}
   </> : undefined;
 
-  return <div>
-    <AdminHeading title="Sản phẩm và kiểm duyệt" description="Xem đúng phiên bản tin, duyệt nội dung và áp dụng hạn chế khi cần." />
-    <SectionCard bodyClassName="p-0 lg:p-0">
-      <Tabs tabs={TABS} value={tab} onChange={(value) => apply({ status: value === "PENDING" ? null : value })} ariaLabel="Trạng thái tin đăng" />
-      <div className="p-4 lg:p-6"><AdminToolbar>
-        <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} placeholder="Tìm theo tiêu đề" label="Tìm tin đăng" className="sm:max-w-sm" />
+  return <div className="admin-stack">
+    <AdminHeading title="Sản phẩm" description="Xem đúng phiên bản tin, duyệt nội dung và áp dụng hạn chế khi cần."
+      badge={!!pending && <AdminPill tone="brand">{pending} yêu cầu mới</AdminPill>}
+      actions={<>
+        <button type="button" className="admin-utility" disabled={query.isFetching} onClick={() => void query.refetch()}><Icon name="refresh" size={16} />Làm mới</button>
+        <button type="button" className="admin-utility" title="Xuất các tin trên trang hiện tại" disabled={!query.data?.items.length} onClick={() => {
+          exportAdminCsv("san-pham.csv", ["Mã tin", "Tiêu đề", "Giá (VND)", "Người bán", "Danh mục", "Trạng thái", "Cập nhật"],
+            (query.data?.items ?? []).map(row => [row.id, row.title, row.price, row.seller.name, row.category_name, PRODUCT_STATUS_LABELS[row.status].label, row.updated_at]));
+        }}><Icon name="download" size={16} />Xuất dữ liệu</button>
+      </>} />
+    <SectionCard className="admin-table-panel" bodyClassName="p-0 lg:p-0">
+      <Tabs tabs={TABS.map(item => ({ ...item, label: item.value === "PENDING" && pending != null ? <span className="admin-inline-icon">{item.label}<span className="admin-tab-count" aria-hidden="true">{pending}</span></span> : item.label }))} value={tab} onChange={(value) => apply({ status: value === "PENDING" ? null : value })} ariaLabel="Trạng thái tin đăng" />
+      <div><AdminToolbar>
+        <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} placeholder="Tìm theo tiêu đề" label="Tìm tin đăng" />
         <ToolbarField label="Danh mục" htmlFor="product-category"><Select id="product-category" value={params.get("category_id") ?? ""} onChange={(event) => apply({ category_id: event.target.value || null })}><option value="">Tất cả danh mục</option>{allCategories.map((category) => <option key={category.id} value={category.id}>{category.parent_id ? "— " : ""}{category.name}</option>)}</Select></ToolbarField>
-<AdminAdvancedFilters fields={["seller_id", "handled_by", "from", "to"]}>
+        <AdminAdvancedFilters fields={["seller_id", "handled_by", "from", "to"]} summary={query.data && `Hiển thị ${query.data.items.length} trên ${query.data.meta.total} bản ghi`}>
         <ToolbarField label="Mã người bán" htmlFor="product-seller"><Input id="product-seller" value={params.get("seller_id") ?? ""} onChange={(event) => apply({ seller_id: event.target.value || null })} placeholder="UUID người bán" /></ToolbarField>
         <ToolbarField label="Người xử lý" htmlFor="product-handler"><Input id="product-handler" value={params.get("handled_by") ?? ""} onChange={(event) => apply({ handled_by: event.target.value || null })} placeholder="UUID quản trị viên" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="product-from"><Input id="product-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
         <ToolbarField label="Đến ngày" htmlFor="product-to"><Input id="product-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
       </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</div>
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có tin đăng trong hàng đợi" description="Hãy chọn trạng thái hoặc bộ lọc khác." />} />}
-      {query.data && <Pagination className="p-4 lg:px-6" page={query.data.meta.page} totalPages={query.data.meta.total_pages} total={query.data.meta.total} onPageChange={(next) => apply({ page: String(next) })} />}
+      {query.data && <AdminPagination meta={query.data.meta} shown={query.data.items.length} onPageChange={(next) => apply({ page: String(next) })} />}
     </SectionCard>
+
+    <div className="admin-product-guides">
+      <div className="admin-panel"><span className="admin-metric-icon"><Icon name="shield" size={19} /></span><div><h2>Tiêu chuẩn kiểm duyệt</h2><p>Kiểm tra hình ảnh, nội dung và giá bán trước khi duyệt tin.</p></div></div>
+      <div className="admin-panel"><span className="admin-metric-icon"><Icon name="flag" size={19} /></span><div><h2>Hạn chế vi phạm</h2><p>Ghi rõ lý do khi hạn chế tin. Có thể gỡ hạn chế sau khi xem xét.</p></div></div>
+    </div>
 
     <Drawer open={selected !== null} onClose={() => apply({ selected: null }, { replace: true })} title="Xem xét tin đăng" widthClassName="max-w-[760px]" footer={footer}>
       {selected && <div className="grid gap-6 md:grid-cols-[45%_1fr]">

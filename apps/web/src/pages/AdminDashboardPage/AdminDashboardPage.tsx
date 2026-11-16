@@ -5,15 +5,14 @@ import { PRODUCT_STATUS_LABELS, TICKET_STATUS_LABELS, formatDateTime, formatVnd 
 import type { AdminDashboard, ProductStatus } from "@remarket/shared";
 import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
-import {
-  Button,
-  ApiImage,
-  DashboardSkeleton,
-  InlineAlert,
-  Input,
-  Icon,
-  SectionCard,
-} from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { DashboardSkeleton } from "../../components/common/Skeleton/Skeleton";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Input } from "../../components/common/Input/Input";
+import { Icon } from "../../components/common/Icon/Icon";
+import { SectionCard } from "../../components/common/SectionCard/SectionCard";
+import { AdminPill } from "../../components/admin/AdminSummary/AdminSummary";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
 import { AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
@@ -62,13 +61,20 @@ function KpiCard({
   metric: KpiSpec["key"];
 }) {
   const highlight = metric === "completed_order_value_in_period";
+  const warning = metric === "pending_reports";
+  const icons = {
+    total_users: "user", new_users_in_period: "users", pending_products: "archive",
+    completed_orders_in_period: "cart", completed_order_value_in_period: "store",
+    pending_reports: "alert-triangle", unresolved_tickets: "chat",
+  } as const;
+  const note = warning ? "Cần phản hồi" : metric === "unresolved_tickets" ? "Cần hỗ trợ" : scope === "current" ? "Tổng hiện tại" : "Theo kỳ đã chọn";
   return (
-    <div className={`min-w-0 rounded-2xl border p-5 shadow-subtle ${highlight ? "border-brand/20 bg-brand-soft sm:col-span-2" : "border-line bg-surface"}`}>
-      <div className="flex items-start justify-between gap-3"><p className="text-sm leading-6 text-muted">{label}</p><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${highlight ? "bg-surface text-brand" : "bg-brand-soft text-brand"}`}><Icon name={metric.includes("users") ? "user" : metric === "pending_products" ? "image" : metric === "pending_reports" ? "alert-triangle" : metric === "unresolved_tickets" ? "chat" : "cart"} size={18} /></span></div>
-      <p className={`mt-4 break-words text-3xl font-semibold tracking-tight ${highlight ? "text-brand" : "text-ink"}`}>{value}</p>
-      <p className="mt-2 text-xs text-muted">
-        {scope === "current" ? "Tổng hiện tại" : "Theo kỳ đã chọn"}
-      </p>
+    <div className="admin-panel dashboard-kpi" data-highlight={highlight || undefined}>
+      <div className="dashboard-kpi-top">
+        <p>{label}</p>
+        <span className="admin-metric-icon" data-warning={warning || undefined}><Icon name={icons[metric]} size={18} /></span>
+      </div>
+      <div className="dashboard-kpi-value"><strong>{value}</strong><small>{highlight ? "Tổng phát sinh hoàn tất" : note}</small></div>
     </div>
   );
 }
@@ -108,14 +114,14 @@ export function AdminDashboardPage() {
   }
 
   return (
-    <div>
+    <div className="admin-stack">
       <AdminHeading
         title="Tổng quan"
         description="Các chỉ số vận hành chính của ReMarket theo khoảng ngày đã chọn."
       />
 
-      <SectionCard>
-        <AdminToolbar>
+      <SectionCard className="admin-section-flush" bodyClassName="p-0 lg:p-0">
+        <AdminToolbar className="dashboard-range">
           <ToolbarField label="Từ ngày" htmlFor="dashboard-from">
             <Input
               id="dashboard-from"
@@ -123,7 +129,7 @@ export function AdminDashboardPage() {
               value={from}
               max={to}
               onChange={(event) => changeFrom(event.target.value)}
-              className="sm:w-52"
+              className="sm:w-36"
             />
           </ToolbarField>
           <ToolbarField label="Đến ngày" htmlFor="dashboard-to">
@@ -133,16 +139,16 @@ export function AdminDashboardPage() {
               value={to}
               min={from}
               onChange={(event) => changeTo(event.target.value)}
-              className="sm:w-52"
+              className="sm:w-36"
             />
           </ToolbarField>
-          <Button variant="ghost" onClick={resetRange}>
+          <Button variant="ghost" className="dashboard-range-reset" onClick={resetRange}>
             30 ngày gần nhất
           </Button>
         </AdminToolbar>
       </SectionCard>
 
-      <div className="mt-5">
+      <div>
         {!validRange ? (
           <InlineAlert tone="warning" title="Khoảng ngày chưa hợp lệ">
             Ngày bắt đầu phải trước hoặc bằng ngày kết thúc theo định dạng YYYY-MM-DD.
@@ -156,7 +162,7 @@ export function AdminDashboardPage() {
             title="Chưa tải được dữ liệu"
           />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="dashboard-kpis">
             {KPIS.map((kpi) => (
               <KpiCard
                 key={kpi.key}
@@ -171,27 +177,29 @@ export function AdminDashboardPage() {
       </div>
 
       {query.data && !query.isError && (
-        <SectionCard className="mt-5" title="Sản phẩm theo trạng thái">
-          <p className="mb-4 t-meta text-muted">Tổng hiện tại, không bao gồm tin đã xóa. Tin bị hạn chế vẫn được tính theo trạng thái giao dịch.</p>
+        <SectionCard className="dashboard-status">
+          <h2>Sản phẩm theo trạng thái</h2>
+          <p className="mb-6 mt-1 text-[13px] text-muted">Tổng hiện tại, không bao gồm tin đã xóa. Tin bị hạn chế vẫn được tính theo trạng thái giao dịch.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {(Object.keys(PRODUCT_STATUS_LABELS) as ProductStatus[]).map((status) => (
-              <Link key={status} to={`/admin/products?status=${status}`} className="rounded-xl border border-line bg-page/60 p-4 transition-colors hover:border-brand/30 hover:bg-brand-soft">
-                <p className="t-meta text-muted">{PRODUCT_STATUS_LABELS[status].label}</p>
-                <p className="mt-2 text-xl font-semibold text-ink">{query.data.products_by_status[status].toLocaleString("vi-VN")}</p>
+              <Link key={status} to={`/admin/products?status=${status}`} className="dashboard-status-tile">
+                <p className="dashboard-status-label">{PRODUCT_STATUS_LABELS[status].label}</p>
+                <p className="dashboard-status-value">{query.data.products_by_status[status].toLocaleString("vi-VN")}</p>
               </Link>
             ))}
           </div>
-          <Link to="/admin/products?status=BLOCKED" className="mt-4 inline-block t-label text-danger hover:underline">Tin bị hạn chế: {query.data.blocked_products.toLocaleString("vi-VN")}</Link>
+          <Link to="/admin/products?status=BLOCKED" className="mt-4 block border-t border-line pt-3 text-[13px] text-danger hover:underline">Tin bị hạn chế: {query.data.blocked_products.toLocaleString("vi-VN")}</Link>
         </SectionCard>
       )}
 
       {query.data && !query.isError && (
-        <div className="mt-5 grid gap-5 xl:grid-cols-2">
-          <SectionCard title="Tin chờ duyệt" actions={<Link to="/admin/products" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
-            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3 p-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /> : <div className="h-12 w-16 shrink-0 rounded-xl bg-surface-subtle" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><span className="shrink-0 t-meta text-accent">{PRODUCT_STATUS_LABELS.PENDING.label}</span></Link></li>)}</ul>}
+        <div className="dashboard-queues">
+          <SectionCard className="admin-section-flush" title="Tin chờ duyệt" actions={<Link to="/admin/products" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
+            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3.5 px-5 py-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" /> : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><AdminPill tone="warning">{PRODUCT_STATUS_LABELS.PENDING.label}</AdminPill></Link></li>)}</ul>}
           </SectionCard>
-          <SectionCard title="Yêu cầu hỗ trợ mới" actions={<Link to="/admin/support?status=OPEN" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
-            {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="divide-y divide-line">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="flex items-center justify-between gap-3 p-4 hover:bg-surface-subtle"><div className="min-w-0"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><span className="shrink-0 t-meta text-accent">{TICKET_STATUS_LABELS.OPEN.label}</span></Link></li>)}</ul>}
+          <SectionCard className="dashboard-support" title="Yêu cầu hỗ trợ mới" actions={<Link to="/admin/support?status=OPEN" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="dashboard-support-body">
+            {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="space-y-2">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="flex items-center gap-3 rounded-xl border border-line bg-page px-4 py-3.5 hover:bg-brand-soft"><span className="admin-avatar admin-avatar-sm"><Icon name="help" size={15} /></span><div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><AdminPill tone="warning">{TICKET_STATUS_LABELS.OPEN.label}</AdminPill></Link></li>)}</ul>}
+            <div className="dashboard-sla"><Icon name="clock" size={18} /><p>Mục tiêu SLA là phản hồi yêu cầu hỗ trợ trong vòng 30 phút.</p></div>
           </SectionCard>
         </div>
       )}

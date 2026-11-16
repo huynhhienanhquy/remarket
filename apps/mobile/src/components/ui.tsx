@@ -1,5 +1,6 @@
+import tokens from "../../../../packages/shared/ui-tokens.json";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { Children, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,22 +36,26 @@ import { api } from "../services/runtime";
 import { queryClient } from "../services/session-context";
 import { ApiError } from "@remarket/api-client";
 
+const { color, radius } = tokens;
+export const layout = tokens.layout;
+
 export const colors = {
-  bg: "#F5F7FA",
-  card: "#FFFFFF",
-  text: "#18313B",
-  muted: "#5D6C7A",
-  green: "#0F766E",
-  border: "#E1E8EE",
-  red: "#B42318",
-  soft: "#E8F6F3",
-  subtle: "#EFF3F6",
-  inputBorder: "#8797A5",
-  dangerBg: "#FEF0EE",
-  warningBg: "#FFF4DA",
-  info: "#245EA8",
-  infoBg: "#ECF3FF",
-  accent: "#B45309",
+  bg: color.page,
+  card: color.surface,
+  text: color.ink,
+  muted: color.muted,
+  green: color.brand,
+  greenPressed: color.brandHover,
+  border: color.line,
+  red: color.danger,
+  soft: color.brandSoft,
+  subtle: color.subtle,
+  inputBorder: color.inputLine,
+  dangerBg: color.dangerBg,
+  warningBg: color.warningBg,
+  info: color.info,
+  infoBg: color.infoBg,
+  accent: color.accent,
 };
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.bg },
@@ -59,16 +64,18 @@ export const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 16,
     width: "100%",
-    maxWidth: 960,
+    maxWidth: layout.maxWidth,
     alignSelf: "center",
   },
   title: {
+    letterSpacing: -0.35,
     fontSize: 24,
     lineHeight: 32,
     fontWeight: "700",
     color: colors.text,
   },
   heading: {
+    letterSpacing: -0.2,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "600",
@@ -86,8 +93,8 @@ export const styles = StyleSheet.create({
   card: {
     padding: 16,
     backgroundColor: colors.card,
-    borderRadius: 12,
-    gap: 10,
+    borderRadius: radius.card,
+    gap: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -102,23 +109,23 @@ export const styles = StyleSheet.create({
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.inputBorder,
-    borderRadius: 8,
+    borderRadius: radius.control,
     padding: 12,
     fontSize: 16,
     minHeight: 48,
   },
   button: {
     backgroundColor: colors.green,
-    borderRadius: 8,
+    borderRadius: radius.control,
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: layout.touchTarget,
   },
   buttonText: {
     color: "white",
-    fontWeight: "500",
+    fontWeight: "600",
     fontSize: 14,
     lineHeight: 20,
   },
@@ -145,6 +152,8 @@ export function Screen({
   description?: string;
   titleCard?: boolean;
 }) {
+  const { width } = useWindowDimensions();
+  const horizontalPadding = width >= 1024 ? 32 : width >= 640 ? 24 : 16;
   const connectivity = useNetInfo();
   const bottomNavigation = showBottomNavigation(usePathname());
   const insets = useSafeAreaInsets();
@@ -153,7 +162,7 @@ export function Screen({
     <KeyboardAvoidingView
       style={styles.page}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={header || safeTop ? 0 : insets.top + 56}
+      keyboardVerticalOffset={header || safeTop ? 0 : insets.top + layout.header}
     >
       {header}
       <ScrollView
@@ -161,6 +170,7 @@ export function Screen({
         contentContainerStyle={[
           styles.content,
           {
+            paddingHorizontal: horizontalPadding,
             paddingTop: safeTop ? insets.top + 16 : 16,
             paddingBottom: Math.max(32, insets.bottom + 16),
           },
@@ -182,7 +192,7 @@ export function Screen({
           <View
             style={
               titleCard
-                ? [styles.card, { borderRadius: 16, padding: 20, gap: 8 }]
+                ? [styles.card, { borderRadius: radius.modal, padding: 20, gap: 8 }]
                 : { gap: 8 }
             }
           >
@@ -200,8 +210,7 @@ export function Screen({
             </Text>
           </View>
         )}
-        {(connectivity.isConnected === false ||
-          connectivity.isInternetReachable === false) && (
+        {connectivity.isConnected === false && (
           <Text style={styles.error}>
             Bạn đang ngoại tuyến. Nội dung mới sẽ cập nhật khi có kết nối.
           </Text>
@@ -215,7 +224,7 @@ export function Screen({
             borderTopWidth: 1,
             borderColor: colors.border,
             padding: 12,
-            paddingBottom: bottomNavigation ? 12 : Math.max(12, insets.bottom),
+            paddingBottom: bottomNavigation ? 12 : 12 + insets.bottom,
           }}
         >
           {footer}
@@ -232,6 +241,8 @@ export function Button({
   danger,
   loading,
   ghost,
+  compact,
+  icon,
 }: {
   title: string;
   onPress: () => void;
@@ -240,10 +251,14 @@ export function Button({
   danger?: boolean;
   loading?: boolean;
   ghost?: boolean;
+  compact?: boolean;
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
 }) {
+  const foreground = (secondary || ghost) && !danger ? colors.green : colors.card;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={title}
       accessibilityState={{
         disabled: !!disabled || !!loading,
         busy: !!loading,
@@ -252,6 +267,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        compact && { paddingHorizontal: 12 },
         secondary && {
           backgroundColor: colors.card,
           borderWidth: 1,
@@ -259,24 +275,28 @@ export function Button({
         },
         danger && { backgroundColor: colors.red },
         ghost && { backgroundColor: "transparent", borderWidth: 0 },
-        pressed && { opacity: 0.7 },
-        disabled && { opacity: 0.45 },
+        pressed && !secondary && !ghost && !danger && {
+          backgroundColor: colors.greenPressed,
+        },
+        pressed && (secondary || ghost) && { backgroundColor: colors.soft },
+        pressed && danger && { opacity: 0.8 },
+        disabled && { opacity: 0.6 },
       ]}
     >
-      <View style={styles.row}>
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
         {loading && (
-          <ActivityIndicator color={secondary ? colors.green : colors.card} />
+          <View style={{ position: "absolute" }}>
+            <ActivityIndicator color={foreground} />
+          </View>
         )}
-        <Text
-          style={[
-            styles.buttonText,
-            secondary && { color: colors.green },
-            danger && { color: colors.card },
-            ghost && { color: colors.green },
-          ]}
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: 8, opacity: loading ? 0 : 1 }}
         >
-          {title}
-        </Text>
+          {icon && <Ionicons name={icon} size={20} color={foreground} />}
+          <Text style={[styles.buttonText, { color: foreground, flexShrink: 1 }]}>
+            {title}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -529,10 +549,14 @@ export function ProductCard({ product }: { product: ProductListItem }) {
           <View
             style={{
               position: "absolute",
-              top: 8,
-              left: 8,
-              right: 60,
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              padding: 8,
+              paddingRight: 52,
               alignItems: "flex-start",
+              backgroundColor: `${colors.text}1A`,
             }}
           >
             <View
@@ -588,29 +612,32 @@ export function ProductCard({ product }: { product: ProductListItem }) {
       </View>
       {!unavailable && (
         <View style={{ padding: 12, gap: 4, flex: 1 }}>
-          <Text numberOfLines={2} style={[styles.label, { minHeight: 40 }]}>
+          <Text numberOfLines={2} style={[styles.label, { minHeight: 40, fontWeight: "600" }]}>
             {product.title}
           </Text>
           {!product.is_hidden && (
-            <Text style={[styles.text, { fontWeight: "700" }]}>
+            <Text style={[styles.text, { fontWeight: "700", color: colors.green }]}>
               {formatVnd(product.price)}
             </Text>
           )}
           {!product.is_hidden && (
-            <Text style={styles.meta}>
-              {CONDITION_LABELS[product.condition]}
-            </Text>
+            <View style={{ alignSelf: "flex-start", backgroundColor: colors.subtle, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={styles.meta}>{CONDITION_LABELS[product.condition]}</Text>
+            </View>
           )}
           <View
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
-              gap: 8,
-              marginTop: "auto",
-              paddingTop: 4,
+              flexWrap: "wrap",
+              columnGap: 8,
+              marginTop: 8,
+              paddingTop: 8,
+              borderTopWidth: 1,
+              borderColor: colors.border,
             }}
           >
-            <Text numberOfLines={1} style={[styles.meta, { flex: 1 }]}>
+            <Text numberOfLines={1} style={[styles.meta, { flexShrink: 1, maxWidth: "100%" }]}>
               {product.province_label}
             </Text>
             <Text style={styles.meta}>
@@ -635,6 +662,7 @@ export function IconButton({
   round,
   color = colors.text,
   filled,
+  outline,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
@@ -645,6 +673,7 @@ export function IconButton({
   round?: boolean;
   color?: string;
   filled?: boolean;
+  outline?: boolean;
 }) {
   return (
     <Pressable
@@ -657,10 +686,12 @@ export function IconButton({
         onPress();
       }}
       style={({ pressed }) => ({
-        width: 44,
-        height: 44,
-        borderRadius: round ? 22 : 8,
+        width: layout.touchTarget,
+        height: layout.touchTarget,
+        borderRadius: round ? layout.touchTarget / 2 : radius.control,
         backgroundColor: filled ? colors.green : colors.card,
+        borderWidth: outline ? 1 : 0,
+        borderColor: colors.green,
         alignItems: "center",
         justifyContent: "center",
         opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
@@ -723,44 +754,45 @@ export function EmptyState({
   );
 }
 
-export function ProductGrid({ items }: { items: ProductListItem[] }) {
+function ProductGridLayout({ children, loading }: { children: ReactNode; loading?: boolean }) {
   const { width } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
-  const available = containerWidth || Math.min(width, 960) - 32;
-  const columns = available >= 900 ? 4 : available >= 608 ? 3 : 2;
+  const padding = width >= 1024 ? 32 : width >= 640 ? 24 : 16;
+  const available = containerWidth || Math.min(width, layout.maxWidth) - padding * 2;
+  const columns = available >= 1216 ? 5 : available >= 960 ? 4 : available >= 592 ? 3 : 2;
   const gap = width >= 640 ? 20 : 12;
+  const cardWidth = Math.floor((available - gap * (columns - 1)) / columns);
   return (
     <View
+      accessibilityLabel={loading ? "Đang tải sản phẩm" : undefined}
+      accessibilityState={loading ? { busy: true } : undefined}
       onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
       style={{ flexDirection: "row", flexWrap: "wrap", gap }}
     >
-      {items.map((product) => (
-        <View
-          key={product.id}
-          style={{
-            width: (available - gap * (columns - 1)) / columns,
-          }}
-        >
-          <ProductCard product={product} />
-        </View>
+      {Children.map(children, (child) => (
+        <View style={{ width: cardWidth }}>{child}</View>
       ))}
     </View>
   );
 }
 
-export function ProductGridSkeleton() {
+export function ProductGrid({ items }: { items: ProductListItem[] }) {
   return (
-    <View
-      accessibilityLabel="Đang tải sản phẩm"
-      accessibilityState={{ busy: true }}
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
-    >
-      {Array.from({ length: 6 }, (_, i) => (
+    <ProductGridLayout>
+      {items.map((product) => <ProductCard key={product.id} product={product} />)}
+    </ProductGridLayout>
+  );
+}
+
+export function ProductGridSkeleton({ count = 6 }: { count?: number } = {}) {
+  return (
+    <ProductGridLayout loading>
+      {Array.from({ length: count }, (_, i) => (
         <View
           key={i}
           style={[
             styles.card,
-            { width: "47%", flexGrow: 1, padding: 0, overflow: "hidden" },
+            { padding: 0, gap: 0, overflow: "hidden" },
           ]}
         >
           <View
@@ -781,7 +813,7 @@ export function ProductGridSkeleton() {
           </View>
         </View>
       ))}
-    </View>
+    </ProductGridLayout>
   );
 }
 

@@ -22,6 +22,8 @@ const listQuery = z
     entity_type: z.string().trim().max(50).optional(),
     entity_id: z.string().trim().max(64).optional(),
     actor_id: z.string().trim().max(64).optional(),
+    actor_type: z.enum(["USER", "ADMIN", "SYSTEM"]).optional(),
+    q: z.string().trim().max(100).optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     page: z.string().optional(),
@@ -41,6 +43,8 @@ router.get(
     if (query.entity_type !== undefined) where.entityType = query.entity_type;
     if (query.entity_id !== undefined) where.entityId = query.entity_id;
     if (query.actor_id !== undefined) where.actorId = query.actor_id;
+    if (query.actor_type !== undefined) where.actorType = query.actor_type;
+    if (query.q) where.actorName = { contains: query.q, mode: "insensitive" };
     where.createdAt = adminDateRange(query.from, query.to);
 
     const [logs, total] = await Promise.all([

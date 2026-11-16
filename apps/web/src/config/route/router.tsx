@@ -5,10 +5,12 @@ import type { ReactNode } from "react";
 import { GuestOnly, RequireAdmin, RequireAuth, RequireVerified } from "./guards";
 import { RouteError, ForbiddenBody, NotFoundBody } from "../../components/common/RouteError/RouteError";
 import { AccountShell } from "../../layouts/AccountShell/AccountShell";
-import { AdminShell } from "../../layouts/AdminShell/AdminShell";
 import { AuthShell } from "../../layouts/AuthShell/AuthShell";
 import { ChatShell, CheckoutShell } from "../../layouts/ChatShell/ChatShell";
 import { MarketplaceShell } from "../../layouts/MarketplaceShell/MarketplaceShell";
+
+// The admin workspace and its CSS are only needed on admin routes.
+const AdminShell = lazy(() => import("../../layouts/AdminShell/AdminShell").then((m) => ({ default: m.AdminShell })));
 
 // Load the current screen only; the login entry need not download every admin,
 // checkout and chat screen. Guards still run before private screens render.

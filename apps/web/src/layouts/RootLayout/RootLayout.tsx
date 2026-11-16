@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
-import { ToastProvider } from "../../components/common";
+import { ToastProvider } from "../../components/common/Toast/Toast";
 import { PageSkeleton } from "../../components/common/PageSkeleton/PageSkeleton";
 import { SessionExpiryWatcher } from "../../components/SessionExpiryWatcher/SessionExpiryWatcher";
 

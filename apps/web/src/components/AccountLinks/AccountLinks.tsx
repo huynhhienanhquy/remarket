@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Icon } from "../common";
+import { Icon } from "../common/Icon/Icon";
 import { ACCOUNT_GROUPS } from "../../config/route/accountNavigation";
 
 export function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {

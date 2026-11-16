@@ -6,7 +6,7 @@ import type { ProductAction } from "@remarket/shared";
 import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
-import { useToast } from "@/components/common";
+import { useToast } from "../../../components/common/Toast/Toast";
 import { urlPage } from "@/utils/urlPage";
 import { useConnectivity } from "@/hooks/useConnectivity";
 

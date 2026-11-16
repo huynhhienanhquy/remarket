@@ -2,14 +2,12 @@ import { useCheckout } from "./hooks/useCheckout";
 import { Link } from "react-router-dom";
 import { formatVnd, validatePhone } from "@remarket/shared";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
-import {
-  Button,
-  EmptyState,
-  FormField,
-  InlineAlert,
-  Input,
-  Radio,
-} from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { FormField } from "../../components/common/FormField/FormField";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Input } from "../../components/common/Input/Input";
+import { Radio } from "../../components/common/Choice/Choice";
 
 export function CheckoutPage() {
   const {

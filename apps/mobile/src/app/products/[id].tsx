@@ -15,6 +15,7 @@ import {
   Button,
   Feedback,
   IconButton,
+  StatusBadge,
   MenuRow,
   useAction,
   styles,
@@ -53,10 +54,12 @@ export default function ProductDetail() {
       refreshing={result.isRefetching}
       footer={
         product && !product.capabilities.can_manage ? (
-          <View style={[styles.row, { flexWrap: "nowrap" }]}>
+          <View style={[styles.row, { flexWrap: "nowrap", maxWidth: 512, width: "100%", alignSelf: "center", gap: 8 }]}>
             <IconButton
               icon="cart-outline"
               label="Thêm vào giỏ"
+              outline
+              color={colors.green}
               disabled={
                 action.pending ||
                 (!!user && !product.capabilities.can_add_to_cart)
@@ -117,14 +120,14 @@ export default function ProductDetail() {
         <>
           <ProductGallery images={product.images} title={product.title} />
           <Text style={styles.meta}>{product.category_path.join(" / ")}</Text>
-          <Text style={styles.title}>{product.title}</Text>
-          <Text style={[styles.title, { fontSize: 28, lineHeight: 36 }]}>
-            {formatVnd(product.price)}
-          </Text>
-          <Text style={styles.muted}>
-            {PRODUCT_STATUS_LABELS[product.status].label} ·{" "}
-            {product.province_label}
-          </Text>
+          <View style={{ gap: 8 }}>
+            <StatusBadge {...PRODUCT_STATUS_LABELS[product.status]} />
+            <Text accessibilityRole="header" style={styles.title}>{product.title}</Text>
+            <Text style={[styles.title, { fontSize: 28, lineHeight: 36, color: colors.green }]}>
+              {formatVnd(product.price)}
+            </Text>
+            {product.province_label && <Text style={styles.meta}>{product.province_label}</Text>}
+          </View>
           {product.capabilities.unavailable_reason && (
             <View style={[styles.card, { backgroundColor: colors.warningBg }]}>
               <Text style={styles.text}>

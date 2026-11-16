@@ -13,11 +13,13 @@ const router = Router();
 router.get("/", asyncHandler(async (req, res) => {
   const query = z.object({
     status: z.enum(["PENDING", "APPROVED", "ALL"]).default("PENDING"),
+    q: z.string().trim().max(100).optional(),
     page: z.unknown().optional(), page_size: z.unknown().optional(),
   }).strict().parse(req.query);
   const paging = parsePaging(query);
   const where: Prisma.UserWhereInput = {
     emailVerificationRequestedAt: { not: null },
+    ...(query.q ? { OR: [{ fullName: { contains: query.q, mode: "insensitive" } }, { email: { contains: query.q, mode: "insensitive" } }] } : {}),
     ...(query.status === "PENDING" ? { emailVerifiedAt: null } : {}),
     ...(query.status === "APPROVED" ? { emailVerifiedAt: { not: null } } : {}),
   };

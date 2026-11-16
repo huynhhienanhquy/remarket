@@ -63,25 +63,3 @@ export function formatRelative(iso: string | null | undefined, now = new Date())
 
   return dateFormatter.format(date);
 }
-
-/** Countdown to a deadline such as an order's `expires_at`. */
-export function formatRemaining(
-  iso: string | null | undefined,
-  now = new Date(),
-): { expired: boolean; text: string } {
-  const date = parse(iso);
-  if (!date) return { expired: false, text: "—" };
-
-  const diffMs = date.getTime() - now.getTime();
-  if (diffMs <= 0) return { expired: true, text: "Đã quá hạn" };
-
-  const totalMinutes = Math.floor(diffMs / 60_000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) return { expired: false, text: `còn ${days} ngày ${hours} giờ` };
-  if (hours > 0) return { expired: false, text: `còn ${hours} giờ ${minutes} phút` };
-  return { expired: false, text: `còn ${minutes} phút` };
-}
-

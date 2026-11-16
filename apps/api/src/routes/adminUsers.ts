@@ -1,17 +1,22 @@
 import type { Prisma } from "@prisma/client";
+import { validateEmail, validateFullName, validatePassword, validatePhone } from "@remarket/shared";
+import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../utils/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import { env } from "../config/env.js";
 import { ok, okList } from "../shared/api-response.js";
-import { forbidden, notFound } from "../shared/errors.js";
+import { forbidden, notFound, validationError } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePaging } from "../shared/pagination.js";
 import { toAdminUserItem } from "../shared/dto-mappers.js";
 import { moderationAuditFilter, adminActor, adminDateRange, writeAudit } from "../shared/admin-helpers.js";
 import { lockUser } from "../services/admin-moderation.js";
 import { openSystemConversation } from "../services/system-chat.js";
 import { chatRateLimit } from "../middleware/rate-limit.js";
+import { createEmailToken } from "../services/email-tokens.js";
+import { newEmailToken } from "../shared/tokens.js";
 
 /**
  * User moderation (detail-project 15): list, lock and unlock. Locking ends
@@ -19,6 +24,50 @@ import { chatRateLimit } from "../middleware/rate-limit.js";
  */
 
 const router = Router();
+
+const createUserBody = z.object({
+  full_name: z.string().max(200),
+  email: z.string().max(254),
+  phone: z.string().max(20),
+  password: z.string().max(200),
+}).strict();
+
+router.post("/", asyncHandler(async (req: AuthRequest, res) => {
+  const actor = adminActor(req);
+  const body = createUserBody.parse(req.body);
+  const fields = Object.fromEntries([
+    ["full_name", validateFullName(body.full_name)],
+    ["email", validateEmail(body.email)],
+    ["phone", validatePhone(body.phone)],
+    ["password", validatePassword(body.password)],
+  ].filter((entry): entry is [string, string] => entry[1] !== null));
+  if (Object.keys(fields).length) throw validationError("Thông tin người dùng chưa hợp lệ.", fields);
+
+  const email = body.email.trim().toLowerCase();
+  const passwordHash = await bcrypt.hash(body.password, env.bcryptCost);
+  try {
+    const user = await prisma.$transaction(async tx => {
+      const created = await tx.user.create({
+        data: { fullName: body.full_name.trim(), email, phone: body.phone.trim(), passwordHash, role: "USER" },
+      });
+      await createEmailToken(tx, {
+        userId: created.id, recipient: email, purpose: "VERIFY_EMAIL",
+        ttlMs: 24 * 60 * 60 * 1000, token: newEmailToken(),
+      });
+      await writeAudit(tx, {
+        actorId: actor.id, actorName: actor.fullName, action: "user.create",
+        entityType: "user", entityId: created.id,
+      });
+      return created;
+    });
+    ok(res, toAdminUserItem(user), 201);
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") {
+      throw validationError("Email đã được sử dụng.", { email: "Email đã được sử dụng." });
+    }
+    throw error;
+  }
+}));
 
 router.post("/:id/conversation", chatRateLimit, asyncHandler(async (req: AuthRequest, res) => {
   z.object({}).strict().parse(req.body ?? {});
@@ -66,13 +115,24 @@ router.get(
         orderBy: { joinedAt: "desc" },
         skip: offsetOf(paging),
         take: paging.page_size,
+        include: { _count: { select: { products: { where: { deletedAt: null } } } } },
       }),
       prisma.user.count({ where }),
     ]);
+    const ratings = users.length ? await prisma.review.groupBy({
+      by: ["reviewedUserId"],
+      where: { reviewedUserId: { in: users.map(user => user.id) }, hiddenAt: null },
+      _avg: { rating: true },
+    }) : [];
+    const ratingByUser = new Map(ratings.map(row => [row.reviewedUserId, row._avg.rating]));
 
     okList(
       res,
-      users.map((user) => toAdminUserItem(user)),
+      users.map(user => ({
+        ...toAdminUserItem(user),
+        product_count: user._count.products,
+        rating: ratingByUser.get(user.id) ?? null,
+      })),
       pageMeta(paging, total),
     );
   }),

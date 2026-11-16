@@ -2,7 +2,7 @@ import { useDismiss } from "@/hooks/useDismiss";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
-import { ChevronRightIcon } from "@/components/common";
+import { ChevronRightIcon } from "../../common/Icon/Icon";
 
 /* ------------------------------------------------------------------ */
 /* Category navigation                                                 */

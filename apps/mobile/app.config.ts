@@ -9,7 +9,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: "light",
   ios: { supportsTablet: true, bundleIdentifier: "com.remarket.app", infoPlist: { ITSAppUsesNonExemptEncryption: false } },
   android: { package: "com.remarket.app", permissions: ["android.permission.POST_NOTIFICATIONS"] },
-  plugins: ["expo-router", "expo-secure-store", ["expo-build-properties", { ios: { enableSceneSupport: true } }], ["expo-image-picker", {
+  plugins: ["expo-router", "expo-secure-store", "expo-build-properties", ["expo-image-picker", {
     photosPermission: "Cho phép ReMarket chọn ảnh để đăng tin hoặc đổi ảnh đại diện.",
     cameraPermission: "Cho phép ReMarket chụp ảnh món đồ bạn muốn đăng bán.", microphonePermission: false,
   }], "expo-notifications"],

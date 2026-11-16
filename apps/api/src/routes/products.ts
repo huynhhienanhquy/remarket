@@ -75,9 +75,18 @@ function imageCreateMany(images: readonly { url: string; storagePath: string; so
   }));
 }
 
-async function assertCategoryEligibleInTransaction(tx: Prisma.TransactionClient, categoryId: string): Promise<void> {
+async function assertCategoryEligibleInTransaction(tx: Prisma.TransactionClient, categoryId: string, newListing: boolean): Promise<void> {
   if (!(await loadCategoryEligibility(tx, [categoryId], true)).has(categoryId)) {
     throw validationError("Thông tin món đồ chưa hợp lệ.", { category_id: "Chỉ chọn danh mục cấp cuối còn hoạt động." });
+  }
+  if (newListing) {
+    const category = await tx.category.findUnique({
+      where: { id: categoryId },
+      select: { acceptNewListings: true, parent: { select: { acceptNewListings: true } } },
+    });
+    if (!category?.acceptNewListings || category.parent?.acceptNewListings === false) {
+      throw validationError("Danh mục này đang tạm ngừng nhận tin đăng mới.", { category_id: "Hãy chọn danh mục khác." });
+    }
   }
 }
 
@@ -212,7 +221,7 @@ async function createProduct(req: AuthRequest, res: Response): Promise<Response>
   const created = await prisma.$transaction(async (tx) => {
     const productId = crypto.randomUUID();
     await assertSellerEligibleInTransaction(tx, viewerId, true);
-    await assertCategoryEligibleInTransaction(tx, normalized.categoryId);
+    await assertCategoryEligibleInTransaction(tx, normalized.categoryId, true);
     const assetIds = await lockEligibleUploads(tx, viewerId, productId, normalized.images);
     // UploadAsset.productId has an immediate FK: create the referenced row
     // before claiming uploads, within the same rollback-safe transaction.
@@ -275,7 +284,7 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
     if (current.version !== payload.expected_version) {
       throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại để xem thông tin mới nhất.");
     }
-    await assertCategoryEligibleInTransaction(tx, normalized.categoryId);
+    await assertCategoryEligibleInTransaction(tx, normalized.categoryId, current.categoryId !== normalized.categoryId);
     let previousPaths: string[] = [];
     if (payload.images) {
       previousPaths = (await tx.productImage.findMany({
@@ -349,7 +358,7 @@ async function submitProduct(req: AuthRequest, res: Response): Promise<Response>
     if (current.version !== product.version) {
       throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại để xem thông tin mới nhất.");
     }
-    await assertCategoryEligibleInTransaction(tx, current.categoryId);
+    await assertCategoryEligibleInTransaction(tx, current.categoryId, false);
     return tx.product.update({
       where: { id: current.id },
       data: { status: "PENDING", rejectionReason: null, version: { increment: 1 } },

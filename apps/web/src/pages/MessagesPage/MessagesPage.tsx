@@ -1,4 +1,5 @@
-import { ChatIcon, EmptyState } from "../../components/common";
+import { ChatIcon } from "../../components/common/Icon/Icon";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
 import { ConversationList } from "../../components/ConversationList/ConversationList";
 import { AccountPageHeader } from "../../components/AccountPageHeader/AccountPageHeader";
 import { useParams } from "react-router-dom";

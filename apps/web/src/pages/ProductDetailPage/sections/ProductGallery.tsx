@@ -1,5 +1,5 @@
 import type { ProductDetail } from "@remarket/shared";
-import { MarketplaceImage } from "../../../components/common";
+import { MarketplaceImage } from "../../../components/common/MarketplaceImage/MarketplaceImage";
 
 interface ProductGalleryProps {
   product: ProductDetail; hidden: boolean; images: ProductDetail["images"];

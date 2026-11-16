@@ -7,7 +7,8 @@ import { Link, useLocation } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
-import { BellIcon, CartIcon, ChatIcon, ChevronLeftIcon, SearchInput } from "../common";
+import { BellIcon, CartIcon, ChatIcon, ChevronLeftIcon } from "../common/Icon/Icon";
+import { SearchInput } from "../common/SearchInput/SearchInput";
 import { Logo } from "../Logo/Logo";
 
 export function MarketplaceHeader({
@@ -90,7 +91,7 @@ export function MarketplaceHeader({
 
       {/* Mobile header: 56px logo row (+ 48px search row on discovery) */}
       <div className="border-b border-line lg:hidden">
-        <div className="rm-container flex h-14 items-center gap-3">
+        <div className="rm-container flex h-mobile-header items-center gap-3">
           <Logo />
           <MobileHeaderActions />
         </div>
@@ -116,15 +117,15 @@ export function MarketplaceHeader({
 export function CompactHeader({ title, backTo }: { title: string; backTo: string }) {
   return (
     <header className="sticky top-0 z-header border-b border-line bg-surface lg:hidden">
-      <div className="rm-container flex h-14 items-center gap-2">
+      <div className="rm-container flex h-mobile-header items-center gap-2">
         <Link
           to={backTo}
           aria-label="Quay lại"
-          className="-ml-2 flex h-11 w-11 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
+          className="-ml-2 flex h-touch w-touch shrink-0 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
         >
           <ChevronLeftIcon />
         </Link>
-        <h1 className="min-w-0 flex-1 truncate t-h3 text-ink">{title}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{title}</h1>
         <MobileHeaderActions />
       </div>
     </header>

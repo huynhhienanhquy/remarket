@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../services/runtime";
@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigationCounts } from "../services/use-navigation-counts";
 import { useSession } from "../services/session-context";
-import { colors, IconButton, styles } from "./ui";
+import { colors, IconButton, layout, styles } from "./ui";
 
 export function Logo() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export function Logo() {
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
-        minHeight: 44,
+        minHeight: layout.touchTarget,
       }}
     >
       <View
@@ -33,19 +33,18 @@ export function Logo() {
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: "700", color: colors.card }}>
-          R
-        </Text>
+        <Ionicons name="sync-outline" size={20} color={colors.card} />
       </View>
       <Text
         style={{
           fontSize: 18,
           lineHeight: 28,
-          fontWeight: "600",
+          fontWeight: "700",
+          letterSpacing: -0.45,
           color: colors.text,
         }}
       >
-        ReMarket
+        Re<Text style={{ color: colors.green }}>Market</Text>
       </Text>
     </Pressable>
   );
@@ -65,6 +64,7 @@ export function MarketplaceHeader({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
+  const { width } = useWindowDimensions();
   const value = search ?? input;
   const update = onSearchChange ?? setInput;
   const submit =
@@ -82,14 +82,14 @@ export function MarketplaceHeader({
       <View
         style={{
           width: "100%",
-          maxWidth: 960,
+          maxWidth: layout.maxWidth,
           alignSelf: "center",
-          paddingHorizontal: 16,
+          paddingHorizontal: width >= 1024 ? 32 : width >= 640 ? 24 : 16,
         }}
       >
         <View
           style={{
-            height: 56,
+            height: layout.header,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -107,8 +107,11 @@ export function MarketplaceHeader({
               gap: 8,
               borderWidth: 1,
               borderColor: colors.inputBorder,
-              borderRadius: 8,
+              borderRadius: 12,
+              backgroundColor: colors.bg,
               paddingLeft: 12,
+              paddingRight: 2,
+              paddingVertical: 1,
               marginBottom: 12,
             }}
           >
@@ -124,7 +127,7 @@ export function MarketplaceHeader({
               maxLength={100}
               style={[
                 styles.text,
-                { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 8 },
+                { flex: 1, minWidth: 0, minHeight: layout.touchTarget, paddingVertical: 8 },
               ]}
             />
             {!!value && (
@@ -232,8 +235,11 @@ export function CompactHeader({
     >
       <View
         style={{
-          height: 56,
-          paddingHorizontal: 16,
+          height: layout.header,
+          width: "100%",
+          maxWidth: layout.maxWidth,
+          alignSelf: "center",
+          paddingHorizontal: 12,
           flexDirection: "row",
           alignItems: "center",
           gap: 8,

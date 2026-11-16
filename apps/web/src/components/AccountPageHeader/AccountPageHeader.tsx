@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { EmptyState, Icon } from "../common";
-import type { EmptyStateProps, IconName } from "../common";
+import { EmptyState } from "../common/EmptyState/EmptyState";
+import { Icon } from "../common/Icon/Icon";
+import type { EmptyStateProps } from "../common/EmptyState/EmptyState";
+import type { IconName } from "../common/Icon/Icon";
 import { ACCOUNT_ITEMS } from "../../config/route/accountNavigation";
 
 export function AccountPageHeader({ title, description, action }: {

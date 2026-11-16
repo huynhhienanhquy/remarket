@@ -88,9 +88,16 @@ describe("admin navigation and filters", () => {
     expect(action).toHaveBeenCalledTimes(1);
     expect(parent).not.toHaveBeenCalled();
   });
-  it.each(ADMIN_NAVIGATION)("marks only $label active at $to", async ({ to, label }) => {
+  it.each(ADMIN_NAVIGATION)("shows the shared topbar and marks only $label active at $to", async ({ to, label }) => {
     show(to);
     const nav = await screen.findByRole("navigation", { name: "Khu vực quản trị" });
+    const topbar = within(screen.getByRole("banner"));
+    expect(topbar.getByRole("link", { name: "Trang quản trị" })).toHaveAttribute("href", "/admin");
+    expect(topbar.getByText(label, { exact: true })).toHaveAttribute("aria-current", "page");
+    expect(topbar.getByRole("link", { name: "Mở marketplace" })).toHaveAttribute("href", "/");
+    expect(topbar.getByRole("link", { name: "Thông báo" })).toHaveAttribute("href", "/notifications");
+    expect(topbar.getByRole("button", { name: "Trợ giúp quản trị" })).toBeInTheDocument();
+    expect(topbar.getByText(member.full_name)).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
     expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     for (const item of ADMIN_NAVIGATION) expect(within(nav).getByRole("link", { name: item.label })).toHaveAttribute("href", item.to);
@@ -112,7 +119,7 @@ describe("admin navigation and filters", () => {
     expect(document.body.style.overflow).not.toBe("hidden");
     await user.click(trigger);
     await user.click(within(screen.getByRole("dialog")).getByRole("link", { name: "Sản phẩm" }));
-    await screen.findByRole("heading", { name: "Sản phẩm và kiểm duyệt", level: 1 });
+    await screen.findByRole("heading", { name: "Sản phẩm", level: 1 });
     expect(window.location.pathname).toBe("/admin/products");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

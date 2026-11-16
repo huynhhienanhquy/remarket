@@ -42,7 +42,7 @@ export function ProductCard({
   return (
     <article
       className={[
-        "group relative flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface transition-shadow hover:shadow-card-hover",
+        "group relative isolate flex h-full min-w-0 flex-col overflow-hidden rounded-card border border-line bg-surface transition-[border-color,box-shadow] hover:border-brand/40 hover:shadow-card-hover",
         className ?? "",
       ].join(" ")}
     >
@@ -79,7 +79,7 @@ export function ProductCard({
             )}
           </div>
           <div className="px-3 pt-3">
-            <h3 className="t-label line-clamp-2 min-h-[40px] text-ink hover:text-brand">
+            <h3 className="line-clamp-2 min-h-[40px] break-words text-sm font-semibold leading-5 text-ink group-hover:text-brand">
               {product.title}
             </h3>
           </div>
@@ -88,11 +88,11 @@ export function ProductCard({
 
       {!unavailable && (
         <div className="flex flex-1 flex-col gap-1 px-3 pb-3">
-          <p className="t-price-card text-ink">{formatVnd(product.price)}</p>
-          <p className="t-meta text-muted">{CONDITION_LABELS[product.condition]}</p>
-          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-            <span className="t-meta truncate text-muted">{product.province_label}</span>
-            <span className="t-meta shrink-0 text-muted">{timeText}</span>
+          <p className="t-price-card break-words text-brand">{formatVnd(product.price)}</p>
+          <p className="t-meta self-start rounded-full bg-surface-subtle px-2 py-0.5 text-muted">{CONDITION_LABELS[product.condition]}</p>
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0 border-t border-line pt-2">
+            <span className="t-meta min-w-0 max-w-full truncate text-muted">{product.province_label}</span>
+            <time dateTime={product.published_at ?? product.created_at} className="t-meta text-muted">{timeText}</time>
           </div>
         </div>
       )}

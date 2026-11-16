@@ -37,7 +37,7 @@ export function Sheet({
         style={{
           flex: 1,
           justifyContent: "flex-end",
-          backgroundColor: "#18313B66",
+          backgroundColor: `${colors.text}66`,
           paddingTop: insets.top + 24,
         }}
       >
@@ -50,9 +50,10 @@ export function Sheet({
         <View
           accessibilityViewIsModal
           style={{
-            backgroundColor: colors.bg,
+            backgroundColor: colors.card,
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
+            overflow: "hidden",
             maxHeight: "90%",
             width: "100%",
             maxWidth: 720,
@@ -64,7 +65,8 @@ export function Sheet({
               styles.row,
               {
                 justifyContent: "space-between",
-                padding: 16,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
                 borderBottomWidth: 1,
                 borderColor: colors.border,
               },

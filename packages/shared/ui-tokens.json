@@ -1,0 +1,22 @@
+{
+  "color": {
+    "page": "#F7F8F5",
+    "surface": "#FFFFFF",
+    "subtle": "#F0F3EE",
+    "ink": "#17251D",
+    "muted": "#56645B",
+    "brand": "#17633F",
+    "brandHover": "#104C30",
+    "brandSoft": "#E8F3EC",
+    "line": "#DDE4DC",
+    "inputLine": "#829087",
+    "accent": "#B45309",
+    "warningBg": "#FFF4DA",
+    "danger": "#B42318",
+    "dangerBg": "#FEF0EE",
+    "info": "#245EA8",
+    "infoBg": "#ECF3FF"
+  },
+  "radius": { "control": 8, "card": 12, "modal": 16 },
+  "layout": { "maxWidth": 1280, "header": 56, "tabBar": 64, "touchTarget": 44 }
+}

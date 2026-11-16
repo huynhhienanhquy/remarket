@@ -6,3 +6,4 @@ export { catalogEndpoints } from "./catalog.js";
 export { commerceEndpoints } from "./commerce.js";
 export { communicationEndpoints } from "./communication.js";
 export { adminEndpoints } from "./admin.js";
+export { aiEndpoints } from "./ai.js";

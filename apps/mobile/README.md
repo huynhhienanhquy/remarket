@@ -1,7 +1,12 @@
 # ReMarket mobile
 
-App Expo SDK 57 / React Native 0.86.3 cho Android và iOS, dùng API ReMarket thật.
+App Expo SDK 58 / React Native 0.88.1 cho Android và iOS, dùng API ReMarket thật.
 Có đầy đủ khu vực người dùng và quản trị. Không chứa mock account, dữ liệu demo hoặc database key.
+
+Hiện ghim Expo 58.0.22 và CLI 58.1.18 vì CLI 58.1.19 tham chiếu
+`@expo/env@~2.5.4` chưa có trên npm. Expo Doctor còn khuyến nghị Expo 58.0.23.
+Các override Metro trong `pnpm-workspace.yaml` giữ bản 0.87.1 mà Expo yêu cầu
+và tránh gói `metro-file-map@0.87.3` chưa phát hành.
 
 Giao diện native đồng bộ với web mobile-first: trang chủ có hero hai CTA,
 danh mục ba cột và 10 tin mới; trang `/products` riêng cho tìm kiếm, sắp xếp
@@ -20,17 +25,20 @@ Xem [đối chiếu chức năng và kết quả kiểm tra](../../docs/mobile-w
 
 ### Test bằng Expo Go
 
-Sau khi cấu hình API và `apps/mobile/.env` theo hướng dẫn dưới, chạy từ root:
+File `apps/mobile/.env.example` dùng backend HTTPS cùng web. Sau khi sao chép
+thành `apps/mobile/.env`, chạy từ root:
 
 ```sh
-pnpm dev:api
-# Terminal thứ hai:
 pnpm dev:mobile:go
 ```
 
-Điện thoại và máy tính dùng cùng Wi-Fi, URL API dùng IP LAN của máy tính thay
-vì localhost. Quét QR bằng Expo Go (Android) hoặc camera iPhone. Expo Go phải
-hỗ trợ SDK 57 của project; nếu báo SDK mismatch, cài bản phù hợp từ expo.dev/go.
+Nếu cần tunnel, từ `apps/mobile` chạy `pnpm run go:tunnel --clear`.
+Sau khi nâng SDK, tạo lại development build trước khi dùng `pnpm dev:mobile`.
+
+Khi dùng API local, chạy `pnpm dev:api` ở terminal riêng. Điện thoại và máy tính
+cần ở cùng Wi-Fi, URL API dùng IP LAN của máy tính thay vì localhost.
+Quét QR bằng Expo Go (Android) hoặc camera iPhone. Expo Go cần
+hỗ trợ SDK 58 của project. Sau khi cập nhật dependency, dừng Metro cũ và quét QR mới.
 Push native được tắt riêng khi chạy Expo Go; hộp thông báo REST và chat vẫn hoạt động.
 Remote push và custom-scheme email links cần development build để kiểm thử đầy đủ.
 
@@ -182,3 +190,5 @@ Metro và reload app. Không trim hoặc đổi hoa/thường mật khẩu để
 dùng nút hiện mật khẩu trên màn đăng nhập để kiểm tra ký tự.
 
 pnpm dev:mobile:go
+
+pnpm run go

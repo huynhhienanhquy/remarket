@@ -1,7 +1,14 @@
 import { useProductForm } from "./hooks/useProductForm";
 import type { Condition, DeliveryMethod } from "@remarket/shared";
 import type { OwnProduct } from "@remarket/shared";
-import { ConfirmDialog, Button, ApiImage, Input, Select, Textarea, FormRow, Skeleton, Spinner, InlineAlert } from "../../components/common";
+import { ConfirmDialog } from "../../components/common/Dialog/Dialog";
+import { Button } from "../../components/common/Button/Button";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { Input, Select, Textarea } from "../../components/common/Input/Input";
+import { FormRow } from "../../components/common/FormRow/FormRow";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
+import { Spinner } from "../../components/common/Spinner/Spinner";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 import { CONDITIONS, DELIVERY_METHODS, conditionLabel, deliveryLabel } from "@remarket/shared";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
 import { ProductImageUpload } from "./sections/ProductImageUpload";

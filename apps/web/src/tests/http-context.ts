@@ -41,6 +41,12 @@ export function httpContext(viewer: SessionUser | null = null) {
   context.reply("GET", "/conversations/unread-count", 0);
   context.reply("GET", "/notifications/navigation-counts", { messages: 0, notifications: 0, cart: 0 });
   context.reply("GET", "/admin/navigation-counts", { pending_products: 0, pending_email_verifications: 0, pending_reports: 0, open_tickets: 0 });
+  context.reply("GET", "/admin/summary/users", { total: 0, active: 0, pending_email: 0, locked: 0 });
+  context.reply("GET", "/admin/summary/reports", { resolved: 0, handled_today: 0, confirmed_rate: null });
+  context.reply("GET", "/admin/summary/reviews", { average: null, total: 0, low_rating_visible: 0, public_rate: null });
+  context.reply("GET", "/admin/summary/support", { resolved_today: 0, first_reply_minutes: null });
+  context.reply("GET", "/admin/summary/email", { approved_today: 0, approval_rate: null });
+  context.reply("GET", "/admin/summary/audit", { today: 0, admin_actions_today: 0, total: 0 });
   vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, options) => {
     const url = new URL(String(input), window.location.origin);
     const request: RecordedRequest = {

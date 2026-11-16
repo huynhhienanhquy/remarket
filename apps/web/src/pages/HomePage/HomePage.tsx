@@ -6,14 +6,12 @@ import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
-import {
-  Button,
-  CategoryIcon,
-  EmptyState,
-  InlineAlert,
-  ProductCard,
-  ProductCardSkeleton,
-} from "../../components/common";
+import { Button, buttonClasses } from "../../components/common/Button/Button";
+import { CategoryIcon } from "../../components/common/Icon/Icon";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { ProductCard } from "../../components/common/ProductCard/ProductCard";
+import { ProductCardSkeleton } from "../../components/common/Skeleton/Skeleton";
 
 const STEPS = [
   {
@@ -63,30 +61,41 @@ export function HomePage() {
     favorites.mutate({ id: product.id, on: !product.is_favorited });
   }
 
-  const roots = (categories.data ?? []).filter((entry) => entry.status === "ACTIVE").slice(0, 6);
+  const roots = (categories.data ?? [])
+    .filter(entry => entry.status === "ACTIVE")
+    .flatMap(entry => [entry, ...(entry.children ?? []).filter(child => child.status === "ACTIVE" && child.show_on_home === true)])
+    .filter(entry => entry.show_on_home !== false)
+    .sort((left, right) => Number(right.show_on_home === true) - Number(left.show_on_home === true) || (left.sort_index ?? 0) - (right.sort_index ?? 0))
+    .slice(0, 6);
   const items = latest.data?.items ?? [];
 
   return (
     <>
       {/* Hero */}
-      <section className="rm-container pt-6 lg:pt-8">
-        <div className="flex flex-col gap-6 rounded-modal bg-brand-soft px-6 py-8 lg:flex-row lg:items-center lg:gap-8 lg:px-10 lg:py-10">
+      <section className="rm-container pt-4 lg:pt-8">
+        <div className="relative isolate flex flex-col gap-6 overflow-hidden rounded-modal border border-brand/10 bg-brand-soft px-5 py-6 lg:flex-row lg:items-center lg:gap-8 lg:px-10 lg:py-8">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 -z-10 grid h-60 w-60 place-items-center rounded-full border border-brand/15 lg:hidden">
+            <div className="h-48 w-48 rounded-full border border-brand/15" />
+          </div>
           <div className="lg:w-[60%]">
-            <p className="t-label uppercase tracking-wide text-brand">
+            <p className="inline-flex rounded-full bg-surface px-3 py-1.5 text-[11px] font-semibold uppercase leading-4 tracking-wide text-brand">
               Mua bán đồ đã qua sử dụng
             </p>
-            <h1 className="mt-3 text-[28px] font-bold leading-tight text-ink lg:text-[36px]">
-              Món đồ cũ. Giá trị mới.
+            <h1 className="mt-3 t-hero text-ink">
+              Món đồ cũ. <span className="block text-brand lg:inline">Giá trị mới.</span>
             </h1>
-            <p className="mt-3 max-w-lg t-body text-muted">
+            <p className="mt-2 max-w-lg t-body text-muted">
               Tìm món bạn cần, nhường món bạn không còn dùng.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/products">
-                <Button variant="primary">Khám phá sản phẩm</Button>
+            <div className="mt-4 flex flex-wrap gap-2 lg:mt-6">
+              <Link to="/products" className={`${buttonClasses()} !px-3 lg:!px-4`}>
+                Khám phá sản phẩm
               </Link>
-              <Link to={viewer ? "/account/products/new" : loginPathFor("/", "")}>
-                <Button variant="secondary">Đăng bán ngay</Button>
+              <Link
+                to={viewer ? "/account/products/new" : loginPathFor("/", "")}
+                className={`${buttonClasses("secondary")} !px-3 lg:!px-4`}
+              >
+                Đăng bán ngay
               </Link>
             </div>
           </div>
@@ -103,9 +112,9 @@ export function HomePage() {
             Khám phá theo danh mục
           </h2>
           {categories.isPending ? (
-            <div className="mt-5 grid grid-cols-3 gap-3 lg:grid-cols-6">
+            <div className="mt-4 grid grid-cols-3 gap-3 lg:grid-cols-6">
               {Array.from({ length: 6 }, (_, index) => (
-                <div key={index} className="rm-skeleton h-24" />
+                <div key={index} className="rm-skeleton min-h-24 rounded-card" />
               ))}
             </div>
           ) : categories.isError ? (
@@ -123,17 +132,17 @@ export function HomePage() {
           ) : roots.length === 0 ? (
             <p className="mt-4 t-body text-muted">Chưa có danh mục nào.</p>
           ) : (
-            <div className="mt-5 grid grid-cols-3 gap-3 lg:grid-cols-6">
+            <div className="mt-4 grid grid-cols-3 gap-3 lg:grid-cols-6">
               {roots.map((root: CategoryNode) => (
                 <Link
                   key={root.id}
                   to={`/products?category_id=${root.id}`}
-                  className="flex flex-col items-center gap-2 rounded-card border border-line bg-surface px-3 py-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
+                  className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-line bg-surface px-2 py-3 text-center transition-colors hover:border-brand hover:bg-brand-soft"
                 >
-                  <span className="text-brand">
-                    <CategoryIcon slug={root.slug} size={24} />
+                  <span className="grid h-9 w-9 place-items-center rounded-control bg-brand-soft text-brand transition-colors group-hover:bg-surface">
+                    <CategoryIcon slug={root.slug} symbol={root.icon} size={20} />
                   </span>
-                  <span className="t-meta text-ink">{root.name}</span>
+                  <span className="text-xs font-medium leading-[18px] text-ink">{root.name}</span>
                 </Link>
               ))}
             </div>
@@ -148,14 +157,14 @@ export function HomePage() {
             <h2 id="home-latest" className="t-h2 text-ink">
               Mới đăng gần đây
             </h2>
-            <Link to="/products" className="t-label text-brand hover:underline">
+            <Link to="/products" className="inline-flex min-h-touch shrink-0 items-center text-sm font-semibold text-brand hover:underline">
               Xem tất cả
             </Link>
           </div>
 
           {latest.isPending ? (
-            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {Array.from({ length: 8 }, (_, index) => (
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+              {Array.from({ length: 10 }, (_, index) => (
                 <ProductCardSkeleton key={index} />
               ))}
             </div>
@@ -184,7 +193,7 @@ export function HomePage() {
               />
             </div>
           ) : (
-            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5">
               {items.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -206,7 +215,7 @@ export function HomePage() {
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
             {STEPS.map((step, index) => (
               <div key={step.title} className="rounded-card border border-line bg-page p-5">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-soft t-label text-brand">
+                <span className="grid h-8 w-8 place-items-center rounded-control bg-brand-soft text-sm font-semibold text-brand">
                   {index + 1}
                 </span>
                 <h3 className="mt-3 t-h3 text-ink">{step.title}</h3>

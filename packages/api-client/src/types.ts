@@ -279,13 +279,19 @@ export interface ProfilesApi {
 }
 
 export interface AdminApi {
+  summary<K extends keyof import("@remarket/shared").AdminWorkspaceSummary>(
+    section: K,
+  ): Promise<import("@remarket/shared").AdminWorkspaceSummary[K]>;
+  categorySummary(id: string): Promise<import("@remarket/shared").AdminCategorySummary>;
   navigationCounts(): Promise<AdminNavigationCounts>;
   emailVerifications(query: {
     status?: "PENDING" | "APPROVED" | "ALL";
+    q?: string;
     page?: number;
   }): Promise<{ items: EmailVerificationRequest[]; meta: PageMeta }>;
   approveEmailVerification(id: string): Promise<EmailVerificationRequest>;
   dashboard(from: string, to: string): Promise<AdminDashboard>;
+  createUser(input: { full_name: string; email: string; phone: string; password: string }): Promise<AdminUserItem>;
   users(query: {
     q?: string;
     status?: UserStatus;
@@ -354,14 +360,14 @@ export interface AdminApi {
       total_pages: number;
     };
   }>;
-  createCategory(input: {
+  createCategory(input: import("@remarket/shared").CategoryPresentationInput & {
     name: string;
     slug: string;
     parent_id: string | null;
   }): Promise<CategoryNode>;
   updateCategory(
     id: string,
-    input: {
+    input: import("@remarket/shared").CategoryPresentationInput & {
       name?: string;
       slug?: string;
       parent_id?: string | null;
@@ -417,6 +423,7 @@ export interface AdminApi {
   tickets(query: {
     status?: TicketStatus;
     type?: TicketType;
+    q?: string;
     assigned_admin_id?: string;
     from?: string;
     to?: string;
@@ -449,6 +456,8 @@ export interface AdminApi {
     entity_type?: string;
     entity_id?: string;
     actor_id?: string;
+    actor_type?: "USER" | "ADMIN" | "SYSTEM";
+    q?: string;
     from?: string;
     to?: string;
     page?: number;

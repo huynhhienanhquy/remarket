@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "../Icon/Icon";
 
 const VI_NUMBER = new Intl.NumberFormat("vi-VN");
@@ -10,12 +11,15 @@ export interface PaginationProps {
   total?: number;
   onPageChange: (page: number) => void;
   className?: string;
+  summary?: ReactNode;
+  showArrows?: boolean;
+  leadingPages?: 2 | 3;
 }
 
 type PageItem = number | "gap";
 
 /** Keeps at most 7 slots: edges plus a window around the current page. */
-function pageItems(page: number, totalPages: number): PageItem[] {
+function pageItems(page: number, totalPages: number, leadingPages: number): PageItem[] {
   if (totalPages <= 7) {
     const all: PageItem[] = [];
     for (let i = 1; i <= totalPages; i += 1) all.push(i);
@@ -23,7 +27,7 @@ function pageItems(page: number, totalPages: number): PageItem[] {
   }
   const items: PageItem[] = [1];
   const start = Math.max(2, page - 1);
-  const end = Math.min(totalPages - 1, page + 1);
+  const end = Math.min(totalPages - 1, Math.max(leadingPages, page + 1));
   if (start > 2) items.push("gap");
   for (let i = start; i <= end; i += 1) items.push(i);
   if (end < totalPages - 1) items.push("gap");
@@ -37,10 +41,13 @@ export function Pagination({
   total,
   onPageChange,
   className,
+  summary,
+  showArrows = true,
+  leadingPages = 2,
 }: PaginationProps) {
-  if (total === undefined && totalPages <= 1) return null;
+  if (summary === undefined && total === undefined && totalPages <= 1) return null;
 
-  const items = pageItems(page, Math.max(totalPages, 1));
+  const items = pageItems(page, Math.max(totalPages, 1), leadingPages);
   const edgeButton =
     "inline-flex min-h-[44px] items-center gap-1 rounded-control border border-line px-3 t-label text-ink transition-colors enabled:hover:bg-surface-subtle disabled:opacity-50 disabled:cursor-not-allowed";
 
@@ -50,7 +57,7 @@ export function Pagination({
       className={`flex flex-col items-center gap-3 sm:flex-row sm:justify-between ${className ?? ""}`}
     >
       <p className="t-meta text-muted">
-        {total !== undefined ? `Tổng ${VI_NUMBER.format(total)} kết quả` : ""}
+        {summary ?? (total !== undefined ? `Tổng ${VI_NUMBER.format(total)} kết quả` : "")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1">
         <button
@@ -59,7 +66,7 @@ export function Pagination({
           onClick={() => onPageChange(page - 1)}
           className={edgeButton}
         >
-          <ChevronLeftIcon />
+          {showArrows && <ChevronLeftIcon />}
           Trước
         </button>
         {items.map((item, index) =>
@@ -92,7 +99,7 @@ export function Pagination({
           className={edgeButton}
         >
           Sau
-          <ChevronRightIcon />
+          {showArrows && <ChevronRightIcon />}
         </button>
       </div>
     </nav>

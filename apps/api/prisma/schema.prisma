@@ -170,6 +170,8 @@ model User {
   orderStatusActions     OrderStatusHistory[] @relation("OrderStatusActor")
   cancelledOrders        Order[]         @relation("OrderCancelledBy")
   hiddenReviews          Review[]        @relation("ReviewHiddenBy")
+  aiThreads              AiThread[]
+  aiRuns                 AiRun[]
 
   @@index([status])
   @@index([emailVerifiedAt, emailVerificationRequestedAt])
@@ -200,6 +202,61 @@ model Session {
   @@index([expiresAt])
 }
 
+model AiThread {
+  id        String      @id @default(uuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope     String      @default("USER")
+  filters   Json        @default("{}")
+  updatedAt DateTime    @updatedAt
+  expiresAt DateTime
+  leaseId   String?
+  leaseUntil DateTime?
+  messages  AiMessage[]
+
+  @@index([userId, scope, updatedAt])
+  @@index([expiresAt])
+}
+
+model AiMessage {
+  threadId  String
+  thread    AiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  id        String
+  role      String
+  content   String
+  results   Json?
+  createdAt DateTime @default(now())
+
+  @@id([threadId, id])
+  @@index([threadId, createdAt, id])
+}
+
+model AiRun {
+  threadId   String
+  id         String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inputHash  String
+  status     String
+  costMicros Int
+  ipHash     String
+  createdAt  DateTime @default(now())
+  latencyMs  Int?
+  inputTokens Int?
+  outputTokens Int?
+  errorCode  String?
+
+  @@id([threadId, id])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
+model AiDailyBudget {
+  day        DateTime @id @db.Date
+  costMicros Int
+}
+
 /// One-time email token: VERIFY_EMAIL (24h) or RESET_PASSWORD (15min).
 /// Only the hash is stored and a token can be consumed exactly once.
 model AuthToken {
@@ -227,6 +284,11 @@ model Category {
   name      String
   slug      String
   status    CategoryStatus @default(ACTIVE)
+  icon      String?
+  sortIndex Int           @default(0)
+  description String?
+  acceptNewListings Boolean @default(true)
+  showOnHome Boolean?
   products  Product[]
   moderationAudits AuditLog[] @relation("AuditTargetCategory")
 

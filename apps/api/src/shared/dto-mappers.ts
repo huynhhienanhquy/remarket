@@ -147,7 +147,8 @@ export function toAdminUserItem(user: User): AdminUserItem {
  * Categories
  * ------------------------------------------------------------------ */
 
-export interface CategoryRow extends Category {
+type CategoryPresentationFields = "icon" | "description" | "sortIndex" | "acceptNewListings" | "showOnHome";
+export interface CategoryRow extends Omit<Category, CategoryPresentationFields>, Partial<Pick<Category, CategoryPresentationFields>> {
   children?: CategoryRow[];
 }
 
@@ -158,6 +159,11 @@ export function toCategoryNode(category: CategoryRow): CategoryNode {
     name: category.name,
     slug: category.slug,
     status: category.status,
+    icon: category.icon,
+    sort_index: category.sortIndex,
+    description: category.description,
+    accept_new_listings: category.acceptNewListings,
+    show_on_home: category.showOnHome,
   };
   if (category.children && category.children.length > 0) {
     node.children = category.children.map(toCategoryNode);

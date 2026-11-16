@@ -72,7 +72,7 @@ export function Drawer({
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>
         {footer !== undefined && (
-          <footer className="shrink-0 border-t border-line bg-surface p-4">
+          <footer className="shrink-0 border-t border-line bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{footer}</div>
           </footer>
         )}

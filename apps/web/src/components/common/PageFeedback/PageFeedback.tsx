@@ -1,4 +1,6 @@
-import { Button, InlineAlert, Skeleton } from "..";
+import { Button } from "../Button/Button";
+import { InlineAlert } from "../InlineAlert/InlineAlert";
+import { Skeleton } from "../Skeleton/Skeleton";
 import { errorTitle, isApiError } from "../../../helpers/errors";
 
 export function OfflineNotice({ online }: { online: boolean }) {

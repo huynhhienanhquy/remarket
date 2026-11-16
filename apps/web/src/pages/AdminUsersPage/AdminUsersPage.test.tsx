@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider } from "../../components/common";
+import { ToastProvider } from "../../components/common/Toast/Toast";
 import { createQueryClient } from "../../config/queryClient";
 import { failure, httpContext } from "../../tests/http-context";
 import { member, product, timestamp } from "../../tests/test-data";

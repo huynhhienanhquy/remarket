@@ -5,7 +5,7 @@ import type { ComponentType } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminDashboard, CategoryNode, AdminProductItem } from "@remarket/shared";
-import { ToastProvider } from "../components/common";
+import { ToastProvider } from "../components/common/Toast/Toast";
 import { createQueryClient } from "../config/queryClient";
 import { httpContext, page } from "./http-context";
 import { product, timestamp } from "./test-data";
@@ -59,12 +59,12 @@ describe("admin routes through the HTTP adapter", () => {
   it.each([
     ["Tổng quan", AdminDashboardPage, "/admin", "/admin/dashboard"],
     ["Người dùng", AdminUsersPage, "/admin/users", "/admin/users"],
-    ["Sản phẩm và kiểm duyệt", AdminProductsPage, "/admin/products", "/admin/products"],
+    ["Sản phẩm", AdminProductsPage, "/admin/products", "/admin/products"],
     ["Danh mục", AdminCategoriesPage, "/admin/categories", "/admin/categories"],
     ["Báo cáo", AdminReportsPage, "/admin/reports", "/admin/reports"],
     ["Đánh giá", AdminReviewsPage, "/admin/reviews", "/admin/reviews"],
     ["Hỗ trợ", AdminSupportPage, "/admin/support", "/admin/support-tickets"],
-    ["Nhật ký thao tác", AdminAuditPage, "/admin/audit", "/admin/audit-logs"],
+    ["Nhật ký hệ thống", AdminAuditPage, "/admin/audit", "/admin/audit-logs"],
   ])("loads %s from its API endpoint", async (heading, Page, path, endpoint) => {
     renderAdmin(Page, path);
     expect(await screen.findByRole("heading", { name: heading, level: 1 })).toBeInTheDocument();

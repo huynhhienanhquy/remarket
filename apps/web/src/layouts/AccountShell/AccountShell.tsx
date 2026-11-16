@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../contexts/SessionContext";
-import { ApiImage, Icon } from "../../components/common";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { Icon } from "../../components/common/Icon/Icon";
 import { ACCOUNT_ITEMS } from "../../config/route/accountNavigation";
 import { MarketplaceHeader } from "../../components/MarketplaceHeader/MarketplaceHeader";
 import { MobileBottomNav } from "../../components/MobileBottomNav/MobileBottomNav";
@@ -36,7 +37,7 @@ export function AccountShell() {
       <MarketplaceHeader search={search} onSearchChange={setSearch} onSearchSubmit={submitSearch} categories={[]} showSearchRow={false} showCategories={false} />
     </div>
     {childTitle && !isIndex && <header className="sticky top-0 z-header border-b border-line bg-surface lg:hidden">
-      <div className="rm-container flex h-14 items-center gap-2">
+      <div className="rm-container flex h-mobile-header items-center gap-2">
         <Link to={isConversation ? `/messages${location.search}` : "/account"} aria-label="Quay lại" className="-ml-2 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-ink hover:bg-surface-subtle"><Icon name="chevron-left" /></Link>
         <p className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{childTitle}</p>
         <MobileHeaderActions />

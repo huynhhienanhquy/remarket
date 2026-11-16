@@ -1,0 +1,52 @@
+[
+  {
+    "id": "RM-F01",
+    "audience": "public",
+    "title": "Xác minh email",
+    "aliases": ["xác minh email", "xác thực email", "không nhận được email", "gửi lại email", "kích hoạt tài khoản", "chưa xác minh"],
+    "text": "Đăng nhập và mở trang Xác minh email để gửi yêu cầu cho quản trị viên. Khi yêu cầu đang chờ duyệt, bạn có thể xem kết quả trong thông báo tài khoản. Tài khoản cần xác minh email để mua, đăng bán và nhắn tin.",
+    "href": "/verify-email",
+    "version": "1",
+    "effective_from": "2026-11-15"
+  },
+  {
+    "id": "RM-F02",
+    "audience": "public",
+    "title": "Mua món đồ",
+    "aliases": ["mua hàng", "mua đồ", "đặt hàng", "thanh toán", "giỏ hàng", "cách mua"],
+    "text": "Chọn một tin đang bán, thêm món đồ vào giỏ rồi chọn phương thức giao nhận mà người bán hỗ trợ khi đặt hàng. Bạn có thể theo dõi trạng thái từ Đơn hàng.",
+    "href": "/products",
+    "version": "1",
+    "effective_from": "2026-11-15"
+  },
+  {
+    "id": "RM-F03",
+    "audience": "public",
+    "title": "Đăng và quản lý tin",
+    "aliases": ["đăng bán", "đăng tin", "bán đồ", "quản lý tin", "sửa tin", "duyệt tin"],
+    "text": "Tài khoản đã xác minh email có thể đăng bán. Khi tạo tin, cung cấp ảnh, danh mục, tình trạng, giá, khu vực và phương thức giao nhận. Theo dõi trạng thái và chỉnh sửa tin ở Tin của tôi.",
+    "href": "/account/products",
+    "version": "1",
+    "effective_from": "2026-11-15"
+  },
+  {
+    "id": "RM-F04",
+    "audience": "public",
+    "title": "Theo dõi và xử lý đơn hàng",
+    "aliases": ["trạng thái đơn", "theo dõi đơn", "hủy đơn", "đã giao", "xác nhận đã nhận hàng", "nhận hàng"],
+    "text": "Mở Đơn hàng và chọn đơn cần xem. Các nút xác nhận, hủy và cập nhật trạng thái phụ thuộc vào vai trò và trạng thái hiện tại của đơn.",
+    "href": "/orders",
+    "version": "1",
+    "effective_from": "2026-11-15"
+  },
+  {
+    "id": "RM-F05",
+    "audience": "public",
+    "title": "Báo cáo vi phạm và liên hệ hỗ trợ",
+    "aliases": ["báo cáo", "vi phạm", "lừa đảo", "liên hệ", "hỗ trợ", "khiếu nại"],
+    "text": "Dùng nút Báo cáo trên tin đăng hoặc hồ sơ người dùng khi thấy dấu hiệu vi phạm. Nếu cần giải đáp hoặc gặp vấn đề với tài khoản hay đơn hàng, hãy gửi yêu cầu hỗ trợ.",
+    "href": "/support/new",
+    "version": "1",
+    "effective_from": "2026-11-15"
+  }
+]

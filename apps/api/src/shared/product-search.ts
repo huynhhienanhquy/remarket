@@ -17,6 +17,7 @@ export interface ProductSearch {
   sort: SortOption;
   offset: number;
   limit: number;
+  productIds?: readonly string[];
 }
 
 type SearchRow = Omit<ProductListRow, "images" | "seller"> & {
@@ -37,12 +38,14 @@ type SearchRow = Omit<ProductListRow, "images" | "seller"> & {
 
 /** One snapshot/round-trip, with no stale category, visibility or identity cache. */
 export async function searchPublicProducts(input: ProductSearch, viewer: Omit<ViewerContext, "aggregates" | "favorited">): Promise<{ items: ProductListItem[]; total: number }> {
+  if (input.productIds?.length === 0) return { items: [], total: 0 };
   const conditions: Prisma.Sql[] = [
     Prisma.sql`p.status = 'ACTIVE' AND p."deletedAt" IS NULL AND NOT p."isBlocked"`,
     Prisma.sql`u.status = 'ACTIVE' AND u."emailVerifiedAt" IS NOT NULL`,
     Prisma.sql`p."categoryId" IN (SELECT id FROM active_categories)
       AND NOT EXISTS (SELECT 1 FROM "Category" child WHERE child."parentId" = p."categoryId")`,
   ];
+  if (input.productIds) conditions.push(Prisma.sql`p.id IN (${Prisma.join(input.productIds)})`);
   if (input.categoryId !== undefined) conditions.push(Prisma.sql`p."categoryId" IN (SELECT id FROM selected_categories)`);
   if (input.keyword !== "") conditions.push(Prisma.sql`(
     strpos(lower(p.title), lower(${input.keyword})) > 0

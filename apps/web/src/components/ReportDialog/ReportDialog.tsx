@@ -7,7 +7,10 @@ import {
 import type { ReportReason, ReportRequest } from "@remarket/shared";
 import { api } from "../../services/api";
 import { isApiError } from "../../helpers/errors";
-import { Button, Dialog, FormField, Select, Textarea } from "../common";
+import { Button } from "../common/Button/Button";
+import { Dialog } from "../common/Dialog/Dialog";
+import { FormField } from "../common/FormField/FormField";
+import { Select, Textarea } from "../common/Input/Input";
 
 export interface ReportDialogProps {
   open: boolean;

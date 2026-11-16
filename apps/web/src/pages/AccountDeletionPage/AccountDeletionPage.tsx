@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSession } from "../../contexts/SessionContext";
 import { http } from "../../services/http";
-import { Button, InlineAlert } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 import { PasswordInput } from "../../components/common/Input/PasswordInput";
 
 export function AccountDeletionPage() {

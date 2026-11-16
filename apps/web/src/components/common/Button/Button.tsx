@@ -5,19 +5,18 @@ import { Spinner } from "../Spinner/Spinner";
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "md" | "lg";
 
-// t-label is unlayered CSS, so no font-* utility may be combined with it.
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-control t-label transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center gap-2 rounded-control text-sm font-semibold leading-5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-white hover:bg-brand-hover",
-  secondary: "border border-brand text-brand hover:bg-brand-soft",
+  secondary: "border border-brand bg-surface text-brand hover:bg-brand-soft",
   ghost: "text-ink hover:bg-surface-subtle",
   danger: "bg-danger text-white hover:bg-danger/90",
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  md: "min-h-[44px] px-4",
+  md: "min-h-touch px-4 py-2.5",
   lg: "h-12 px-5",
 };
 

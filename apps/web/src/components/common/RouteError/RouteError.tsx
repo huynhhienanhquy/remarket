@@ -1,6 +1,7 @@
 import { useRouteError, isRouteErrorResponse, Link } from "react-router-dom";
 import { errorTitle, isApiError } from "../../../helpers/errors";
-import { Button, InlineAlert } from "..";
+import { Button } from "../Button/Button";
+import { InlineAlert } from "../InlineAlert/InlineAlert";
 
 /**
  * Route-level error boundary: the shell stays, the page body becomes an error

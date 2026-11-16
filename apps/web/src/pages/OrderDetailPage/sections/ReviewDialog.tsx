@@ -1,7 +1,13 @@
 import { useId, useState } from "react";
 import { REVIEW_LIMITS } from "@remarket/shared";
 import type { OrderDetail } from "@remarket/shared";
-import { Button, ConfirmDialog, Dialog, FormField, Radio, StarIcon, Textarea, UserSummary } from "@/components/common";
+import { Button } from "../../../components/common/Button/Button";
+import { ConfirmDialog, Dialog } from "../../../components/common/Dialog/Dialog";
+import { FormField } from "../../../components/common/FormField/FormField";
+import { Radio } from "../../../components/common/Choice/Choice";
+import { StarIcon } from "../../../components/common/Icon/Icon";
+import { Textarea } from "../../../components/common/Input/Input";
+import { UserSummary } from "../../../components/common/UserSummary/UserSummary";
 import { OfflineNotice } from "@/components/common/PageFeedback/PageFeedback";
 import { useOrderReview } from "../hooks/useOrderReview";
 

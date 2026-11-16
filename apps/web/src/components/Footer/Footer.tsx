@@ -23,7 +23,7 @@ export function Footer() {
   );
 
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="border-t border-line bg-surface pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="rm-container grid gap-8 py-10 lg:grid-cols-[1fr_2fr] lg:py-12">
         <div className="space-y-3">
           <Logo />
@@ -32,26 +32,26 @@ export function Footer() {
           </p>
           <Link
             to="/support"
-            className="inline-flex t-label text-brand hover:underline"
+            className="inline-flex min-h-touch items-center text-sm font-semibold text-brand hover:underline"
           >
             Trung tâm hỗ trợ
           </Link>
         </div>
-        <div>
-          <h2 className="t-label text-ink">Danh mục</h2>
+        {roots.length > 0 && <div>
+          <h2 className="text-sm font-semibold text-ink">Danh mục</h2>
           <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
             {roots.map((root) => (
               <li key={root.id}>
                 <Link
                   to={`/products?category_id=${root.id}`}
-                  className="t-body text-muted transition-colors hover:text-ink"
+                  className="inline-flex min-h-touch items-center text-sm text-muted transition-colors hover:text-brand"
                 >
                   {root.name}
                 </Link>
               </li>
             ))}
           </ul>
-        </div>
+        </div>}
       </div>
     </footer>
   );

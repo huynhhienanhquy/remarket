@@ -30,7 +30,7 @@
 @layer components {
   /* Public container: max 1280px, padding 16/24/32 by breakpoint. */
   .rm-container {
-    @apply mx-auto w-full max-w-[1280px] px-4 lg:px-8;
+    @apply mx-auto w-full max-w-marketplace px-4 lg:px-8;
   }
 
   @media (min-width: 640px) {
@@ -66,7 +66,7 @@
   }
 
   .rm-account-heading {
-    @apply rounded-2xl border border-line bg-surface p-5 shadow-subtle sm:p-6;
+    @apply rounded-modal border border-line bg-surface p-5 shadow-subtle sm:p-6;
   }
 
   .rm-account-heading-action > * {
@@ -108,49 +108,4 @@
 /* Keep scrollbar of horizontal thumbnail rows out of the layout flow. */
 .scrollbar-thin {
   scrollbar-width: thin;
-}
-/* Admin uses the same controls and palette, with denser desktop data views. */
-@layer components {
-  .rm-admin-page main section {
-    @apply min-w-0 rounded-2xl shadow-subtle;
-  }
-  .rm-admin-page button, .rm-admin-page input,
-  .rm-admin-page select, .rm-admin-page textarea {
-    @apply rounded-xl;
-  }
-  .rm-admin-page input, .rm-admin-page select, .rm-admin-page textarea {
-    @apply border-input-line bg-surface;
-  }
-  .rm-admin-toolbar > div { max-width: 100%; }
-  .rm-admin-page [role="tablist"] {
-    @apply gap-1 rounded-xl border-0 bg-page p-1;
-    overflow-y: hidden;
-  }
-  .rm-admin-page [role="tab"] { @apply m-0 min-h-11 border-0; }
-  .rm-admin-page [role="tab"][aria-selected="true"] { @apply bg-surface text-brand shadow-subtle; }
-  .rm-admin-table thead th { @apply whitespace-nowrap bg-page text-xs font-semibold; }
-  .rm-admin-table tbody td { @apply py-4 text-sm; }
-  .rm-admin-table tbody tr:last-child { border-bottom: 0; }
-  .rm-admin-table tbody tr:focus-visible { @apply outline outline-2 outline-focus -outline-offset-2; }
-  @media (max-width: 639px) {
-    .rm-admin-table { overflow-x: visible; }
-    .rm-admin-table table, .rm-admin-table tbody { display: block; }
-    .rm-admin-table thead { display: none; }
-    .rm-admin-table tbody tr {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 16px;
-      padding: 20px;
-    }
-    .rm-admin-table tbody td { display: block; min-width: 0; padding: 0; }
-    .rm-admin-table tbody td.hidden { display: none; }
-    .rm-admin-table tbody td:first-child,
-    .rm-admin-table tbody td:last-child,
-    .rm-admin-table tbody td[colspan] { grid-column: 1 / -1; }
-    .rm-admin-table tbody td:has(.rm-admin-cell-wide) { grid-column: 1 / -1; }
-    .rm-admin-table .rm-admin-cell div { min-width: 0; overflow-wrap: anywhere; }
-    .rm-admin-table .rm-admin-cell > div > * { min-width: 0; }
-    .rm-admin-table .rm-admin-cell p { white-space: normal; }
-    .rm-admin-table tbody td[colspan] { padding: 16px 0; }
-  }
 }

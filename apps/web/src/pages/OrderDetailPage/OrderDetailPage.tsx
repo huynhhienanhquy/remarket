@@ -7,15 +7,13 @@ import {
   primaryOrderAction,
 } from "@remarket/shared";
 import { Link } from "react-router-dom";
-import {
-  Button,
-  EmptyState,
-  InlineAlert,
-  OrderTimeline,
-  StatusBadge,
-  UserSummary,
-  useToast
-} from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { OrderTimeline } from "../../components/common/OrderTimeline/OrderTimeline";
+import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
+import { UserSummary } from "../../components/common/UserSummary/UserSummary";
+import { useToast } from "../../components/common/Toast/Toast";
 import { OfflineNotice } from "../../components/common/PageFeedback/PageFeedback";
 import { isApiError } from "../../helpers/errors";
 import { useOrderDetail } from "./hooks/useOrderDetail";

@@ -1,7 +1,7 @@
 import { ProfileForm } from "./sections/ProfileForm";
 import { Link } from "react-router-dom";
 import { useSession } from "../../contexts/SessionContext";
-import { InlineAlert } from "../../components/common";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 import { AccountPageHeader } from "../../components/AccountPageHeader/AccountPageHeader";
 
 export function AccountPage() {

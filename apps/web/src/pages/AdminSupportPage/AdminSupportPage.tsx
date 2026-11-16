@@ -1,18 +1,32 @@
 import type { AdminSupportTicketDetail, AdminSupportTicketItem, TicketStatus, TicketType } from "@remarket/shared";
 import { ORDER_STATUS_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, formatDateTime, formatVnd } from "@remarket/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdminDataTable as DataTable } from "../../components/admin/AdminDataTable/AdminDataTable";
+import { AdminPagination } from "../../components/admin/AdminPagination/AdminPagination";
 import { AdminHeading } from "../../components/admin/AdminHeading/AdminHeading";
+import { AdminMetrics, AdminNotice, AdminPill } from "../../components/admin/AdminSummary/AdminSummary";
 import { AdminAdvancedFilters, AdminToolbar, ToolbarField } from "../../components/admin/AdminToolbar/AdminToolbar";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
 import { RowAction } from "../../components/admin/RowAction/RowAction";
-import type { DataTableColumn } from "../../components/common";
-import { Button, ConfirmDialog, Dialog, Drawer, EmptyState, FormField, Input, OrderTimeline, Pagination, SectionCard, Select, StatusBadge, Textarea, useToast } from "../../components/common";
+import type { DataTableColumn } from "../../components/common/DataTable/DataTable";
+import { Button } from "../../components/common/Button/Button";
+import { ConfirmDialog, Dialog } from "../../components/common/Dialog/Dialog";
+import { Drawer } from "../../components/common/Drawer/Drawer";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { FormField } from "../../components/common/FormField/FormField";
+import { Icon } from "../../components/common/Icon/Icon";
+import { Input, Select, Textarea } from "../../components/common/Input/Input";
+import { OrderTimeline } from "../../components/common/OrderTimeline/OrderTimeline";
+import { SearchInput } from "../../components/common/SearchInput/SearchInput";
+import { SectionCard } from "../../components/common/SectionCard/SectionCard";
+import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
+import { useToast } from "../../components/common/Toast/Toast";
 import { queryKeys } from "../../config/queryClient";
 import { invalidateAdminResources, patchAdminRows } from "../../helpers/adminCache";
 import { errorDescription, fieldError } from "../../helpers/adminErrors";
 import { useAdminParams } from "../../hooks/useAdminParams";
+import { useAdminQueueCounts, useAdminSummary } from "../../hooks/useAdminSummary";
 import { api, apiForQuery } from "../../services/api";
 import { readEnumParam, readPage } from "../../utils/adminParams";
 
@@ -23,6 +37,8 @@ export function AdminSupportPage() {
   const { params, apply } = useAdminParams();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const openTickets = useAdminQueueCounts()?.open_tickets;
+  const { data: summary } = useAdminSummary("support");
   const page = readPage(params);
   const status = readEnumParam(params, "status", STATUSES);
   const type = readEnumParam(params, "type", TYPES);
@@ -31,10 +47,14 @@ export function AdminSupportPage() {
   const [decision, setDecision] = useState<"resolve" | "close" | null>(null);
   const [note, setNote] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [deliveryOutcome, setDeliveryOutcome] = useState<"NOT_DELIVERED" | "RETURNED">("NOT_DELIVERED");
   const [paymentResolution, setPaymentResolution] = useState("");
-  const queryInput = useMemo(() => ({ ...(status ? { status: status as TicketStatus } : {}), ...(type ? { type: type as TicketType } : {}), ...(params.get("assigned_admin_id") ? { assigned_admin_id: params.get("assigned_admin_id")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [status, type, params, page]);
+  const keyword = params.get("q") ?? "";
+  const [search, setSearch] = useState(keyword);
+  useEffect(() => setSearch(keyword), [keyword]);
+  const queryInput = useMemo(() => ({ ...(status ? { status: status as TicketStatus } : {}), ...(type ? { type: type as TicketType } : {}), ...(keyword ? { q: keyword } : {}), ...(params.get("assigned_admin_id") ? { assigned_admin_id: params.get("assigned_admin_id")! } : {}), ...(params.get("from") ? { from: params.get("from")! } : {}), ...(params.get("to") ? { to: params.get("to")! } : {}), page }), [status, type, keyword, params, page]);
   const query = useQuery({ queryKey: queryKeys.adminTickets(queryInput), queryFn: ({ signal }) => apiForQuery(signal).admin.tickets(queryInput) });
   const detail = useQuery({ queryKey: queryKeys.adminTicket(selectedId ?? ""), queryFn: ({ signal }) => apiForQuery(signal).admin.ticket(selectedId!), enabled: selectedId !== null });
 
@@ -91,12 +111,12 @@ export function AdminSupportPage() {
   });
 
   const columns: Array<DataTableColumn<AdminSupportTicketItem>> = [
-    { key: "code", header: "Yêu cầu", render: (ticket) => <div className="min-w-[220px]"><p className="t-label text-ink">{ticket.code}</p><p className="line-clamp-2 t-body text-ink">{ticket.subject}</p></div> },
+    { key: "code", header: "Yêu cầu", render: (ticket) => <div><p className="t-label text-ink">{ticket.code}</p><p className="line-clamp-2 t-meta text-muted">{ticket.subject}</p></div> },
     { key: "user", header: "Người gửi", render: (ticket) => ticket.user.name, hideOnMobile: true },
-    { key: "type", header: "Loại", render: (ticket) => TICKET_TYPE_LABELS[ticket.type], hideOnMobile: true },
-    { key: "status", header: "Trạng thái", render: (ticket) => <StatusBadge label={TICKET_STATUS_LABELS[ticket.status].label} tone={TICKET_STATUS_LABELS[ticket.status].tone} size="sm" /> },
-    { key: "assigned_admin", header: "Phụ trách", render: (ticket) => ticket.assigned_admin?.name ?? "Chưa phân công", hideOnMobile: true },
-    { key: "updated_at", header: "Cập nhật", render: (ticket) => formatDateTime(ticket.updated_at), hideOnMobile: true },
+    { key: "type", header: "Loại", render: (ticket) => <span className="text-muted">{TICKET_TYPE_LABELS[ticket.type]}</span>, hideOnMobile: true },
+    { key: "status", header: "Trạng thái", render: (ticket) => <AdminPill tone={TICKET_STATUS_LABELS[ticket.status].tone}>{TICKET_STATUS_LABELS[ticket.status].label}</AdminPill> },
+    { key: "assigned_admin", header: "Phụ trách", render: (ticket) => ticket.assigned_admin?.name ?? <i className="text-muted">Chưa phân công</i>, hideOnMobile: true },
+    { key: "updated_at", header: "Cập nhật", render: (ticket) => <time dateTime={ticket.updated_at} className="text-muted">{formatDateTime(ticket.updated_at)}</time>, hideOnMobile: true },
     { key: "id", header: "Thao tác", render: (ticket) => <RowAction onClick={() => apply({ selected: ticket.id })}>Mở</RowAction> },
   ];
 
@@ -108,20 +128,44 @@ export function AdminSupportPage() {
     {canCancelOrder && <Button variant="danger" onClick={() => setCancelOpen(true)}>Hủy đơn</Button>}
   </> : undefined;
 
-  return <div>
+  const averageReply = summary?.first_reply_minutes;
+  return <div className="admin-stack">
     <AdminHeading title="Hỗ trợ" description="Tiếp nhận ticket, trao đổi trong luồng hỗ trợ và chuyển trạng thái đúng quy trình." />
-    <SectionCard bodyClassName="p-0 lg:p-0">
-      <div className="p-4 lg:p-6"><AdminToolbar>
+    <AdminMetrics columns={3} metrics={[
+      { label: "Ticket đang mở", value: openTickets, icon: "clock", tone: "warning", badge: !!openTickets && <AdminPill tone="warning">Cần phản hồi</AdminPill>, note: "Yêu cầu mới từ người dùng" },
+      { label: "Đã giải quyết hôm nay", value: summary?.resolved_today, icon: "check", badge: !!summary?.resolved_today && <AdminPill tone="brand">Hoàn thành</AdminPill>, note: "Ticket đã có kết luận" },
+      { label: "Thời gian phản hồi TB", value: averageReply == null ? undefined : Math.round(averageReply).toLocaleString("vi-VN") + " phút", icon: "clock", tone: "info", badge: averageReply != null && <AdminPill tone={averageReply < 30 ? "info" : "warning"}>{averageReply < 30 ? "Đạt SLA" : "Quá SLA"}</AdminPill>, note: "Mục tiêu phản hồi dưới 30 phút" },
+    ]} />
+    <div className="admin-panel">
+      <AdminToolbar>
         <ToolbarField label="Trạng thái" htmlFor="ticket-status"><Select id="ticket-status" value={status} onChange={(event) => apply({ status: event.target.value || null })}><option value="">Tất cả</option>{STATUSES.map((value) => <option key={value} value={value}>{TICKET_STATUS_LABELS[value].label}</option>)}</Select></ToolbarField>
         <ToolbarField label="Loại yêu cầu" htmlFor="ticket-type"><Select id="ticket-type" value={type} onChange={(event) => apply({ type: event.target.value || null })}><option value="">Tất cả</option>{TYPES.map((value) => <option key={value} value={value}>{TICKET_TYPE_LABELS[value]}</option>)}</Select></ToolbarField>
-<AdminAdvancedFilters fields={["assigned_admin_id", "from", "to"]}>
+        <div className="admin-toolbar-search admin-labeled-search admin-quiet-search">
+          <span aria-hidden="true">Tìm mã ticket hoặc người gửi</span>
+          <SearchInput label="Tìm mã ticket hoặc người gửi" value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} placeholder="Nhập TK-xxx hoặc tên khách hàng…" />
+        </div>
+        <button type="button" className="admin-utility" onClick={() => { setSearch(""); apply({ q: null, status: null, type: null, assigned_admin_id: null, from: null, to: null, page: null }); }}><Icon name="refresh" size={16} />Đặt lại</button>
+        <AdminAdvancedFilters fields={["assigned_admin_id", "from", "to"]}>
         <ToolbarField label="Người phụ trách" htmlFor="ticket-assignee"><Input id="ticket-assignee" value={params.get("assigned_admin_id") ?? ""} onChange={(event) => apply({ assigned_admin_id: event.target.value || null })} placeholder="UUID hoặc UNASSIGNED" /></ToolbarField>
         <ToolbarField label="Từ ngày" htmlFor="ticket-from"><Input id="ticket-from" type="date" value={params.get("from") ?? ""} onChange={(event) => apply({ from: event.target.value || null })} /></ToolbarField>
         <ToolbarField label="Đến ngày" htmlFor="ticket-to"><Input id="ticket-to" type="date" value={params.get("to") ?? ""} onChange={(event) => apply({ to: event.target.value || null })} /></ToolbarField></AdminAdvancedFilters>
-      </AdminToolbar>{query.isError && <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} />}</div>
+      </AdminToolbar>
+    </div>
+    {query.isError ? <QueryErrorAlert error={query.error} onRetry={() => query.refetch()} /> : <SectionCard className="admin-table-panel" bodyClassName="p-0 lg:p-0">
       {!query.isError && <DataTable columns={columns} rows={query.data?.items ?? []} rowKey={(row) => row.id} loading={query.isPending} onRowClick={(row) => apply({ selected: row.id })} empty={<EmptyState title="Không có yêu cầu hỗ trợ" description="Hãy thay đổi bộ lọc hoặc kiểm tra lại sau." />} />}
-      {query.data && <Pagination className="p-4 lg:px-6" page={query.data.meta.page} totalPages={query.data.meta.total_pages} total={query.data.meta.total} onPageChange={(next) => apply({ page: String(next) })} />}
-    </SectionCard>
+      {query.data && <AdminPagination meta={query.data.meta} shown={query.data.items.length} showArrows={false} onPageChange={(next) => apply({ page: String(next) })} />}
+    </SectionCard>}
+    <AdminNotice title="Quy tắc chuẩn hóa phản hồi Ticket (SLA)"
+      action={<button className="admin-notice-link" type="button" onClick={() => setGuideOpen(true)}>Xem quy trình CSKH <Icon name="chevron-right" size={16} /></button>}>
+      Phản hồi sơ bộ mọi ticket mới trong vòng 30 phút. Khi giải quyết xong khiếu nại, ghi kết luận và chuyển trạng thái sang “Đã giải quyết” để người gửi nhận thông báo.
+    </AdminNotice>
+    <Dialog open={guideOpen} onClose={() => setGuideOpen(false)} title="Quy trình CSKH">
+      <ol className="list-decimal space-y-2 pl-5">
+        <li>Mở ticket, xem nội dung và nhận xử lý nếu chưa có người phụ trách.</li>
+        <li>Gửi phản hồi sơ bộ trong vòng 30 phút và cập nhật trạng thái “Đang xử lý”.</li>
+        <li>Ghi kết luận khi đã có kết quả, rồi chuyển ticket sang “Đã giải quyết”.</li>
+      </ol>
+    </Dialog>
     <Drawer open={selectedId !== null} onClose={() => apply({ selected: null }, { replace: true })} title={ticket ? `${ticket.code} · ${ticket.subject}` : "Chi tiết hỗ trợ"} widthClassName="max-w-[900px]" footer={footer}>
       {detail.isPending ? <p className="t-body text-muted">Đang tải yêu cầu…</p> : detail.isError ? <QueryErrorAlert error={detail.error} onRetry={() => detail.refetch()} /> : ticket ? <div className="grid gap-6 md:grid-cols-[1fr_260px]">
         <div className="space-y-4"><div className="space-y-3">{ticket.messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-card p-3 ${message.sender.role === "ADMIN" ? "ml-auto bg-brand-soft" : "bg-surface-subtle"}`}><div className="flex flex-wrap items-center justify-between gap-2"><p className="t-label text-ink">{message.sender.name}</p><span className="t-meta text-muted">{formatDateTime(message.created_at)}</span></div><p className="mt-1 whitespace-pre-wrap t-body text-ink">{message.message}</p></div>)}</div>{ticket.allowed_actions.includes("reply") && <form className="border-t border-line pt-4" onSubmit={(event) => { event.preventDefault(); replyMutation.mutate(); }}><FormField label="Phản hồi" htmlFor="ticket-reply" required error={fieldError(replyMutation.error, "message")}><Textarea id="ticket-reply" value={reply} maxLength={5000} onChange={(event) => setReply(event.target.value)} placeholder="Nhập phản hồi cho người dùng" /></FormField><div className="mt-3 flex justify-end"><Button type="submit" loading={replyMutation.isPending} disabled={reply.trim() === ""}>Gửi phản hồi</Button></div></form>}</div>

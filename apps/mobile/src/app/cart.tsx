@@ -23,8 +23,7 @@ export default function Cart() {
   const router = useRouter();
   const { user } = useSession();
   const network = useNetInfo();
-  const online =
-    network.isConnected !== false && network.isInternetReachable !== false;
+  const online = network.isConnected !== false;
   const action = useAction();
   const [excluded, setExcluded] = useState<string[]>([]);
   useEffect(() => setExcluded([]), [user?.id]);

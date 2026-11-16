@@ -8,6 +8,7 @@ import { ok } from "../shared/api-response.js";
 import { toAdminProductItem, toAdminSupportTicketItem } from "../shared/dto-mappers.js";
 import { adminDateRange } from "../shared/admin-helpers.js";
 import { loadDashboardMetrics } from "../shared/dashboard-metrics.js";
+import { adminSummaryLoaders } from "../shared/admin-workspace-summary.js";
 
 import { adminUsersRouter } from "./adminUsers.js";
 import { adminProductsRouter } from "./adminProducts.js";
@@ -27,6 +28,14 @@ import { adminEmailVerificationsRouter } from "./adminEmailVerifications.js";
  */
 
 const router = Router();
+
+router.get("/summary/:section", asyncHandler(async (req, res) => {
+  const section = z.enum(["users", "reports", "reviews", "support", "email", "audit"]).parse(req.params.section);
+  const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const start = new Date(today + "T00:00:00.000+07:00");
+  const end = new Date(start.getTime() + 86400000 - 1);
+  ok(res, await adminSummaryLoaders[section](start, end));
+}));
 
 // Counts only: shared navigation must not load the individual queue pages.
 router.get("/navigation-counts", asyncHandler(async (_req, res) => {

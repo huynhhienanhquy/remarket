@@ -9,6 +9,10 @@ type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 type OpenApiNode = Record<string, unknown>;
 
 const requiredOperations: Array<[string, HttpMethod]> = [
+  ["/ai/config", "get"], ["/ai/threads", "get"], ["/ai/threads", "post"],
+  ["/ai/threads/{id}", "get"], ["/ai/threads/{id}", "delete"], ["/ai/products/resolve", "post"],
+  ["/ai/copilotkit/info", "get"], ["/ai/copilotkit/agent/marketplace/run", "post"],
+  ["/ai/copilotkit/agent/marketplace/connect", "post"], ["/ai/copilotkit/agent/marketplace/stop/{threadId}", "post"],
   ["/auth/register", "post"], ["/auth/login", "post"], ["/auth/refresh", "post"],
   ["/auth/bootstrap", "post"],
   ["/auth/me", "get"], ["/auth/logout", "post"], ["/auth/logout-all", "post"],
@@ -161,19 +165,19 @@ describe("OpenAPI contract", () => {
   });
 
   it("keeps the generated Postman collection in sync with OpenAPI", async () => {
-    const path = fileURLToPath(
-      new URL("../../../../docs/remarket.postman_collection.json", import.meta.url),
-    );
-    const collection = JSON.parse(await readFile(path, "utf8")) as {
+    const docs = new URL("../../../../docs/", import.meta.url);
+    const document = asNode(YAML.parse(await readFile(new URL("openapi.yaml", docs), "utf8")));
+    const collection = JSON.parse(await readFile(new URL("remarket.postman_collection.json", docs), "utf8")) as {
       item?: Array<{ item?: Array<{ name?: string }> }>;
     };
     const requestNames = new Set(
       (collection.item ?? []).flatMap((folder) => folder.item ?? []).map((item) => item.name),
     );
-    expect(requestNames.size).toBe(requiredOperations.length);
-    for (const [route, method] of requiredOperations) {
-      expect(requestNames.has(`${method.toUpperCase()} ${route}`)).toBe(true);
-    }
+    const methods = new Set(["get", "post", "patch", "put", "delete"]);
+    const documented = Object.entries(asNode(document.paths)).flatMap(([route, operations]) =>
+      Object.keys(asNode(operations)).filter((method) => methods.has(method)).map((method) => `${method.toUpperCase()} ${route}`),
+    );
+    expect(requestNames).toEqual(new Set(documented));
   });
 
   it("keeps every live frontend HTTP call aligned with an OpenAPI method and path", async () => {

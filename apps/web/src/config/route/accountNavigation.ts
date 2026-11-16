@@ -1,4 +1,4 @@
-import type { IconName } from "../../components/common";
+import type { IconName } from "../../components/common/Icon/Icon";
 
 export interface AccountNavItem {
   to: string;

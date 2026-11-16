@@ -7,7 +7,7 @@ import type { ProductInput } from "@/types/api";
 import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors } from "@/helpers/errors";
-import { useToast } from "@/components/common";
+import { useToast } from "../../../components/common/Toast/Toast";
 import { PRODUCT_LIMITS, validateProductTitle, validateDescription, validatePriceInput, validateUsageMonths, validateCondition, validateDeliveryMethod, validateShippingFee } from "@remarket/shared";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
@@ -65,11 +65,13 @@ export function useProductForm() {
   const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: ({ signal }) => apiForQuery(signal).categories.provinces() });
 
   // Flatten categories for select (leaf only)
-  const flatCategories = categories?.flatMap((root) =>
-    root.children?.length
-      ? root.children.map((child) => ({ ...child, parentName: root.name }))
-      : [{ ...root, parentName: "" }],
-  ) ?? [];
+  const flatCategories = categories?.flatMap(root => {
+    const rootAcceptsNew = root.accept_new_listings !== false;
+    const leaves = root.children?.length ? root.children : [root];
+    return leaves
+      .filter(category => category.id === existingProduct?.category_id || (rootAcceptsNew && category.accept_new_listings !== false))
+      .map(category => ({ ...category, parentName: category.id === root.id ? "" : root.name }));
+  }) ?? [];
 
   // Initialize form with existing data
   useEffect(() => {

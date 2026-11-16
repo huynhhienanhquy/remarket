@@ -1,6 +1,6 @@
 import type { OrderDetail } from "@remarket/shared";
 import { DELIVERY_LABELS, conditionLabel, formatVnd } from "@remarket/shared";
-import { MarketplaceImage } from "../../../components/common";
+import { MarketplaceImage } from "../../../components/common/MarketplaceImage/MarketplaceImage";
 export function OrderContents({ order }: { order: OrderDetail }) {
   const deliveryLabel = DELIVERY_LABELS[order.delivery_method];
   return <><section className="rounded-card border border-line bg-surface p-5" aria-labelledby="items-heading">

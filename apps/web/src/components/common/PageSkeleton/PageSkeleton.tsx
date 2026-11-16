@@ -1,4 +1,4 @@
-import { Skeleton } from "..";
+import { Skeleton } from "../Skeleton/Skeleton";
 
 /**
  * Shell-level skeleton used while the first session check runs, so private

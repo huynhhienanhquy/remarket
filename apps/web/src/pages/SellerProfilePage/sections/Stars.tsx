@@ -1,4 +1,4 @@
-import { StarIcon } from "@/components/common";
+import { StarIcon } from "../../../components/common/Icon/Icon";
 
 /** Star row rendered only when a review exists; rating is 1–5 (ui-spec 5). */
 export function Stars({ rating }: { rating: number }) {

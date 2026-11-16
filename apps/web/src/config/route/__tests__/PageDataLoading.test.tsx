@@ -4,7 +4,7 @@ import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../queryClient";
 import { SessionProvider } from "../../../contexts/SessionContext";
-import { ToastProvider } from "../../../components/common";
+import { ToastProvider } from "../../../components/common/Toast/Toast";
 import { MarketplaceShell } from "../../../layouts/MarketplaceShell/MarketplaceShell";
 import { AccountShell } from "../../../layouts/AccountShell/AccountShell";
 import { AdminShell } from "../../../layouts/AdminShell/AdminShell";
@@ -84,7 +84,7 @@ describe("only the current page loads its data", () => {
     context.viewer = { ...member, role: "ADMIN" };
     show("/admin/users");
     await settled("/admin/users");
-    expect(reads().sort()).toEqual(["/admin/users", "/admin/navigation-counts"].sort());
+    expect(reads().sort()).toEqual(["/admin/users", "/admin/summary/users", "/admin/navigation-counts", "/notifications/navigation-counts"].sort());
   });
 
   it("aborts the old page request on navigation and keeps subsequent page loads isolated", async () => {

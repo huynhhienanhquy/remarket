@@ -22,26 +22,28 @@ export function AuthScreen({
           width: "100%",
           maxWidth: 420,
           alignSelf: "center",
-          gap: 24,
+          gap: 16,
           paddingTop: 16,
         }}
       >
         <Logo />
-        <View style={{ gap: 8, marginTop: 8 }}>
-          <Text accessibilityRole="header" style={styles.title}>
-            {title}
-          </Text>
-          {description && (
-            <Text style={[styles.text, { color: colors.muted }]}>
-              {description}
+        <View style={[styles.card, { borderRadius: 16, padding: 20, gap: 16 }]}>
+          <View style={{ gap: 8 }}>
+            <Text accessibilityRole="header" style={styles.title}>
+              {title}
             </Text>
-          )}
+            {description && (
+              <Text style={[styles.text, { color: colors.muted }]}>
+                {description}
+              </Text>
+            )}
+          </View>
+          <View style={{ gap: 16 }}>{children}</View>
         </View>
-        <View style={{ gap: 16 }}>{children}</View>
         <Pressable
           accessibilityRole="link"
           onPress={() => router.navigate("/")}
-          style={{ minHeight: 44, justifyContent: "center", marginTop: 16 }}
+          style={{ minHeight: 44, justifyContent: "center" }}
         >
           <Text style={[styles.label, { color: colors.green }]}>
             ← Quay lại khám phá

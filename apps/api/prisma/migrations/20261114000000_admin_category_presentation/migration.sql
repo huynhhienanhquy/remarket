@@ -1,0 +1,6 @@
+ALTER TABLE "Category"
+  ADD COLUMN "icon" TEXT,
+  ADD COLUMN "sortIndex" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "description" TEXT,
+  ADD COLUMN "acceptNewListings" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "showOnHome" BOOLEAN;

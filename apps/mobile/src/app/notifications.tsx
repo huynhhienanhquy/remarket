@@ -30,8 +30,7 @@ export default function Notifications() {
   const [selected, setSelected] = useState<Notification | null>(null);
   const action = useAction();
   const network = useNetInfo();
-  const offline =
-    network.isConnected === false || network.isInternetReachable === false;
+  const offline = network.isConnected === false;
   const result = useQuery({
     queryKey: ["notifications", user?.id, page, unread],
     enabled: !!user,

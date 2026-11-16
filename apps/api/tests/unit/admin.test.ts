@@ -23,6 +23,7 @@ import { createApp } from "../../src/app.js";
 import { signAccessToken } from "../../src/shared/tokens.js";
 import { adminDateRange } from "../../src/shared/admin-helpers.js";
 import { bootstrapFirstAdmin } from "../../src/services/bootstrap-admin.js";
+import { env } from "../../src/config/env.js";
 
 const admin = { id: "operator", email: "admin@example.com", fullName: "Admin Test", role: "ADMIN", status: "ACTIVE", emailVerifiedAt: new Date() };
 const authorization = () => "Bearer " + signAccessToken(admin.id, "session");
@@ -51,6 +52,21 @@ describe("admin date bounds", () => {
 });
 
 describe("admin HTTP contracts with isolated persistence", () => {
+  it("serves only the marketplace AI runtime when AI is enabled", async () => {
+    const aiConfig: { enabled: boolean } = env.ai;
+    const original = aiConfig.enabled;
+    const app = request(createApp());
+    try {
+      aiConfig.enabled = true;
+      const marketplace = await app.get("/api/v1/ai/copilotkit/info").set("Authorization", authorization()).expect(200);
+      expect(Object.keys(marketplace.body.agents)).toEqual(["marketplace"]);
+      await app.get("/api/v1/admin/ai/copilotkit/info").set("Authorization", authorization()).expect(404);
+      await app.post("/api/v1/admin/ai/reviews").set("Authorization", authorization()).send({}).expect(404);
+    } finally {
+      aiConfig.enabled = original;
+    }
+  });
+
   it("returns global pending queue counts without loading queue rows", async () => {
     client.user.count.mockResolvedValue(2);
     client.report.count.mockResolvedValue(104);

@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -45,6 +45,10 @@ const steps = [
 
 export default function Home() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const wide = width >= 1024;
+  const categoryWidth = wide ? "15%" : "30%";
+  const categoryColumns = wide ? 6 : 3;
   const { user } = useSession();
   const categories = useQuery({
     queryKey: ["categories"],
@@ -72,33 +76,60 @@ export default function Home() {
         style={{
           backgroundColor: colors.soft,
           borderRadius: 16,
-          paddingHorizontal: 24,
-          paddingVertical: 32,
-          gap: 12,
-          marginTop: 8,
+          paddingHorizontal: 20,
+          paddingVertical: 24,
+          gap: 10,
+          borderWidth: 1,
+          borderColor: `${colors.green}1A`,
+          overflow: "hidden",
         }}
       >
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -96,
+            right: -80,
+            width: 240,
+            height: 240,
+            borderRadius: 120,
+            borderWidth: 1,
+            borderColor: `${colors.green}26`,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <View style={{ width: 192, height: 192, borderRadius: 96, borderWidth: 1, borderColor: `${colors.green}26` }} />
+        </View>
         <Text
-          style={[
-            styles.label,
-            {
-              color: colors.green,
-              textTransform: "uppercase",
-              letterSpacing: 0.7,
-            },
-          ]}
+          style={{
+            alignSelf: "flex-start",
+            backgroundColor: colors.card,
+            borderRadius: 999,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            fontSize: 11,
+            lineHeight: 16,
+            fontWeight: "600",
+            color: colors.green,
+            textTransform: "uppercase",
+            letterSpacing: 0.55,
+          }}
         >
           Mua bán đồ đã qua sử dụng
         </Text>
         <Text
+          accessibilityRole="header"
           style={{
-            fontSize: 28,
-            lineHeight: 35,
+            fontSize: wide ? 40 : 28,
+            lineHeight: wide ? 48 : 36,
+            letterSpacing: -0.3,
             fontWeight: "700",
             color: colors.text,
           }}
         >
-          Món đồ cũ. Giá trị mới.
+          Món đồ cũ.{wide ? " " : "\n"}
+          <Text style={{ color: colors.green }}>Giá trị mới.</Text>
         </Text>
         <Text style={[styles.text, { color: colors.muted }]}>
           Tìm món bạn cần, nhường món bạn không còn dùng.
@@ -107,22 +138,24 @@ export default function Home() {
           style={{
             flexDirection: "row",
             flexWrap: "wrap",
-            gap: 12,
-            marginTop: 12,
+            gap: 8,
+            marginTop: 6,
           }}
         >
           <Button
             title="Khám phá sản phẩm"
+            compact={!wide}
             onPress={() => router.push("/products")}
           />
           <Button
             title="Đăng bán ngay"
             secondary
+            compact={!wide}
             onPress={() => router.push("/sell")}
           />
         </View>
       </View>
-      <View style={{ gap: 20, paddingVertical: 16 }}>
+      <View style={{ gap: 16, paddingTop: 16, paddingBottom: 12 }}>
         <Text style={styles.heading}>Khám phá theo danh mục</Text>
         {categories.isPending ? (
           <View
@@ -134,9 +167,9 @@ export default function Home() {
               <View
                 key={i}
                 style={{
-                  flexBasis: "30%",
+                  flexBasis: categoryWidth,
                   flexGrow: 1,
-                  height: 92,
+                  height: 96,
                   borderRadius: 12,
                   backgroundColor: colors.subtle,
                 }}
@@ -157,54 +190,64 @@ export default function Home() {
         {!!roots.length && (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {roots.map((item) => (
-              <View
+              <Pressable
                 key={item.id}
-                style={{ width: "30%", flexGrow: 1, maxWidth: "33.333%" }}
+                accessibilityRole="link"
+                accessibilityLabel={item.name}
+                onPress={() =>
+                  router.push({
+                    pathname: "/products",
+                    params: { category_id: item.id },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.card,
+                  {
+                    flexBasis: categoryWidth,
+                    flexGrow: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingHorizontal: 8,
+                    minHeight: 96,
+                    paddingVertical: 12,
+                    backgroundColor: pressed ? colors.soft : colors.card,
+                  },
+                ]}
               >
-                <Pressable
-                  accessibilityRole="link"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/products",
-                      params: { category_id: item.id },
-                    })
-                  }
-                  style={({ pressed }) => [
-                    styles.card,
-                    {
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      paddingHorizontal: 8,
-                      minHeight: 92,
-                      height: "100%",
-                      backgroundColor: pressed ? colors.soft : colors.card,
-                    },
-                  ]}
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    backgroundColor: colors.soft,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
                   <Ionicons
                     name={categoryIcons[item.slug] ?? "cube-outline"}
-                    size={24}
+                    size={20}
                     color={colors.green}
                   />
-                  <Text
-                    style={[
-                      styles.meta,
-                      { color: colors.text, textAlign: "center" },
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
-                </Pressable>
-              </View>
+                </View>
+                <Text
+                  style={[
+                    styles.meta,
+                    { color: colors.text, textAlign: "center", fontWeight: "500" },
+                  ]}
+                >
+                  {item.name}
+                </Text>
+              </Pressable>
             ))}
-            {Array.from({ length: (3 - (roots.length % 3)) % 3 }, (_, i) => (
-              <View key={`space-${i}`} style={{ width: "30%", flexGrow: 1 }} />
+            {Array.from({ length: (categoryColumns - (roots.length % categoryColumns)) % categoryColumns }, (_, i) => (
+              <View key={`space-${i}`} style={{ flexBasis: categoryWidth, flexGrow: 1 }} />
             ))}
           </View>
         )}
       </View>
-      <View style={{ gap: 20 }}>
+      <View style={{ gap: 12 }}>
         <View style={[styles.row, { justifyContent: "space-between", gap: 8 }]}>
           <Text style={styles.heading}>Mới đăng gần đây</Text>
           <Pressable
@@ -218,7 +261,7 @@ export default function Home() {
           </Pressable>
         </View>
         {latest.isPending ? (
-          <ProductGridSkeleton />
+          <ProductGridSkeleton count={10} />
         ) : (
           <Feedback
             error={latest.error}
@@ -262,7 +305,7 @@ export default function Home() {
               style={{
                 width: 32,
                 height: 32,
-                borderRadius: 16,
+                borderRadius: 8,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: colors.soft,

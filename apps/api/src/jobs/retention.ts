@@ -33,5 +33,19 @@ export async function cleanupExpiredRecords(client: PrismaClient = backgroundPri
     const removed = await tx.outboxEvent.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
     return removed.count;
   });
+  const aiRunBefore = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  await client.$executeRaw`
+    DELETE FROM "AiThread" WHERE id IN (
+      SELECT id FROM "AiThread" WHERE "expiresAt" < ${now}
+      ORDER BY "expiresAt", id FOR UPDATE SKIP LOCKED LIMIT ${BATCH}
+    )
+  `;
+  await client.$executeRaw`
+    DELETE FROM "AiRun" WHERE ("threadId", id) IN (
+      SELECT "threadId", id FROM "AiRun" WHERE "createdAt" < ${aiRunBefore}
+      ORDER BY "createdAt", "threadId", id FOR UPDATE SKIP LOCKED LIMIT ${BATCH}
+    )
+  `;
+  await client.aiDailyBudget.deleteMany({ where: { day: { lt: aiRunBefore } } });
   return { tokens, sessions, events };
 }

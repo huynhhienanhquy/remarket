@@ -6,7 +6,7 @@ import { api } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { apiFieldErrors, isApiError } from "@/helpers/errors";
 import { useConnectivity } from "@/hooks/useConnectivity";
-import { useToast } from "@/components/common";
+import { useToast } from "../../../components/common/Toast/Toast";
 
 export function useOrderReview(order: OrderDetail, onClose: () => void) {
   const queryClient = useQueryClient();

@@ -262,6 +262,8 @@ router.post(
           data: { subject: "Yêu cầu của tài khoản đã xóa" },
         });
         await tx.cartItem.deleteMany({ where: { userId: user.id } });
+        await tx.aiThread.deleteMany({ where: { userId: user.id } });
+        await tx.aiRun.deleteMany({ where: { userId: user.id } });
         await tx.favorite.deleteMany({ where: { userId: user.id } });
         const conversations = await tx.conversation.findMany({
           where: { OR: [{ buyerId: user.id }, { sellerId: user.id }] },

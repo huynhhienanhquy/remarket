@@ -2,7 +2,12 @@ import { useProfileForm } from "../hooks/useProfileForm";
 import { Link } from "react-router-dom";
 import { validateFullName, validatePhone } from "@remarket/shared";
 import type { SessionUser } from "@remarket/shared";
-import { ApiImage, Button, ConfirmDialog, FormField, Icon, Input, Select, Textarea } from "@/components/common";
+import { ApiImage } from "../../../components/common/ApiImage/ApiImage";
+import { Button } from "../../../components/common/Button/Button";
+import { ConfirmDialog } from "../../../components/common/Dialog/Dialog";
+import { FormField } from "../../../components/common/FormField/FormField";
+import { Icon } from "../../../components/common/Icon/Icon";
+import { Input, Select, Textarea } from "../../../components/common/Input/Input";
 import { OfflineNotice, QueryFailure } from "@/components/common/PageFeedback/PageFeedback";
 
 export function ProfileForm({ viewer }: { viewer: SessionUser }) {

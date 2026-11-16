@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Drawer, HeartIcon, HomeIcon, Icon, MenuIcon, PlusIcon, UserIcon } from "../common";
+import { Drawer } from "../common/Drawer/Drawer";
+import { HeartIcon, HomeIcon, Icon, MenuIcon, PlusIcon, UserIcon } from "../common/Icon/Icon";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
 import { AccountLinks } from "../AccountLinks/AccountLinks";
@@ -51,9 +52,9 @@ export function MobileBottomNav() {
       aria-label="Điều hướng chính"
       className="rm-safe-bottom fixed inset-x-0 bottom-0 z-action-bar border-t border-line bg-surface lg:hidden"
     >
-      <ul className="rm-container flex h-16 items-stretch justify-between">
+      <ul className="rm-container flex h-mobile-nav items-stretch justify-between gap-1">
         {tabs.map((tab) => {
-          const active = tab.match(pathname) && (tab.authOnly !== true || viewer !== null);
+          const active = !menuOpen && tab.match(pathname) && (tab.authOnly !== true || viewer !== null);
           const Icon = tab.icon;
           return (
             <li key={tab.label} className="flex-1">
@@ -61,11 +62,13 @@ export function MobileBottomNav() {
                 to={tab.to}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "flex h-full min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-control py-1",
-                  active ? "bg-brand-soft text-brand" : "text-muted",
+                  "flex h-full min-h-touch flex-col items-center justify-center gap-0.5 rounded-control py-1",
+                  active ? "text-brand" : "text-muted hover:text-brand",
                 ].join(" ")}
               >
-                <Icon className={active ? "text-brand" : "text-muted"} />
+                <span className={`grid h-7 w-11 place-items-center rounded-full ${tab.icon === PlusIcon ? "bg-brand text-white" : active ? "bg-brand-soft text-brand" : ""}`}>
+                  <Icon />
+                </span>
                 <span
                   className={[
                     "text-[11px] leading-[14px]",
@@ -79,14 +82,14 @@ export function MobileBottomNav() {
           );
         })}
         <li className="flex-1">
-          <button type="button" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)} className={`flex h-full min-h-[44px] w-full flex-col items-center justify-center gap-0.5 rounded-control py-1 ${menuOpen ? "bg-brand-soft text-brand" : "text-muted"}`}>
-            <MenuIcon />
+          <button type="button" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)} className={`flex h-full min-h-touch w-full flex-col items-center justify-center gap-0.5 rounded-control py-1 ${menuOpen ? "text-brand" : "text-muted hover:text-brand"}`}>
+            <span className={`grid h-7 w-11 place-items-center rounded-full ${menuOpen ? "bg-brand-soft" : ""}`}><MenuIcon /></span>
             <span className={`text-[11px] leading-[14px] ${menuOpen ? "font-semibold" : ""}`}>Menu</span>
           </button>
         </li>
       </ul>
     </nav>
-    <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu">
+    <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" widthClassName="max-w-none" className="!inset-x-0 !bottom-0 !top-auto !h-auto max-h-[90dvh] rounded-t-modal pb-[env(safe-area-inset-bottom)] sm:mx-auto sm:max-w-[560px] sm:rounded-bl-none">
       <nav aria-label="Menu điều hướng" className="space-y-5">
         <Link to="/products" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center gap-3 rounded-xl bg-brand-soft px-3 py-2.5 text-sm font-semibold text-brand"><HomeIcon />Khám phá sản phẩm</Link>
         {viewer ? <>

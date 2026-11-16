@@ -17,12 +17,15 @@ import { ApiError } from "@remarket/api-client";
 import { session, SOCKET_URL } from "./runtime";
 import { registerPush } from "./push";
 import { notificationRoute } from "./linking";
+import { createConnectionRecovery } from "./query-recovery";
 import { mergeMessage, mergeReadReceipt } from "@remarket/shared";
 import type { Message, MessageHistory, ConversationReadEvent } from "@remarket/shared";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // The configured API can be reachable even when the OS reachability probe fails.
+      networkMode: "always",
       staleTime: 30_000,
       retry: (count, error) =>
         count < 1 &&
@@ -62,9 +65,7 @@ export function Providers({ children }: { children: ReactNode }) {
     });
     void session.restore().catch(() => undefined);
     const network = NetInfo.addEventListener((value) =>
-      onlineManager.setOnline(
-        value.isConnected !== false && value.isInternetReachable !== false,
-      ),
+      onlineManager.setOnline(value.isConnected !== false),
     );
     const appState = AppState.addEventListener("change", (value) => {
       focusManager.setFocused(value === "active");
@@ -82,6 +83,7 @@ export function Providers({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     if (!viewerId || viewerStatus !== "ACTIVE") return;
+    const recoverQueries = createConnectionRecovery(queryClient);
     const socket = io(SOCKET_URL, {
       autoConnect: false,
       auth: (callback) => callback({ token: session.getToken() }),
@@ -106,9 +108,7 @@ export function Providers({ children }: { children: ReactNode }) {
         recovering = false;
       }
     };
-    socket.on("connect", () => {
-      void queryClient.invalidateQueries();
-    });
+    socket.on("connect", recoverQueries);
     socket.on("disconnect", (reason) => {
       if (reason === "io server disconnect") void recover();
     });

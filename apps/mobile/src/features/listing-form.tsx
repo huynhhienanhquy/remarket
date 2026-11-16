@@ -45,10 +45,13 @@ const initial: ProductInput = {
   shipping_fee: "0",
   images: [],
 };
-function leaves(categories: CategoryNode[]): CategoryNode[] {
-  return categories.flatMap((item) =>
-    item.children?.length ? leaves(item.children) : [item],
-  );
+function listingCategories(categories: CategoryNode[], currentId?: string): CategoryNode[] {
+  return categories.flatMap(root => {
+    const leaves = root.children?.length ? root.children : [root];
+    return leaves.filter(category => category.status === "ACTIVE" && (
+      category.id === currentId || (root.accept_new_listings !== false && category.accept_new_listings !== false)
+    ));
+  });
 }
 export default function ListingForm() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -230,8 +233,7 @@ export default function ListingForm() {
         <SelectField
           label="Danh mục"
           value={draft.category_id}
-          items={leaves(categories.data ?? [])
-            .filter((item) => item.status === "ACTIVE")
+          items={listingCategories(categories.data ?? [], existing.data?.category_id)
             .map((item) => ({ value: item.id, label: item.name }))}
           onChange={(value) => patch("category_id", value)}
         />

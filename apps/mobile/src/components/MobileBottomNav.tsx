@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Keyboard, Pressable, Text, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import type { Href } from "expo-router";
@@ -11,7 +11,25 @@ import {
 } from "../services/navigation";
 import { useSession } from "../services/session-context";
 import { Sheet } from "./Sheet";
-import { Button, colors, MenuRow, styles } from "./ui";
+import { Button, colors, layout, MenuRow, styles } from "./ui";
+
+const navStyles = StyleSheet.create({
+  item: {
+    flex: 1,
+    minHeight: layout.touchTarget,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  icon: {
+    height: 28,
+    width: layout.touchTarget,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selected: { backgroundColor: colors.soft },
+});
 
 const tabs = [
   { key: "explore", title: "Khám phá", icon: "home-outline", href: "/" },
@@ -73,9 +91,10 @@ export function MobileBottomNav() {
         <View
           style={{
             flexDirection: "row",
-            height: 64,
+            height: layout.tabBar,
             paddingHorizontal: 16,
-            maxWidth: 960,
+            gap: 4,
+            maxWidth: layout.maxWidth,
             width: "100%",
             alignSelf: "center",
           }}
@@ -95,21 +114,18 @@ export function MobileBottomNav() {
                     ? login(tab.href)
                     : navigate(tab.href)
                 }
-                style={{
-                  flex: 1,
-                  minHeight: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                  borderRadius: 8,
-                  backgroundColor: active ? colors.soft : colors.card,
-                }}
+                style={navStyles.item}
               >
-                <Ionicons
-                  name={tab.icon}
-                  size={20}
-                  color={active ? colors.green : colors.muted}
-                />
+                <View style={[
+                  navStyles.icon,
+                  tab.key === "sell" ? { backgroundColor: colors.green } : active && navStyles.selected,
+                ]}>
+                  <Ionicons
+                    name={tab.icon}
+                    size={20}
+                    color={tab.key === "sell" ? colors.card : active ? colors.green : colors.muted}
+                  />
+                </View>
                 <Text
                   style={{
                     fontSize: 11,
@@ -128,26 +144,21 @@ export function MobileBottomNav() {
             accessibilityLabel="Menu"
             accessibilityState={{ expanded: open }}
             onPress={() => setOpen(true)}
-            style={{
-              flex: 1,
-              minHeight: 44,
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 2,
-              borderRadius: 8,
-              backgroundColor: open ? colors.soft : colors.card,
-            }}
+            style={navStyles.item}
           >
-            <Ionicons
-              name="menu-outline"
-              size={20}
-              color={open ? colors.green : colors.muted}
-            />
+            <View style={[navStyles.icon, open && navStyles.selected]}>
+              <Ionicons
+                name="menu-outline"
+                size={20}
+                color={open ? colors.green : colors.muted}
+              />
+            </View>
             <Text
               style={{
                 fontSize: 11,
                 lineHeight: 14,
                 color: open ? colors.green : colors.muted,
+                fontWeight: open ? "600" : "400",
               }}
             >
               Menu

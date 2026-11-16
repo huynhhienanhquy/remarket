@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { useSession } from "../../../contexts/SessionContext";
 import { useUnreadCounts } from "../../../hooks/useUnreadCounts";
 import { loginPathFor } from "../../../config/route/guards";
-import { BellIcon, CartIcon, ChatIcon } from "../../common";
+import { BellIcon, CartIcon, ChatIcon } from "../../common/Icon/Icon";
 import { IconButton } from "./HeaderIconLink";
 
 export function MobileHeaderActions() {

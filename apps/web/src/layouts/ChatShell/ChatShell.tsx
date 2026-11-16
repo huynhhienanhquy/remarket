@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../../contexts/SessionContext";
-import { ChevronLeftIcon } from "../../components/common";
+import { ChevronLeftIcon } from "../../components/common/Icon/Icon";
 import { adminChatReturnPath } from "../../utils/chatNavigation";
 import { AccountShell } from "../AccountShell/AccountShell";
 

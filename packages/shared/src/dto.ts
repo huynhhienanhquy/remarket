@@ -56,16 +56,6 @@ export interface ApiSuccess<T> {
   meta: ApiMeta;
 }
 
-export interface ApiErrorBody {
-  success: false;
-  error: {
-    code: ApiErrorCode;
-    message: string;
-    details?: Record<string, unknown>;
-  };
-  meta: ApiMeta;
-}
-
 export const API_ERROR_CODES = {
   VALIDATION_ERROR: "VALIDATION_ERROR",
   UNAUTHORIZED: "UNAUTHORIZED",
@@ -151,7 +141,14 @@ export interface CategoryNode {
   slug: string;
   status: CategoryStatus;
   children?: CategoryNode[];
+  icon?: string | null;
+  sort_index?: number;
+  description?: string | null;
+  accept_new_listings?: boolean;
+  show_on_home?: boolean | null;
 }
+
+export type CategoryPresentationInput = Pick<CategoryNode, "icon" | "sort_index" | "description" | "accept_new_listings" | "show_on_home">;
 
 /* ------------------------------------------------------------------ *
  * Products
@@ -563,6 +560,23 @@ export interface AdminUserItem {
   created_at: IsoDateTime;
   lock_reason: string | null;
   locked_at: IsoDateTime | null;
+  product_count?: number;
+  rating?: number | null;
+}
+
+export interface AdminWorkspaceSummary {
+  users: { total: number; active: number; pending_email: number; locked: number };
+  reports: { resolved: number; handled_today: number; confirmed_rate: number | null };
+  reviews: { average: number | null; total: number; low_rating_visible: number; public_rate: number | null };
+  support: { resolved_today: number; first_reply_minutes: number | null };
+  email: { approved_today: number; approval_rate: number | null };
+  audit: { today: number; admin_actions_today: number; total: number; storage_bytes?: number };
+}
+
+export interface AdminCategorySummary {
+  active_products: number;
+  pending_products: number;
+  completed_orders: number;
 }
 
 export interface AdminProductItem {

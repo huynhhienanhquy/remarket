@@ -1,0 +1,24 @@
+.rm-ai-launcher, .rm-ai-empty {
+  position: fixed;
+  right: 0.75rem;
+  z-index: 35;
+}
+
+.rm-ai-launcher { bottom: calc(4rem + env(safe-area-inset-bottom)); }
+.rm-ai-empty { bottom: calc(7.5rem + env(safe-area-inset-bottom)); width: min(23rem, calc(100vw - 1.5rem)); }
+.rm-marketplace-ai [data-slot="chat-toggle-button"] { display: none; }
+.rm-marketplace-ai [data-copilotkit]:has(> [data-copilot-popup]) {
+  z-index: 45;
+}
+
+@media (min-width: 768px) {
+  .rm-marketplace-ai [data-copilotkit]:has(> [data-copilot-popup]) {
+    bottom: calc(7.5rem + env(safe-area-inset-bottom));
+    right: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .rm-ai-launcher { bottom: 1rem; right: 1rem; }
+  .rm-ai-empty, .rm-marketplace-ai [data-copilotkit]:has(> [data-copilot-popup]) { bottom: 4.5rem; right: 1rem; }
+}

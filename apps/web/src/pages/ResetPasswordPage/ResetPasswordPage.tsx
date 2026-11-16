@@ -1,7 +1,9 @@
 import { PasswordInput } from "@/components/common/Input/PasswordInput";
 import { useResetPasswordForm } from "./hooks/useResetPasswordForm";
 import { Link } from "react-router-dom";
-import { Button, FormField, InlineAlert } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { FormField } from "../../components/common/FormField/FormField";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 
 export function ResetPasswordPage() {
   const {

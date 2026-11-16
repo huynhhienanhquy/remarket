@@ -16,11 +16,15 @@ export function RowAction({
   tone = "brand",
   onClick,
   disabled,
+  label,
+  className,
   children,
 }: {
   tone?: RowActionTone;
   onClick: () => void;
   disabled?: boolean;
+  label?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -29,11 +33,14 @@ export function RowAction({
         type="button"
         onClick={onClick}
         disabled={disabled}
+        aria-label={label}
+        title={label}
         className={[
-          "inline-flex min-h-[44px] items-center whitespace-nowrap rounded-xl border border-line bg-surface px-3 text-sm font-medium transition-colors",
+          "admin-row-action inline-flex items-center gap-1.5 whitespace-nowrap border border-line bg-surface transition-colors",
           "disabled:cursor-not-allowed disabled:opacity-50",
           ROW_ACTION_TONES[tone],
-        ].join(" ")}
+          className,
+        ].filter(Boolean).join(" ")}
       >
         {children}
       </button>

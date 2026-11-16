@@ -1,17 +1,15 @@
 import { useProductSearch } from "./hooks/useProductSearch";
 import { FilterChip } from "./sections/FilterChip";
 import { Link } from "react-router-dom";
-import {
-  Button,
-  Drawer,
-  EmptyState,
-  FilterIcon,
-  InlineAlert,
-  Pagination,
-  ProductCard,
-  ProductCardSkeleton,
-  Select,
-} from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { Drawer } from "../../components/common/Drawer/Drawer";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { FilterIcon } from "../../components/common/Icon/Icon";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Pagination } from "../../components/common/Pagination/Pagination";
+import { ProductCard } from "../../components/common/ProductCard/ProductCard";
+import { ProductCardSkeleton } from "../../components/common/Skeleton/Skeleton";
+import { Select } from "../../components/common/Input/Input";
 import { FilterPanel, type FilterValues, emptyFilters } from "./sections/FilterPanel";
 
 const SORT_OPTIONS = [
@@ -63,7 +61,7 @@ export function SearchPage() {
   );
 
   return (
-    <div className="rm-container py-6 lg:py-8">
+    <div className="rm-container py-4 lg:py-8">
       {/* Heading */}
       <nav aria-label="Đường dẫn" className="t-meta text-muted">
         <Link to="/" className="hover:text-ink">
@@ -83,7 +81,17 @@ export function SearchPage() {
             {isRefetching && <span className="ml-2 t-meta">· Đang cập nhật</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            className="flex-1 lg:hidden"
+            onClick={() => setSheetOpen(true)}
+          >
+            <span className="flex items-center gap-2 whitespace-nowrap">
+              <FilterIcon />
+              Bộ lọc {activeCount > 0 ? `(${activeCount})` : ""}
+            </span>
+          </Button>
           <label htmlFor="sort-select" className="sr-only">
             Sắp xếp theo
           </label>
@@ -91,7 +99,7 @@ export function SearchPage() {
             id="sort-select"
             value={sort}
             onChange={(event) => applyParams({ sort: event.target.value })}
-            className="h-11 min-w-[180px]"
+            className="h-touch min-w-[160px] flex-[2] text-sm lg:min-w-[180px]"
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -100,18 +108,6 @@ export function SearchPage() {
             ))}
           </Select>
         </div>
-      </div>
-
-      {/* Mobile filter bar */}
-      <div className="mt-4 flex gap-2 lg:hidden">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={() => setSheetOpen(true)}
-        >
-          <FilterIcon className="mr-2" />
-          Bộ lọc {activeCount > 0 ? `(${activeCount})` : ""}
-        </Button>
       </div>
 
       {/* Active chips */}
@@ -159,7 +155,7 @@ export function SearchPage() {
         {/* Results */}
         <div className="min-w-0 flex-1" aria-busy={isRefetching || undefined}>
           {listQuery.isPending ? (
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 xl:grid-cols-4">
               {Array.from({ length: 6 }, (_, index) => (
                 <ProductCardSkeleton key={index} />
               ))}
@@ -192,7 +188,7 @@ export function SearchPage() {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 xl:grid-cols-4">
                 {items.map((product) => (
                   <ProductCard
                     key={product.id}

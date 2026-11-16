@@ -9,16 +9,20 @@ const realtime = vi.hoisted(() => ({
   handlers: new Map<string, () => void>(),
   any: null as ((event: string, payload?: unknown) => void) | null,
   socket: { on: vi.fn(), onAny: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), removeAllListeners: vi.fn() },
+  createSocket: vi.fn(),
+  guest: false,
   refresh: vi.fn(),
 }));
-vi.mock("socket.io-client", () => ({ io: () => realtime.socket }));
-vi.mock("../SessionContext", () => ({ useSession: () => ({ viewer: member, refresh: realtime.refresh }) }));
+vi.mock("socket.io-client", () => ({ io: () => realtime.createSocket() }));
+vi.mock("../SessionContext", () => ({ useSession: () => ({ viewer: realtime.guest ? null : member, refresh: realtime.refresh }) }));
 vi.mock("../../services/http", () => ({
   http: { getAccessToken: () => "test-access-token" }, subscribeAccessToken: () => () => {},
 }));
 let client: ReturnType<typeof createQueryClient>;
 beforeEach(() => {
   vi.clearAllMocks();
+  realtime.guest = false;
+  realtime.createSocket.mockReturnValue(realtime.socket);
   realtime.handlers.clear();
   realtime.socket.on.mockImplementation((event: string, listener: () => void) => realtime.handlers.set(event, listener));
   realtime.socket.onAny.mockImplementation((listener: (event: string, payload?: unknown) => void) => { realtime.any = listener; });
@@ -31,10 +35,24 @@ function Probe({ load }: { load: () => Promise<string> }) {
   return <div>{query.data ?? "Loading"}</div>;
 }
 function show(load: () => Promise<string>) {
-  render(<QueryClientProvider client={client}><RealtimeProvider><Probe load={load} /></RealtimeProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><RealtimeProvider><Probe load={load} /></RealtimeProvider></QueryClientProvider>);
 }
 
 describe("realtime connection freshness", () => {
+  it("does not create a socket for guests", async () => {
+    realtime.guest = true;
+    show(vi.fn().mockResolvedValue("Public product"));
+    await screen.findByText("Public product");
+    expect(realtime.createSocket).not.toHaveBeenCalled();
+  });
+
+  it("does not open a late connection after the provider unmounts", async () => {
+    const view = show(vi.fn().mockResolvedValue("Product"));
+    view.unmount();
+    await act(async () => {});
+    expect(realtime.createSocket).not.toHaveBeenCalled();
+  });
+
   it("renders delivered messages from cache without refetching history or unrelated products", async () => {
     const key = ["chat", "messages", "thread"];
     client.setQueryData(key, { pages: [{ items: [], next_cursor: "older" }], pageParams: [null] });

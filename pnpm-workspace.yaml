@@ -2,9 +2,17 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# CLI 58.1.19 requires @expo/env 2.5.4, which is not published on npm yet.
+overrides:
+  'expo@58.0.22>@expo/cli': 58.1.18
+  # Metro 0.87.3 references metro-file-map 0.87.3, which is not published yet.
+  'metro@>=0.87.0 <0.88.0': 0.87.1
+  'metro-config@>=0.87.0 <0.88.0': 0.87.1
+
 # pnpm 11 reads workspace settings from this file, not package.json.
 # esbuild needs its postinstall so vite/vitest can resolve the platform binary.
 allowBuilds:
+  '@scarf/scarf': false
   esbuild: true
   '@prisma/client': true
   '@prisma/engines': true

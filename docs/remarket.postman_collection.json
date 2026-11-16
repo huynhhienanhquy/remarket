@@ -67,6 +67,376 @@
   ],
   "item": [
     {
+      "name": "Marketplace AI",
+      "item": [
+        {
+          "name": "GET /ai/config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "config"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /ai/threads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/threads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "threads"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /ai/threads",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/threads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "threads"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /ai/threads/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/threads/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "threads",
+                "{{id}}"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /ai/threads/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/threads/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "threads",
+                "{{id}}"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /ai/products/resolve",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/products/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "products",
+                "resolve"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"00000000-0000-0000-0000-000000000001\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /ai/copilotkit/info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/copilotkit/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "copilotkit",
+                "info"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /ai/copilotkit/agent/marketplace/run",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/copilotkit/agent/marketplace/run",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "copilotkit",
+                "agent",
+                "marketplace",
+                "run"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threadId\": \"00000000-0000-0000-0000-000000000001\",\n  \"runId\": \"00000000-0000-0000-0000-000000000001\",\n  \"messages\": [\n    {\n      \"id\": \"sample-message\",\n      \"role\": \"user\",\n      \"content\": \"Tìm iPhone 13 dưới 8 triệu ở TP.HCM\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /ai/copilotkit/agent/marketplace/connect",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/copilotkit/agent/marketplace/connect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "copilotkit",
+                "agent",
+                "marketplace",
+                "connect"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"threadId\": \"00000000-0000-0000-0000-000000000001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /ai/copilotkit/agent/marketplace/stop/{threadId}",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ai/copilotkit/agent/marketplace/stop/{{threadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "copilotkit",
+                "agent",
+                "marketplace",
+                "stop",
+                "{{threadId}}"
+              ],
+              "variable": [
+                {
+                  "key": "threadId",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runId\": \"00000000-0000-0000-0000-000000000001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Auth",
       "item": [
         {
@@ -1074,6 +1444,11 @@
                   "disabled": true
                 },
                 {
+                  "key": "q",
+                  "value": "string",
+                  "disabled": true
+                },
+                {
                   "key": "page",
                   "value": "1",
                   "disabled": true
@@ -1159,6 +1534,42 @@
                 "navigation-counts"
               ],
               "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /admin/summary/{section}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/summary/{{section}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "summary",
+                "{{section}}"
+              ],
+              "variable": [
+                {
+                  "key": "section",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
               "query": []
             },
             "auth": {
@@ -1282,6 +1693,45 @@
                   "type": "string"
                 }
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /admin/users",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"string\",\n  \"email\": \"user@example.com\",\n  \"phone\": \"string\",\n  \"password\": \"ChangeMe-Only-For-Local-123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1797,7 +2247,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"parent_id\": \"00000000-0000-0000-0000-000000000001\"\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"parent_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"icon\": \"string\",\n  \"sort_index\": 0,\n  \"description\": \"string\",\n  \"accept_new_listings\": true,\n  \"show_on_home\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1823,6 +2273,43 @@
                 "tree"
               ],
               "variable": [],
+              "query": []
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /admin/categories/{id}/summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/categories/{{id}}/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "categories",
+                "{{id}}",
+                "summary"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000001"
+                }
+              ],
               "query": []
             },
             "auth": {
@@ -1873,7 +2360,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"parent_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"status\": \"ACTIVE\"\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"parent_id\": \"00000000-0000-0000-0000-000000000001\",\n  \"status\": \"ACTIVE\",\n  \"icon\": \"string\",\n  \"sort_index\": 0,\n  \"description\": \"string\",\n  \"accept_new_listings\": true,\n  \"show_on_home\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2180,6 +2667,11 @@
               "variable": [],
               "query": [
                 {
+                  "key": "q",
+                  "value": "string",
+                  "disabled": true
+                },
+                {
                   "key": "status",
                   "value": "OPEN",
                   "disabled": true
@@ -2372,6 +2864,16 @@
               ],
               "variable": [],
               "query": [
+                {
+                  "key": "q",
+                  "value": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "actor_type",
+                  "value": "USER",
+                  "disabled": true
+                },
                 {
                   "key": "action",
                   "value": "string",

@@ -6,7 +6,12 @@ import { loginPathFor } from "../../config/route/guards";
 import { errorTitle } from "../../helpers/errors";
 import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
-import { Button, FormField, InlineAlert, Input, Skeleton, useToast } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { FormField } from "../../components/common/FormField/FormField";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Input } from "../../components/common/Input/Input";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
+import { useToast } from "../../components/common/Toast/Toast";
 import { OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
 import { useConnectivity } from "../../hooks/useConnectivity";
 

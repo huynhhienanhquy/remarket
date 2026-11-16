@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { EmailVerificationRequest } from "@remarket/shared";
 import { SessionProvider } from "../contexts/SessionContext";
-import { ToastProvider } from "../components/common";
+import { ToastProvider } from "../components/common/Toast/Toast";
 import { createQueryClient } from "../config/queryClient";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage/VerifyEmailPage";
 import { AdminEmailVerificationsPage } from "../pages/AdminEmailVerificationsPage/AdminEmailVerificationsPage";

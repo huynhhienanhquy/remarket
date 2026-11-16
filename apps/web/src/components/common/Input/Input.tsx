@@ -6,11 +6,11 @@ import type {
 } from "react";
 
 const INPUT_BASE =
-  "w-full min-h-[44px] rounded-control border bg-surface px-3 py-2 text-[16px] text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus";
+  "w-full min-h-touch rounded-control border bg-surface px-3 py-2 text-[16px] text-ink placeholder:text-muted transition-colors hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus";
 
 /** Exactly one border color class so the error state always wins. */
 export function inputClasses(error = false): string {
-  return `${INPUT_BASE} ${error ? "border-danger" : "border-input-line"}`;
+  return `${INPUT_BASE} ${error ? "border-danger hover:border-danger" : "border-input-line"}`;
 }
 
 export function hasErrorAttr(value: boolean | "true" | "false" | "grammar" | "spelling" | undefined): boolean {

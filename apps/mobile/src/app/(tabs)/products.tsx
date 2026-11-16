@@ -161,16 +161,19 @@ function ProductSearch({
       }}
       refreshing={products.isRefetching}
     >
-      <Text style={styles.meta}>Trang chủ / Sản phẩm</Text>
-      <Text style={styles.title}>
-        {q ? `Kết quả cho “${q}”` : "Khám phá sản phẩm"}
-      </Text>
-      {products.data && (
-        <Text style={styles.muted}>{products.data.meta.total} sản phẩm</Text>
-      )}
-      <View style={[styles.row, { justifyContent: "space-between" }]}>
+      <View style={{ gap: 4 }}>
+        <Text style={styles.meta}>Trang chủ / Sản phẩm</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          {q ? `Kết quả cho “${q}”` : "Khám phá sản phẩm"}
+        </Text>
+        {products.data && (
+          <Text style={styles.muted}>{products.data.meta.total} kết quả</Text>
+        )}
+      </View>
+      <View style={[styles.row, { justifyContent: "space-between", gap: 8 }]}>
         <Button
           title={`Bộ lọc${activeFilters ? ` (${activeFilters})` : ""}`}
+          icon="funnel-outline"
           secondary
           onPress={() => {
             setDraft(filters);

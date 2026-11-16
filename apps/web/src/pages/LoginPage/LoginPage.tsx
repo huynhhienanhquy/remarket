@@ -1,7 +1,10 @@
 import { PasswordInput } from "@/components/common/Input/PasswordInput";
 import { useLoginForm } from "./hooks/useLoginForm";
 import { Link } from "react-router-dom";
-import { Button, FormField, InlineAlert, Input } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { FormField } from "../../components/common/FormField/FormField";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Input } from "../../components/common/Input/Input";
 
 export function LoginPage() {
   const {

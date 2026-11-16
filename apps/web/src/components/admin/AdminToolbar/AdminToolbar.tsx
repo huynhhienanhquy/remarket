@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Button, Icon } from "@/components/common";
+import { Button } from "../../common/Button/Button";
+import { Icon } from "../../common/Icon/Icon";
 import { useAdminParams } from "../../../hooks/useAdminParams";
 
 /** Filter bar: stacked on mobile, one wrapping row on desktop. */
-export function AdminToolbar({ children }: { children: ReactNode }) {
+export function AdminToolbar({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="rm-admin-toolbar mb-4 flex flex-col gap-3 rounded-xl bg-page/70 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+    <div className={["admin-toolbar", className].filter(Boolean).join(" ")}>
       {children}
     </div>
   );
@@ -25,8 +26,8 @@ export function ToolbarField({
   className?: string;
 }) {
   return (
-    <div className={`min-w-0 flex flex-col gap-1.5 ${className ?? ""}`}>
-      <label htmlFor={htmlFor} className="t-label text-ink">
+    <div className={`admin-toolbar-field ${className ?? ""}`}>
+      <label htmlFor={htmlFor}>
         {label}
       </label>
       {children}
@@ -35,9 +36,31 @@ export function ToolbarField({
 }
 
 /** Less frequent filters stay available without crowding the primary toolbar. */
-export function AdminAdvancedFilters({ children, fields }: { children: ReactNode; fields: string[] }) {
+export function AdminAdvancedFilters({ children, fields, summary, open: controlledOpen, onOpenChange }: {
+  children: ReactNode;
+  fields: string[];
+  summary?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { params, apply } = useAdminParams();
   const count = fields.filter(field => params.has(field)).length;
   const [open, setOpen] = useState(count > 0);
-  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)} className="w-full border-t border-line pt-3"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted hover:text-brand"><Icon name="filter" size={18} />Bộ lọc nâng cao{count > 0 && <span className="rounded-full bg-brand-soft px-2 text-xs text-brand">{count}</span>}<Icon name={open ? "chevron-left" : "chevron-right"} size={16} className="ml-auto" /></summary><div className="flex flex-col gap-3 pt-3 sm:flex-row sm:flex-wrap sm:items-end">{children}{count > 0 && <Button variant="ghost" onClick={() => apply(Object.fromEntries(fields.map(field => [field, null])))}>Xóa bộ lọc nâng cao</Button>}</div></details>;
+  return (
+    <details open={controlledOpen ?? open} onToggle={event => {
+      setOpen(event.currentTarget.open);
+      onOpenChange?.(event.currentTarget.open);
+    }} className="admin-advanced">
+      <summary>
+        <Icon name="sliders" size={17} />Bộ lọc nâng cao
+        {count > 0 && <span className="admin-pill" data-tone="brand">{count}</span>}
+        <Icon name="chevron-right" size={15} className={`admin-advanced-chevron ${summary ? "" : "ml-auto"}`} />
+        {summary && <span className="ml-auto hidden text-xs sm:inline">{summary}</span>}
+      </summary>
+      <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:flex-wrap sm:items-end">
+        {children}
+        {count > 0 && <Button variant="ghost" onClick={() => apply(Object.fromEntries(fields.map(field => [field, null])))}>Xóa bộ lọc nâng cao</Button>}
+      </div>
+    </details>
+  );
 }

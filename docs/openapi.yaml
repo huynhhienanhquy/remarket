@@ -18,6 +18,7 @@ tags:
   - name: Marketplace
   - name: Orders
   - name: Chat
+  - name: Marketplace AI
   - name: Trust
   - name: Admin
 x-error-profiles:
@@ -29,6 +30,16 @@ x-error-profiles:
   active-mutation: &ActiveMutationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
   admin-operation: &AdminOperationErrors [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, FORBIDDEN, ACCOUNT_LOCKED, NOT_FOUND, INVALID_ORDER_TRANSITION, VERSION_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
 x-operation-error-codes:
+  aiConfig: *ActiveReadErrors
+  listAiThreads: *ActiveReadErrors
+  createAiThread: *ActiveReadErrors
+  getAiThread: *ActiveReadErrors
+  deleteAiThread: *ActiveReadErrors
+  resolveAiProducts: *ActiveReadErrors
+  marketplaceAiInfo: *ActiveReadErrors
+  runMarketplaceAi: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, ACCOUNT_LOCKED, NOT_FOUND, IDEMPOTENCY_CONFLICT, RETRY_LATER, RATE_LIMITED, INTERNAL]
+  connectMarketplaceAi: *ActiveReadErrors
+  stopMarketplaceAi: *ActiveReadErrors
   register: *PublicValidationErrors
   login: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
   bootstrapSession: [VALIDATION_ERROR, FORBIDDEN, RETRY_LATER, RATE_LIMITED, INTERNAL]
@@ -283,6 +294,185 @@ x-operation-error-codes:
 
   refreshOwnUploadPreview: [VALIDATION_ERROR, UNAUTHORIZED, SESSION_EXPIRED, NOT_FOUND, RATE_LIMITED, INTERNAL]
 paths:
+  /ai/config:
+    get:
+      tags: [Marketplace AI]
+      operationId: aiConfig
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Availability of the marketplace assistant for an active account.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { type: object, required: [enabled], properties: { enabled: { type: boolean } } } } }
+  /ai/threads:
+    get:
+      tags: [Marketplace AI]
+      operationId: listAiThreads
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Up to 20 current threads owned by the caller.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AiThreadSummary' } } } }
+    post:
+      tags: [Marketplace AI]
+      operationId: createAiThread
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: New server-issued marketplace thread.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { $ref: '#/components/schemas/AiThreadSummary' } } }
+        '429': { $ref: '#/components/responses/Error' }
+  /ai/threads/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Marketplace AI]
+      operationId: getAiThread
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: The caller's thread and up to 60 recent messages.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { $ref: '#/components/schemas/AiThread' } } }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Marketplace AI]
+      operationId: deleteAiThread
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Thread and history deleted.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { type: object, required: [deleted], properties: { deleted: { type: boolean, enum: [true] } } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /ai/products/resolve:
+    post:
+      tags: [Marketplace AI]
+      operationId: resolveAiProducts
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              additionalProperties: false
+              properties:
+                ids: { type: array, maxItems: 6, items: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Matching products that are still publicly available, in request order.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ProductListItem' } } } }
+  /ai/copilotkit/info:
+    get:
+      tags: [Marketplace AI]
+      operationId: marketplaceAiInfo
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: CopilotKit runtime metadata for the marketplace agent. }
+        '404': { $ref: '#/components/responses/Error' }
+  /ai/copilotkit/agent/marketplace/run:
+    post:
+      tags: [Marketplace AI]
+      operationId: runMarketplaceAi
+      security: [{ bearerAuth: [] }]
+      description: The final message must be a user text message. The server restores history and filters for the owned thread. A completed runId with identical input replays persisted history.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [threadId, runId, messages]
+              properties:
+                threadId: { type: string, format: uuid }
+                runId: { type: string, format: uuid }
+                messages:
+                  type: array
+                  minItems: 1
+                  maxItems: 120
+                  items:
+                    type: object
+                    required: [id, role, content]
+                    properties:
+                      id: { type: string, example: sample-message }
+                      role: { type: string, example: user }
+                      content: { type: string, maxLength: 1200, example: Tìm iPhone 13 dưới 8 triệu ở TP.HCM }
+      responses:
+        '200':
+          description: AG-UI event stream.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /ai/copilotkit/agent/marketplace/connect:
+    post:
+      tags: [Marketplace AI]
+      operationId: connectMarketplaceAi
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [threadId]
+              properties:
+                threadId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Owned thread history and active events as AG-UI.
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+  /ai/copilotkit/agent/marketplace/stop/{threadId}:
+    post:
+      tags: [Marketplace AI]
+      operationId: stopMarketplaceAi
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: threadId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                runId: { type: string, format: uuid }
+      responses:
+        '200': { description: CopilotKit stop response. }
+        '404': { $ref: '#/components/responses/Error' }
   /auth/register:
     post: { tags: [Auth], operationId: register, requestBody: { $ref: '#/components/requestBodies/RegisterBody' }, responses: { '201': { $ref: '#/components/responses/RegisterSuccess' }, '422': { $ref: '#/components/responses/Error' } } }
   /auth/login:
@@ -339,7 +529,7 @@ paths:
       operationId: adminEmailVerifications
       security: [{ bearerAuth: [] }]
       description: ACTIVE ADMIN only. Pending requests by default, including users who became locked after submitting.
-      parameters: [{ name: status, in: query, schema: { type: string, enum: [PENDING, APPROVED, ALL], default: PENDING } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }]
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [PENDING, APPROVED, ALL], default: PENDING } }, { name: q, in: query, schema: { type: string, maxLength: 100 } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }]
       responses:
         '200': { $ref: '#/components/responses/EmailVerificationListSuccess' }
         '401': { $ref: '#/components/responses/Error' }
@@ -537,10 +727,52 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/AdminNavigationCounts' }
+  /admin/summary/{section}:
+    get:
+      tags: [Admin]
+      operationId: adminWorkspaceSummary
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: section, in: path, required: true, schema: { type: string, enum: [users, reports, reviews, support, email, audit] } }]
+      responses:
+        '200':
+          description: Metrics for the requested admin section.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - { type: object, required: [total, active, pending_email, locked], properties: { total: { type: integer }, active: { type: integer }, pending_email: { type: integer }, locked: { type: integer } } }
+                          - { type: object, required: [resolved, handled_today, confirmed_rate], properties: { resolved: { type: integer }, handled_today: { type: integer }, confirmed_rate: { type: number, nullable: true } } }
+                          - { type: object, required: [average, total, low_rating_visible, public_rate], properties: { average: { type: number, nullable: true }, total: { type: integer }, low_rating_visible: { type: integer }, public_rate: { type: number, nullable: true } } }
+                          - { type: object, required: [resolved_today, first_reply_minutes], properties: { resolved_today: { type: integer }, first_reply_minutes: { type: number, nullable: true } } }
+                          - { type: object, required: [approved_today, approval_rate], properties: { approved_today: { type: integer }, approval_rate: { type: number, nullable: true } } }
+                          - { type: object, required: [today, admin_actions_today, total], properties: { today: { type: integer }, admin_actions_today: { type: integer }, total: { type: integer }, storage_bytes: { type: integer, minimum: 0 } } }
   /admin/dashboard:
     get: { tags: [Admin], operationId: adminDashboard, security: [{ bearerAuth: [] }], parameters: [{ name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }], responses: { '200': { $ref: '#/components/responses/AdminDashboardSuccess' } } }
   /admin/users:
     get: { tags: [Admin], operationId: adminUsers, security: [{ bearerAuth: [] }], parameters: [{ name: handled_by, in: query, description: Admin who has audited an action on this entity., schema: { type: string, maxLength: 64 } }, { name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: status, in: query, schema: { type: string, enum: [ACTIVE, LOCKED, ALL] } }, { name: role, in: query, schema: { type: string, enum: [USER, ADMIN, ALL] } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminUserListSuccess' } } }
+    post:
+      tags: [Admin]
+      operationId: adminCreateUser
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [full_name, email, phone, password]
+              properties:
+                full_name: { type: string, maxLength: 200 }
+                email: { type: string, format: email, maxLength: 254 }
+                phone: { type: string, maxLength: 20 }
+                password: { type: string, format: password, maxLength: 200 }
+      responses: { '201': { $ref: '#/components/responses/AdminUserSuccess' }, '422': { $ref: '#/components/responses/Error' } }
   /admin/users/{id}/lock:
     post: { tags: [Admin], operationId: adminLockUser, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReasonBody' }, responses: { '200': { $ref: '#/components/responses/AdminUserSuccess' } } }
   /admin/users/{id}/unlock:
@@ -585,6 +817,23 @@ paths:
     post: { tags: [Admin], operationId: adminCreateCategory, security: [{ bearerAuth: [] }], requestBody: { $ref: '#/components/requestBodies/CategoryCreateBody' }, responses: { '201': { $ref: '#/components/responses/CategorySuccess' } } }
   /admin/categories/tree:
     get: { tags: [Admin], operationId: adminCategoryTree, security: [{ bearerAuth: [] }], description: Full tree including inactive categories for administration., responses: { '200': { $ref: '#/components/responses/CategoryTreeSuccess' } } }
+  /admin/categories/{id}/summary:
+    get:
+      tags: [Admin]
+      operationId: adminCategorySummary
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CategoryId' }]
+      responses:
+        '200':
+          description: Current category inventory and completed orders from the last 30 days.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - type: object
+                    properties:
+                      data: { type: object, required: [active_products, pending_products, completed_orders], properties: { active_products: { type: integer }, pending_products: { type: integer }, completed_orders: { type: integer } } }
   /admin/categories/{id}:
     patch: { tags: [Admin], operationId: adminUpdateCategory, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/CategoryId' }], requestBody: { $ref: '#/components/requestBodies/CategoryUpdateBody' }, responses: { '200': { $ref: '#/components/responses/CategorySuccess' } } }
   /admin/reports:
@@ -598,14 +847,14 @@ paths:
   /admin/reviews/{id}/hide:
     post: { tags: [Admin], operationId: adminHideReview, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/ReasonBody' }, responses: { '200': { $ref: '#/components/responses/AdminReviewSuccess' } } }
   /admin/support-tickets:
-    get: { tags: [Admin], operationId: adminTickets, security: [{ bearerAuth: [] }], parameters: [{ name: status, in: query, schema: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, ALL] } }, { name: type, in: query, schema: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER, ALL] } }, { name: assigned_admin_id, in: query, schema: { type: string, description: Admin UUID or UNASSIGNED } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminSupportTicketListSuccess' } } }
+    get: { tags: [Admin], operationId: adminTickets, security: [{ bearerAuth: [] }], parameters: [{ name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: status, in: query, schema: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, ALL] } }, { name: type, in: query, schema: { type: string, enum: [ACCOUNT, ORDER_PROBLEM, PRODUCT, OTHER, ALL] } }, { name: assigned_admin_id, in: query, schema: { type: string, description: Admin UUID or UNASSIGNED } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AdminSupportTicketListSuccess' } } }
   /admin/support-tickets/{id}:
     get: { tags: [Admin], operationId: adminTicketDetail, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
     patch: { tags: [Admin], operationId: adminUpdateTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminTicketUpdateBody' }, responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
   /admin/support-tickets/{id}/messages:
     post: { tags: [Admin], operationId: adminReplyTicket, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/SupportReplyBody' }, responses: { '200': { $ref: '#/components/responses/AdminSupportTicketSuccess' } } }
   /admin/audit-logs:
-    get: { tags: [Admin], operationId: adminAudit, security: [{ bearerAuth: [] }], parameters: [{ name: action, in: query, schema: { type: string, maxLength: 100 } }, { name: entity_type, in: query, schema: { type: string, maxLength: 50 } }, { name: entity_id, in: query, schema: { type: string } }, { name: actor_id, in: query, schema: { type: string } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AuditLogListSuccess' } } }
+    get: { tags: [Admin], operationId: adminAudit, security: [{ bearerAuth: [] }], parameters: [{ name: q, in: query, schema: { type: string, maxLength: 100 } }, { name: actor_type, in: query, schema: { type: string, enum: [USER, ADMIN, SYSTEM] } }, { name: action, in: query, schema: { type: string, maxLength: 100 } }, { name: entity_type, in: query, schema: { type: string, maxLength: 50 } }, { name: entity_id, in: query, schema: { type: string } }, { name: actor_id, in: query, schema: { type: string } }, { name: from, in: query, schema: { type: string, format: date } }, { name: to, in: query, schema: { type: string, format: date } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/AuditLogListSuccess' } } }
   /admin/orders/{id}/cancel:
     post: { tags: [Admin], operationId: adminCancelOrder, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], requestBody: { $ref: '#/components/requestBodies/AdminOrderCancelBody' }, responses: { '200': { $ref: '#/components/responses/AdminOrderCancelSuccess' }, '409': { $ref: '#/components/responses/Error' } } }
 
@@ -1482,6 +1731,90 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
   schemas:
+    AiThreadSummary:
+      type: object
+      required: [id, updated_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        updated_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    AiThread:
+      allOf:
+        - { $ref: '#/components/schemas/AiThreadSummary' }
+        - type: object
+          required: [messages]
+          properties:
+            messages:
+              type: array
+              items:
+                type: object
+                required: [id, role, content]
+                properties:
+                  id: { type: string }
+                  role: { type: string, enum: [user, assistant] }
+                  content: { type: string }
+                  results: { type: array, items: { $ref: '#/components/schemas/AiToolResult' } }
+    AiToolResult:
+      oneOf:
+        - type: object
+          required: [kind, total, product_ids, filters, labels]
+          properties:
+            kind: { type: string, enum: [search] }
+            total: { type: integer, minimum: 0 }
+            product_ids: { type: array, items: { type: string, format: uuid } }
+            labels: { type: array, items: { type: string } }
+            filters:
+              type: object
+              properties:
+                q: { type: string }
+                category_id: { type: string, format: uuid }
+                province_code: { type: string }
+                condition: { type: string, enum: [LIKE_NEW, GOOD, FAIR, HEAVILY_USED] }
+                delivery_method: { type: string, enum: [COD, MEETUP, BOTH] }
+                min_price: { type: string, pattern: '^\d{1,12}$' }
+                max_price: { type: string, pattern: '^\d{1,12}$' }
+                sort: { type: string, enum: [newest, price_asc, price_desc] }
+        - type: object
+          required: [kind, sources]
+          properties:
+            kind: { type: string, enum: [faq] }
+            sources:
+              type: array
+              items:
+                type: object
+                required: [id, title, version, href]
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  version: { type: string }
+                  href: { type: string, enum: [/support/new, /products, /account/products, /orders, /verify-email] }
+        - type: object
+          required: [kind, message]
+          properties:
+            kind: { type: string, enum: [clarify] }
+            message: { type: string }
+            tool: { type: string, enum: [get_account_stats] }
+        - type: object
+          required: [kind, period_label, as_of, topics, rows]
+          properties:
+            kind: { type: string, enum: [account_stats] }
+            period_label: { type: string, description: Date range in Vietnam local time. }
+            as_of: { type: string, format: date-time }
+            topics:
+              type: array
+              items: { type: string, enum: [sales, purchases, listings, favorites, reviews, support] }
+            rows:
+              type: array
+              items:
+                type: object
+                required: [key, value]
+                properties:
+                  key: { type: string }
+                  value:
+                    description: Counts and ratings are numbers. VND totals are exact decimal strings. An average without reviews is null.
+                    oneOf:
+                      - { type: number, minimum: 0, nullable: true }
+                      - { type: string, pattern: '^\d+$' }
     EmailVerificationRequest:
       type: object
       required: [id, user, status, requested_at, approved_at]
@@ -1693,6 +2026,11 @@ components:
         name: { type: string, minLength: 1, maxLength: 100 }
         slug: { type: string, minLength: 1, maxLength: 120 }
         parent_id: { type: string, nullable: true, maxLength: 64 }
+        icon: { type: string, nullable: true, maxLength: 64, pattern: '^[a-z][a-z0-9_]*$' }
+        sort_index: { type: integer, minimum: 0, maximum: 99999 }
+        description: { type: string, nullable: true, maxLength: 1000 }
+        accept_new_listings: { type: boolean }
+        show_on_home: { type: boolean, nullable: true }
     CategoryUpdateInput:
       type: object
       minProperties: 1
@@ -1702,6 +2040,11 @@ components:
         slug: { type: string, minLength: 1, maxLength: 120 }
         parent_id: { type: string, nullable: true, maxLength: 64 }
         status: { type: string, enum: [ACTIVE, INACTIVE] }
+        icon: { type: string, nullable: true, maxLength: 64, pattern: '^[a-z][a-z0-9_]*$' }
+        sort_index: { type: integer, minimum: 0, maximum: 99999 }
+        description: { type: string, nullable: true, maxLength: 1000 }
+        accept_new_listings: { type: boolean }
+        show_on_home: { type: boolean, nullable: true }
     ReportResolutionInput:
       type: object
       required: [resolution_note]
@@ -1836,6 +2179,11 @@ components:
         slug: { type: string }
         status: { type: string, enum: [ACTIVE, INACTIVE] }
         children: { type: array, items: { $ref: '#/components/schemas/CategoryNode' } }
+        icon: { type: string, nullable: true, maxLength: 64, pattern: '^[a-z][a-z0-9_]*$' }
+        sort_index: { type: integer, minimum: 0, maximum: 99999 }
+        description: { type: string, nullable: true, maxLength: 1000 }
+        accept_new_listings: { type: boolean }
+        show_on_home: { type: boolean, nullable: true }
     ProductImage:
       type: object
       required: [id, url, sort_order]
@@ -2214,6 +2562,8 @@ components:
         created_at: { $ref: '#/components/schemas/IsoDateTime' }
         lock_reason: { type: string, nullable: true }
         locked_at: { allOf: [{ $ref: '#/components/schemas/IsoDateTime' }], nullable: true }
+        product_count: { type: integer, minimum: 0 }
+        rating: { type: number, nullable: true, minimum: 1, maximum: 5 }
     AdminProduct:
       type: object
       required: [id, title, price, image_url, status, is_blocked, block_reason, rejection_reason, version, updated_at, created_at, seller, category_name, description, images, condition, usage_months, province_code, delivery_method, shipping_fee]

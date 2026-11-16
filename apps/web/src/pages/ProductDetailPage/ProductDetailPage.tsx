@@ -7,7 +7,15 @@ import {
   formatVnd,
 } from "@remarket/shared";
 import { Link } from "react-router-dom";
-import { Button, CartIcon, ChatIcon, EmptyState, HeartIcon, ImageViewer, InlineAlert, SectionCard, Skeleton, StatusBadge, UserSummary } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { CartIcon, ChatIcon, HeartIcon } from "../../components/common/Icon/Icon";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { ImageViewer } from "../../components/common/ImageViewer/ImageViewer";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { SectionCard } from "../../components/common/SectionCard/SectionCard";
+import { Skeleton } from "../../components/common/Skeleton/Skeleton";
+import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
+import { UserSummary } from "../../components/common/UserSummary/UserSummary";
 import { OfflineNotice } from "../../components/common/PageFeedback/PageFeedback";
 import { ReportDialog } from "../../components/ReportDialog/ReportDialog";
 import { isApiError } from "../../helpers/errors";
@@ -137,24 +145,24 @@ export function ProductDetailPage() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-12">
+      <div className="mt-4 grid gap-5 lg:mt-6 lg:grid-cols-12 lg:gap-8">
         <ProductGallery {...{ product, hidden, images, mainImage, activeImage, openViewer, selectImage }} />
 
         {/* Summary */}
-        <div className="lg:col-span-5">
+        <div className="min-w-0 lg:col-span-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="t-label text-muted">
+            <span className="rounded-full bg-surface-subtle px-2.5 py-1 t-meta text-muted">
               {CONDITION_LABELS[product.condition]}
             </span>
             <StatusBadge label={statusMeta.label} tone={statusMeta.tone} />
             {product.is_blocked && <StatusBadge label="Bị hạn chế" tone="danger" />}
           </div>
 
-          <h1 className="mt-3 text-[22px] font-bold leading-snug text-ink lg:text-[28px]">
+          <h1 className="mt-3 t-h1 break-words text-ink">
             {hidden ? "Tin đăng không còn khả dụng" : product.title}
           </h1>
 
-          <p className="mt-3 t-price-detail text-ink">
+          <p className="mt-2 t-price-detail break-words text-brand">
             {hidden ? "" : formatVnd(product.price)}
           </p>
 
@@ -167,9 +175,9 @@ export function ProductDetailPage() {
 
           <dl className="mt-5 divide-y divide-line rounded-card border border-line bg-surface">
             {specs.map((spec) => (
-              <div key={spec.label} className="flex justify-between gap-4 px-4 py-3">
-                <dt className="t-body text-muted">{spec.label}</dt>
-                <dd className="text-right t-body text-ink">{spec.value}</dd>
+              <div key={spec.label} className="flex items-baseline justify-between gap-4 px-4 py-3">
+                <dt className="shrink-0 text-sm text-muted">{spec.label}</dt>
+                <dd className="min-w-0 break-words text-right text-sm font-medium text-ink">{spec.value}</dd>
               </div>
             ))}
           </dl>
@@ -268,19 +276,8 @@ export function ProductDetailPage() {
       </div>
 
       {/* Mobile sticky action bar */}
-      <div className="rm-safe-bottom fixed inset-x-0 bottom-0 z-action-bar border-t border-line bg-surface px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="secondary"
-            disabled={!canChat || actionBusy}
-            loading={chat.isPending}
-            onClick={openChat}
-            aria-label="Chat với người bán"
-            className="min-h-[44px] flex-1"
-          >
-            <ChatIcon />
-            Chat
-          </Button>
+      <div className="fixed inset-x-0 bottom-0 z-action-bar border-t border-line bg-surface px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-2">
           <button
             type="button"
             disabled={!canCart || actionBusy}
@@ -290,6 +287,16 @@ export function ProductDetailPage() {
           >
             <CartIcon />
           </button>
+          <Button
+            variant="secondary"
+            disabled={!canChat || actionBusy}
+            loading={chat.isPending}
+            onClick={openChat}
+            aria-label="Chat với người bán"
+            className="min-h-touch flex-1"
+          >
+            Nhắn tin
+          </Button>
           <Button
             variant="primary"
             disabled={!canBuy || actionBusy}

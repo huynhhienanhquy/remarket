@@ -3,7 +3,14 @@ import { Stars } from "./sections/Stars";
 import { formatDateTime, formatRelative } from "@remarket/shared";
 import { isApiError } from "../../helpers/errors";
 import { loginPathFor } from "../../config/route/guards";
-import { Button, ApiImage, EmptyState, InlineAlert, Pagination, ProductCard, ProductCardSkeleton, Skeleton, Tabs } from "../../components/common";
+import { Button } from "../../components/common/Button/Button";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
+import { Pagination } from "../../components/common/Pagination/Pagination";
+import { ProductCard } from "../../components/common/ProductCard/ProductCard";
+import { ProductCardSkeleton, Skeleton } from "../../components/common/Skeleton/Skeleton";
+import { Tabs } from "../../components/common/Tabs/Tabs";
 import { ReportDialog } from "../../components/ReportDialog/ReportDialog";
 
 export function SellerProfilePage() {

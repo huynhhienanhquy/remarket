@@ -31,11 +31,11 @@ export function EmptyState({
     <div
       className={`mx-auto flex max-w-md flex-col items-center gap-3 px-4 py-10 text-center ${className ?? ""}`}
     >
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-subtle text-muted">
-        {icon ?? <InboxIcon size={32} />}
+      <span className="flex h-16 w-16 items-center justify-center rounded-modal bg-brand-soft text-brand">
+        {icon ?? <InboxIcon size={28} />}
       </span>
       <h2 className="t-h2 text-ink">{title}</h2>
-      {description && <p className="t-body text-muted">{description}</p>}
+      {description && <p className="text-sm leading-6 text-muted">{description}</p>}
       {action && (
         <div className="mt-1">
           {action.to !== undefined ? (

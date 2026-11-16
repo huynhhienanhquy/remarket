@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../../../services/api";
-import { FormField, Input } from "../../../components/common";
+import { FormField } from "../../../components/common/FormField/FormField";
+import { Input } from "../../../components/common/Input/Input";
 import { QueryFailure } from "../../../components/common/PageFeedback/PageFeedback";
 import { ApiError } from "../../../helpers/errors";
 

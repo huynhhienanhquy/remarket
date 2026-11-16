@@ -1,5 +1,7 @@
 import type { OwnProduct, ProductAction } from "@remarket/shared";
-import { Button, ApiImage, Badge } from "@/components/common";
+import { Button } from "../../../components/common/Button/Button";
+import { ApiImage } from "../../../components/common/ApiImage/ApiImage";
+import { Badge } from "../../../components/common/Badge/Badge";
 import { PRODUCT_STATUS_LABELS, conditionLabel, formatVnd, formatRelative } from "@remarket/shared";
 
 interface ProductCardProps {

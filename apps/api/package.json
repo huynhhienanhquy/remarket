@@ -26,10 +26,14 @@
     "contracts:check": "node scripts/generate-response-contracts.mjs --check"
   },
   "dependencies": {
+    "@ag-ui/client": "1.0.2",
+    "@ai-sdk/openai": "3.0.143",
+    "@copilotkit/runtime": "1.85.0",
     "@prisma/adapter-pg": "5.22.0",
     "@prisma/client": "^5.22.0",
     "@prisma/engines": "5.22.0",
     "@remarket/shared": "workspace:*",
+    "ai": "6.0.332",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^18.0.5",
@@ -37,9 +41,10 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "8.23.1",
+    "rxjs": "7.8.1",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.4",
-    "zod": "^3.23.8"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

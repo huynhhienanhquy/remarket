@@ -274,15 +274,57 @@ const CATEGORY_PATHS: Record<string, string> = {
   "gia-dung": "M6 4h12l-1 16H7zM6 9h12",
 };
 
-export function CategoryIcon({ slug, ...props }: IconProps & { slug: string }) {
+export const categorySymbols = {
+  category: "M4 6h6v6H4zM14 14h6v6h-6zM16 3l4 7h-8z",
+  headphones: "M4 14v-3a8 8 0 0 1 16 0v3M4 13h4v7H6a2 2 0 0 1-2-2zM20 13h-4v7h2a2 2 0 0 0 2-2z",
+  smartphone: "M7 3h10v18H7zM11 17h2",
+  laptop: "M5 4h14v12H5zM3 20h18M5 16l-2 4m16-4 2 4",
+  devices: CATEGORY_PATHS["dien-tu"],
+  checkroom: "M10 8a2 2 0 1 1 2 2v2m0 0 9 6H3z",
+  two_wheeler: "M9 17a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6 17l5-7 5 7m-7-7h5m1-4h4l3 6",
+  weekend: CATEGORY_PATHS["noi-that"],
+  menu_book: CATEGORY_PATHS["sach-van-phong"],
+  electrical_services: "M5 3v5m4-5v5M3 8h8v2a4 4 0 0 1-4 4v3a3 3 0 0 0 6 0v-4a3 3 0 0 1 6 0v4m-2 0h4",
+};
+
+export function CategoryIcon({ slug, symbol, ...props }: IconProps & { slug: string; symbol?: string | null }) {
+  const symbolPath = symbol && Object.hasOwn(categorySymbols, symbol) ? categorySymbols[symbol as keyof typeof categorySymbols] : undefined;
+  const slugPath = Object.hasOwn(CATEGORY_PATHS, slug) ? CATEGORY_PATHS[slug] : undefined;
   return (
     <Glyph {...props}>
-      <path d={Object.hasOwn(CATEGORY_PATHS, slug) ? CATEGORY_PATHS[slug] : "M4 7l8-4 8 4v10l-8 4-8-4zM12 3v18"} />
+      <path d={symbolPath ?? slugPath ?? "M4 7l8-4 8 4v10l-8 4-8-4zM12 3v18"} />
     </Glyph>
   );
 }
 
+function strokeIcon(path: string) {
+  return function StrokeIcon(props: IconProps) {
+    return <Glyph {...props}><path d={path} /></Glyph>;
+  };
+}
+
 const ICONS = {
+  sort: strokeIcon("M8 20V4m-4 4 4-4 4 4m4-4v16m-4-4 4 4 4-4"),
+  unfold: strokeIcon("m9 9 3-3 3 3m-6 6 3 3 3-3"),
+  "check-circle": strokeIcon("M22 12a10 10 0 1 1-5-8.7M7 12l4 4 9-10"),
+  "chat-square": strokeIcon("M3 4h18v13H8l-5 4z"),
+  dashboard: strokeIcon("M3 3h8v10H3zM15 3h6v6h-6zM3 17h8v4H3zM15 13h6v8h-6z"),
+  archive: strokeIcon("M4 8h16v13H4zM3 3h18v5H3zM9 12h6"),
+  shapes: strokeIcon("m12 2 5 8H7zM3 14h7v7H3zM21 17.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z"),
+  users: strokeIcon("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2zM16 4a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-4M13 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"),
+  "mail-check": strokeIcon("M11 19H3V5h18v6M3 6l9 7 9-7M14 17l3 3 5-6"),
+  flag: strokeIcon("M4 22V3h10l1 3h6v11h-7l-1-3H4"),
+  headset: strokeIcon("M4 13v-2a8 8 0 0 1 16 0v2M4 12h3v6H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 1-2ZM20 12h-3v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-2ZM18 18v1a2 2 0 0 1-2 2h-4"),
+  history: strokeIcon("M3 12a9 9 0 1 1 2.6 6.4M3 3v6h6M12 7v5l4 2"),
+  store: strokeIcon("M4 10v11h16V10M3 6l2-3h14l2 3 1 4c0 2-4 2-5 0-1 2-4 2-5 0-1 2-4 2-5 0-1 2-5 2-5 0zM8 3l-1 7M16 3l1 7M12 3v7"),
+  logout: strokeIcon("M10 4H4v16h6M9 12h12m-4-4 4 4-4 4"),
+  help: strokeIcon("M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM9 9a3 3 0 1 1 4 2.8c-.7.3-1 1-1 1.7m0 3h.01"),
+  refresh: strokeIcon("M20 10a8 8 0 1 0-.8 6M20 4v6h-6"),
+  download: strokeIcon("M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"),
+  sliders: strokeIcon("M3 5h6m4 0h8M9 2v6M3 12h11m4 0h3m-3-3v6M3 19h3m4 0h11M6 16v6"),
+  shield: strokeIcon("M12 22c-7-3-8-7-8-16l8-4 8 4c0 9-1 13-8 16Zm-4-10 3 3 5-6"),
+  eye: strokeIcon("M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"),
+  clock: strokeIcon("M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6l4 3"),
   heart: HeartIcon,
   star: StarIcon,
   search: SearchIcon,

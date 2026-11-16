@@ -12,8 +12,9 @@ new screens match them.
   hero illustration lives in `images/illustrations/HeroArt.tsx`; preserve its
   SVG markup and accessibility. Add fonts/images only when the app uses them.
 - `apps/web/src/components/common/<ComponentName>/<ComponentName>.tsx` — the
-  shared UI kit, with existing tests beside each component. `common/index.ts`
-  exposes the kit's unchanged public exports. Keep the behavior and markup
+  shared UI kit, with existing tests beside each component. Import directly
+  from each component module so Vite does not load the entire kit in development.
+  Keep the behavior and markup
   unchanged during structural refactors; compose variants in a screen or
   reusable feature rather than duplicating primitives.
 - `apps/web/src/components/<FeatureName>/**` — reusable composites such as
@@ -129,7 +130,7 @@ add empty subfolders, fake assets, duplicated DTOs or a new state library.
   (vertical rhythm), `.rm-safe-bottom` (fixed bottom bars), `.rm-skeleton`.
 - Breakpoints: `sm` 640, `lg` 1024, `xl` 1280. Touch targets ≥44px
   (`min-h-[44px]`, `h-11 w-11`).
-- Icons: import from `@/components/common` (24px viewBox, 20px default). Give
+- Icons: import from `@/components/common/Icon/Icon` (24px viewBox, 20px default). Give
   icon-only buttons an `aria-label`.
 - Light mode only.
 

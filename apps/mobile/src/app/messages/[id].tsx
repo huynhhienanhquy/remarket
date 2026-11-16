@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import type { ViewToken } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -218,11 +217,7 @@ export default function Conversation() {
           itemVisiblePercentThreshold: 80,
           minimumViewTime: 500,
         }}
-        onViewableItemsChanged={({
-          viewableItems,
-        }: {
-          viewableItems: ViewToken<Message>[];
-        }) => {
+        onViewableItemsChanged={({ viewableItems }) => {
           visible.current = viewableItems.map((item) => item.item);
           markVisible();
         }}

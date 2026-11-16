@@ -10,6 +10,7 @@ describe("reference-only seed", () => {
     const prisma = new PrismaClient();
     const category = vi.spyOn(prisma.category, "upsert").mockResolvedValue({
       id: "operator-category", name: "Operator name", slug: "operator-slug", parentId: null, status: "INACTIVE",
+      icon: null, description: null, sortIndex: 0, acceptNewListings: true, showOnHome: null,
     });
     const province = vi.spyOn(prisma.province, "upsert").mockResolvedValue({ id: "operator-province", code: "VN-01", name: "Hà Nội" });
     const user = vi.spyOn(prisma.user, "createMany");

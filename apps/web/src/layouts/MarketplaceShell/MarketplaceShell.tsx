@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiForQuery } from "../../services/api";
@@ -7,6 +7,11 @@ import { MarketplaceHeader } from "../../components/MarketplaceHeader/Marketplac
 import { MobileBottomNav } from "../../components/MobileBottomNav/MobileBottomNav";
 import { Footer } from "../../components/Footer/Footer";
 import { useSession } from "../../contexts/SessionContext";
+import { aiEndpoints } from "@remarket/api-client";
+import { http } from "../../services/http";
+
+const MarketplaceAi = lazy(() => import("../../components/MarketplaceAi/MarketplaceAi"));
+const readAiConfig = aiEndpoints(http).config;
 
 /** Discovery pages keep footer + search row; deep task pages drop both. */
 function isDiscovery(pathname: string): boolean {
@@ -22,7 +27,7 @@ function isDiscovery(pathname: string): boolean {
  * footer on discovery pages, and the mobile bottom navigation (ui-spec 3.1).
  */
 export function MarketplaceShell() {
-  const { status } = useSession();
+  const { status, viewer } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -39,6 +44,13 @@ export function MarketplaceShell() {
     queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
     enabled: status === "ready",
     staleTime: 5 * 60_000,
+  });
+  const { data: aiConfig } = useQuery({
+    queryKey: ["ai-config", viewer?.id],
+    queryFn: readAiConfig,
+    enabled: status === "ready" && viewer?.status === "ACTIVE",
+    staleTime: 60_000,
+    retry: false,
   });
 
   const submitSearch = useCallback(() => {
@@ -68,6 +80,9 @@ export function MarketplaceShell() {
       </main>
       {footerVisible && <Footer />}
       <MobileBottomNav />
+      {viewer?.status === "ACTIVE" && aiConfig?.enabled && (
+        <Suspense fallback={null}><MarketplaceAi key={viewer.id} userId={viewer.id} /></Suspense>
+      )}
     </div>
   );
 }

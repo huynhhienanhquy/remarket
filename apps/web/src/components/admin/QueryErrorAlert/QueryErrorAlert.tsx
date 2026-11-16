@@ -1,4 +1,5 @@
-import { Button, InlineAlert } from "@/components/common";
+import { Button } from "../../common/Button/Button";
+import { InlineAlert } from "../../common/InlineAlert/InlineAlert";
 import { errorTitle, isApiError } from "@/helpers/errors";
 
 /** Inline error with the mandatory "Tải lại" action (ui-spec 24). */

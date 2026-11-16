@@ -47,11 +47,6 @@ function groupDigits(digits: string): string {
 const MAX_PRICE = 1_000_000_000;
 const MAX_SHIPPING_FEE = 10_000_000;
 
-export const MONEY_LIMITS = {
-  maxPrice: MAX_PRICE,
-  maxShippingFee: MAX_SHIPPING_FEE,
-} as const;
-
 /** Returns an error message or null when the raw VND input is valid. */
 export function validatePrice(raw: string): string | null {
   const value = normalizeVndInput(raw);

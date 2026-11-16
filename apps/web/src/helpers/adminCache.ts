@@ -5,6 +5,13 @@ type AdminResource = "dashboard" | "products" | "reports" | "reviews" | "users" 
 /** Invalidate the complete resource, including its list and detail queries. */
 export function invalidateAdminResources(client: QueryClient, ...resources: AdminResource[]) {
   const invalidations = [...new Set(resources)].map((resource) => client.invalidateQueries({ queryKey: ["admin", resource] }));
+  for (const resource of resources) {
+    const section = resource === "tickets" ? "support" : resource;
+    invalidations.push(client.invalidateQueries({ queryKey: ["admin", "summary", section] }));
+  }
+  if (resources.includes("products") || resources.includes("categories") || resources.includes("tickets")) {
+    invalidations.push(client.invalidateQueries({ queryKey: ["admin", "category-summary"] }));
+  }
   if (resources.includes("products") || resources.includes("reports") || resources.includes("tickets")) {
     invalidations.push(client.invalidateQueries({ queryKey: ["admin", "navigation-counts"] }));
   }

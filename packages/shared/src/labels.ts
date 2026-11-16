@@ -1,7 +1,6 @@
 import type {
   Condition,
   DeliveryMethod,
-  NotificationType,
   OrderStatus,
   ProductStatus,
   ReportReason,
@@ -46,12 +45,6 @@ export const DELIVERY_LABELS: Record<DeliveryMethod, string> = {
   BOTH: "Cả hai hình thức",
 };
 
-/** Label for the method actually written on an order (BOTH never appears). */
-export const ORDER_DELIVERY_LABELS: Record<"COD" | "MEETUP", string> = {
-  COD: "Giao hàng, trả tiền mặt",
-  MEETUP: "Gặp trực tiếp",
-};
-
 export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   COUNTERFEIT: "Hàng giả, hàng nhái",
   PROHIBITED: "Hàng cấm hoặc không được phép bán",
@@ -86,31 +79,3 @@ export const USER_STATUS_LABELS: Record<UserStatus, { label: string; tone: Tone 
   ACTIVE: { label: "Hoạt động", tone: "brand" },
   LOCKED: { label: "Bị khóa", tone: "danger" },
 };
-
-export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
-  PRODUCT_APPROVED: "Tin đăng đã được duyệt",
-  PRODUCT_REJECTED: "Tin đăng bị từ chối",
-  PRODUCT_BLOCKED: "Tin đăng bị hạn chế",
-  NEW_MESSAGE: "Tin nhắn mới",
-  ORDER_CREATED: "Đơn hàng đã tạo",
-  ORDER_CONFIRMED: "Đơn hàng đã xác nhận",
-  ORDER_CANCELLED: "Đơn hàng đã hủy",
-  ORDER_SHIPPED: "Đơn hàng đang giao",
-  ORDER_DELIVERED: "Đã ghi nhận giao hàng",
-  ORDER_COMPLETED: "Đơn hàng hoàn tất",
-  ORDER_REMINDER: "Nhắc xử lý đơn hàng",
-  REVIEW_CREATED: "Đánh giá mới",
-  TICKET_REPLY: "Phản hồi hỗ trợ",
-  REPORT_RESULT: "Kết quả báo cáo",
-  EMAIL_VERIFICATION_REQUESTED: "Yêu cầu xác minh email",
-  EMAIL_VERIFIED: "Email đã được xác minh",
-};
-
-export function productStatusLabel(status: ProductStatus): string {
-  return PRODUCT_STATUS_LABELS[status].label;
-}
-
-export function orderStatusLabel(status: OrderStatus): string {
-  return ORDER_STATUS_LABELS[status].label;
-}
-

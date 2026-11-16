@@ -44,8 +44,9 @@ export default function AdminLayout() {
         screenOptions={{
           headerTintColor: colors.text,
           headerTitleAlign: "left",
-          headerTitleStyle: { fontSize: 18, fontWeight: "600" },
+          headerTitleStyle: { fontSize: 18, fontWeight: "700" },
           headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.bg },
           headerStyle: { backgroundColor: colors.card },
           headerBackTitle: "Quản trị",
           headerLeft: () => (

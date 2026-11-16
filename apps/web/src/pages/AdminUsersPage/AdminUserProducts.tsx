@@ -4,7 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { QueryErrorAlert } from "../../components/admin/QueryErrorAlert/QueryErrorAlert";
-import { ApiImage, EmptyState, Pagination, StatusBadge, Tabs } from "../../components/common";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
+import { EmptyState } from "../../components/common/EmptyState/EmptyState";
+import { Pagination } from "../../components/common/Pagination/Pagination";
+import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
+import { Tabs } from "../../components/common/Tabs/Tabs";
 import { queryKeys } from "../../config/queryClient";
 import { apiForQuery } from "../../services/api";
 
