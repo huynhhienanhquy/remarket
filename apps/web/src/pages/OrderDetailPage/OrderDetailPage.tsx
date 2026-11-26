@@ -139,7 +139,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="timeline-heading">
             <h2 id="timeline-heading" className="t-h3 text-ink mb-4">

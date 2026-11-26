@@ -19,7 +19,7 @@ export function OrderContents({ order }: { order: OrderDetail }) {
             <div className="h-16 w-16 shrink-0 rounded-control bg-surface-subtle" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="t-body text-ink">{snap.title_snapshot}</p>
+            <p className="t-body break-words text-ink">{snap.title_snapshot}</p>
             <p className="t-meta text-muted">
               {conditionLabel(snap.condition_snapshot)}
             </p>
@@ -32,7 +32,7 @@ export function OrderContents({ order }: { order: OrderDetail }) {
 
     <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="delivery-heading">
       <h2 id="delivery-heading" className="t-h3 text-ink mb-4">Giao nhận</h2>
-      <dl className="space-y-2">
+      <dl className="space-y-2 [&_dd]:min-w-0 [&_dd]:break-words">
         <div className="flex justify-between">
           <dt className="t-body text-muted">Phương thức</dt>
           <dd className="t-body text-ink">{deliveryLabel}</dd>
