@@ -24,35 +24,34 @@ export class AppError extends Error {
   }
 }
 
-/** Compact correlated log line: message only, never payloads or stack data. */
-function log(error: Error, requestId: string): void {
-  const message = error.message.replace(/[\r\n]+/g, " ").slice(0, 1_000);
-  const line = `[${new Date().toISOString()}] request_id=${requestId} ${error.name}: ${message}`;
-  const parserError = error as Error & { status?: number };
-  if (
-    (error instanceof AppError && error.status < 500) ||
-    error instanceof ZodError ||
-    (parserError.status !== undefined && parserError.status >= 400 && parserError.status < 500)
-  ) {
-    console.warn(line);
-    return;
-  }
-  console.error(line);
-}
-
 export function errorHandler(
   err: Error,
   _req: Request,
   res: Response,
   _next: NextFunction,
 ): Response | void {
-  if (res.headersSent) return;
-
   const requestId =
     typeof res.locals.requestId === "string" && res.locals.requestId !== ""
       ? res.locals.requestId
       : "unknown";
-  log(err, requestId);
+  // Error messages may include submitted values or database connection details.
+  const parser = err as Error & { status?: number; type?: string };
+  const bodyTooLarge = parser.status === 413 || parser.type === "entity.too.large";
+  const invalidJson = parser.status === 400 && parser.type === "entity.parse.failed";
+  const code = err instanceof AppError || err instanceof Prisma.PrismaClientKnownRequestError ? err.code
+    : err instanceof ZodError ? API_ERROR_CODES.VALIDATION_ERROR
+    : bodyTooLarge ? "BODY_TOO_LARGE" : invalidJson ? "INVALID_JSON" : API_ERROR_CODES.INTERNAL;
+  const line = `[${new Date().toISOString()}] request_id=${requestId} code=${code}`;
+  if (bodyTooLarge || invalidJson || err instanceof ZodError || (err instanceof AppError && err.status < 500)) {
+    console.warn(line);
+  } else {
+    console.error(line);
+  }
+
+  if (res.headersSent) {
+    res.destroy();
+    return;
+  }
 
   if (err instanceof AppError) {
     return res.status(err.status).json({
@@ -63,7 +62,7 @@ export function errorHandler(
   }
 
   if (err instanceof ZodError) {
-    const fields: Record<string, string> = {};
+    const fields: Record<string, string> = Object.create(null);
     for (const issue of err.issues) {
       const path = issue.path.join(".") || "_";
       if (!fields[path]) fields[path] = issue.message;
@@ -79,8 +78,7 @@ export function errorHandler(
     });
   }
 
-  const parserError = err as Error & { status?: number; type?: string };
-  if (parserError.status === 413 || parserError.type === "entity.too.large") {
+  if (bodyTooLarge) {
     return res.status(413).json({
       success: false,
       error: {
@@ -90,7 +88,7 @@ export function errorHandler(
       meta: envelopeMeta(res),
     });
   }
-  if (parserError.status === 400 && parserError.type === "entity.parse.failed") {
+  if (invalidJson) {
     return res.status(400).json({
       success: false,
       error: {

@@ -194,6 +194,24 @@ describe("shared session restoration", () => {
     expect(expired).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a newer access token when the final retry returns an older 401", async () => {
+    session.updateSessionUser(user);
+    transport.setAccessToken("first-token");
+    const expired = vi.spyOn(window, "dispatchEvent");
+    fetchMock.mockResolvedValueOnce(failure(401, "SESSION_EXPIRED"))
+      .mockResolvedValueOnce(envelope({ user, access_token: "second-token" }))
+      .mockImplementationOnce(async () => {
+        transport.setAccessToken("third-token");
+        return failure(401, "SESSION_EXPIRED");
+      });
+
+    await expect(transport.http.get("/orders")).rejects.toMatchObject({ status: 401 });
+    expect(transport.getAccessToken()).toBe("third-token");
+    expect(session.getSessionUser()).toEqual(user);
+    expect(expired).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("revalidates locked marketplace identity without replaying the denied operation", async () => {
     transport.setAccessToken("token"); session.updateSessionUser(user);
     fetchMock.mockResolvedValueOnce(failure(403, "ACCOUNT_LOCKED")).mockResolvedValueOnce(envelope({ ...user, status: "LOCKED" }));

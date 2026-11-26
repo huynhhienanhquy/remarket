@@ -1,5 +1,6 @@
 import type { ApiSuccess, SessionUser } from "@remarket/shared";
 import { validApiResponse, apiResponseIssue } from "@remarket/shared";
+import { apiErrorFromResponse } from "@remarket/api-client";
 import { API_BASE_URL } from "../config/environment";
 import { ApiError, networkError } from "../helpers/errors";
 import { getSessionRevision, getSessionUser, updateSessionUser, updateSessionValidation } from "../stores/sessionStore";
@@ -260,17 +261,7 @@ async function parseEnvelope<T>(response: Response, path: string, method: string
     return resolveApiMediaUrls(envelope.data) as T;
   }
 
-  const errorBody = payload as
-    | { error?: { code?: string; message?: string; details?: Record<string, unknown> }; meta?: { request_id?: string } }
-    | null;
-  throw new ApiError({
-    code: errorBody?.error?.code ?? `HTTP_${response.status}`,
-    message: errorBody?.error?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.",
-    status: response.status,
-    details: errorBody?.error?.details,
-    requestId: errorBody?.meta?.request_id,
-    fields: (errorBody?.error?.details as { fields?: Record<string, string> } | undefined)?.fields,
-  });
+  throw apiErrorFromResponse(response.status, payload, "Có lỗi xảy ra. Vui lòng thử lại.");
 }
 
 async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -325,11 +316,6 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
     throw new ApiError({ code: "SESSION_EXPIRED", message: "Phiên đăng nhập đã hết hạn.", status: 401 });
   }
 
-  if (response.status === 401 && options.terminalAuthFailure && !credentialEndpoint) {
-    setAccessToken(null);
-    emitSessionExpired();
-  }
-
   if (response.status === 403 && !credentialEndpoint) {
     const error: unknown = await parseEnvelope<T>(response, path, method, assertRequestContext).catch((caught: unknown) => caught);
     assertRequestContext();
@@ -340,9 +326,18 @@ async function send<T>(path: string, options: RequestOptions = {}): Promise<T> {
     throw error;
   }
 
-  const data = await parseEnvelope<T>(response, path, method, assertRequestContext);
-  assertRequestContext();
-  return data;
+  try {
+    const data = await parseEnvelope<T>(response, path, method, assertRequestContext);
+    assertRequestContext();
+    return data;
+  } catch (error) {
+    assertRequestContext();
+    if (response.status === 401 && options.terminalAuthFailure && !credentialEndpoint && accessToken === requestToken) {
+      setAccessToken(null);
+      emitSessionExpired();
+    }
+    throw error;
+  }
 }
 
 export const http = {

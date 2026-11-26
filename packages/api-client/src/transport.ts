@@ -1,5 +1,5 @@
 import { validApiResponse, apiResponseIssue } from "@remarket/shared";
-import { ApiError } from "./errors.js";
+import { ApiError, apiErrorFromResponse } from "./errors.js";
 
 type Query = Record<
   string,
@@ -142,15 +142,7 @@ export function createTransport(options: TransportOptions): HttpTransport {
         assertCurrent();
         if (restored) return send<T>(method, path, body, query, extra, true);
       }
-      const payload = (await response.json().catch(() => null)) as {
-        data?: T;
-        error?: {
-          code?: string;
-          message?: string;
-          details?: Record<string, unknown>;
-        };
-        meta?: { request_id?: string };
-      } | null;
+      const payload: unknown = await response.json().catch(() => null);
       assertCurrent();
       if (controller.signal.aborted)
         throw new ApiError({
@@ -159,30 +151,22 @@ export function createTransport(options: TransportOptions): HttpTransport {
           status: 0,
         });
       if (!response.ok) {
-        if (response.status === 401 && !credentialEndpoint)
+        const error = apiErrorFromResponse(response.status, payload, "Yêu cầu chưa được thực hiện.");
+        if (response.status === 401 && !credentialEndpoint && token === options.getToken?.())
           await options.onExpired?.();
         if (
           response.status === 403 &&
           !credentialEndpoint &&
           path !== "/auth/mobile/me" &&
-          (payload?.error?.code === "ACCOUNT_LOCKED" ||
-            payload?.error?.code === "EMAIL_NOT_VERIFIED" ||
+          (error.code === "ACCOUNT_LOCKED" ||
+            error.code === "EMAIL_NOT_VERIFIED" ||
             (path.startsWith("/admin/") &&
-              payload?.error?.code === "FORBIDDEN"))
+              error.code === "FORBIDDEN"))
         ) {
           await options.onForbidden?.().catch(() => undefined);
           assertCurrent();
         }
-        throw new ApiError({
-          code: payload?.error?.code ?? `HTTP_${response.status}`,
-          message: payload?.error?.message ?? "Yêu cầu chưa được thực hiện.",
-          status: response.status,
-          details: payload?.error?.details,
-          requestId: payload?.meta?.request_id,
-          fields: payload?.error?.details?.fields as
-            | Record<string, string>
-            | undefined,
-        });
+        throw error;
       }
       if (!validApiResponse(path, method, response.status, payload))
         throw new ApiError({
@@ -193,7 +177,7 @@ export function createTransport(options: TransportOptions): HttpTransport {
             contract: apiResponseIssue(path, method, response.status, payload),
           },
         });
-      return resolveMedia(payload!.data, options.baseUrl) as T;
+      return resolveMedia((payload as { data: T }).data, options.baseUrl) as T;
     } finally {
       clearTimeout(timer);
     }

@@ -41,7 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "8.23.1",
     "rxjs": "7.8.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "socket.io": "^4.8.4",
     "zod": "3.25.76"
   },
@@ -61,7 +61,7 @@
     "tsx": "^4.19.2",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^3.2.7",
+    "vitest": "^4.1.12",
     "yaml": "^2.9.1"
   },
   "prisma": {

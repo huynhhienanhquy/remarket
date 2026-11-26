@@ -52,6 +52,7 @@ describe("admin date bounds", () => {
 });
 
 describe("admin HTTP contracts with isolated persistence", () => {
+  // The first request imports the full SDK in the Vitest worker.
   it("serves only the marketplace AI runtime when AI is enabled", async () => {
     const aiConfig: { enabled: boolean } = env.ai;
     const original = aiConfig.enabled;
@@ -65,7 +66,7 @@ describe("admin HTTP contracts with isolated persistence", () => {
     } finally {
       aiConfig.enabled = original;
     }
-  });
+  }, 20_000);
 
   it("returns global pending queue counts using one statement without loading queue rows", async () => {
     client.$queryRaw.mockResolvedValue([{ pending_email_verifications: 2n, pending_reports: 104n, open_tickets: 3n, pending_products: 5n }]);

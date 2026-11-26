@@ -31,14 +31,13 @@ export function MarketplaceShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const discovery = isDiscovery(location.pathname);
 
   // Keep the header field in sync when the URL query changes elsewhere.
   useEffect(() => {
     setSearch(searchParams.get("q") ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+  }, [searchParams]);
 
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,

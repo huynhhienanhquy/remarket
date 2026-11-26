@@ -96,7 +96,11 @@ try {
     : process.argv.includes("--storage-only")
     ? ["tests/integration/shared-storage.test.ts", "tests/integration/image-availability.test.ts"]
     : [process.argv.includes("--navigation-only") ? "tests/integration/navigation.test.ts" : process.argv.includes("--mobile-only") ? "tests/integration/mobile.test.ts" : process.argv.includes("--reliability-only") ? "tests/integration/reliability.test.ts" : process.argv.includes("--auth-only") ? "tests/integration/auth-lifecycle.test.ts" : process.argv.includes("--search-only") ? "tests/integration/product-search.test.ts" : "tests/integration"];
-  if (!process.argv.includes("--browser-only") && !process.argv.includes("--first-load")) await run("vitest/vitest.mjs", ["run", ...targets, "--testTimeout=120000", "--hookTimeout=120000", ...(process.argv.includes("--driver-pg") ? ["--maxWorkers=1"] : [])]);
+  if (!process.argv.includes("--browser-only") && !process.argv.includes("--first-load")) {
+    const manifest = require.resolve("vitest/package.json");
+    const cli = path.resolve(path.dirname(manifest), require(manifest).bin.vitest);
+    await run(cli, ["run", ...targets, "--testTimeout=120000", "--hookTimeout=120000", ...(process.argv.includes("--driver-pg") ? ["--maxWorkers=1"] : [])]);
+  }
   if (process.argv.includes("--first-load")) {
     await run("tsx/cli", ["tests/fixtures/first-load-seed.ts"], apiDir, { STORAGE_DRIVER: "database" });
     await run("../../scripts/benchmark-first-load.mjs", ["first-load-member", "--fixture"], path.resolve(apiDir, "../.."), { STORAGE_DRIVER: "database" });

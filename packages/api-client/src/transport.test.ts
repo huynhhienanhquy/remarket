@@ -83,6 +83,26 @@ describe("platform-neutral HTTP", () => {
       { code: "SESSION_CHANGED" },
     );
   });
+  it("does not expire a newer token when the final retry returns 401", async () => {
+    let token = "first-token";
+    const refresh = vi.fn(async () => {
+      token = "second-token";
+      return true;
+    });
+    const onExpired = vi.fn(async () => undefined);
+    const requestFetch = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockImplementationOnce(async () => {
+        token = "third-token";
+        return new Response(null, { status: 401 });
+      });
+    const http = createTransport({ baseUrl: "https://api.example.test/api/v1", fetch: requestFetch, getToken: () => token, refresh, onExpired });
+
+    await expect(http.get("/orders")).rejects.toMatchObject({ status: 401 });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(requestFetch).toHaveBeenCalledTimes(2);
+    expect(onExpired).not.toHaveBeenCalled();
+  });
   it("does not forward cookie credentials and preserves the checkout idempotency key", async () => {
     const requestFetch = vi.fn<typeof fetch>(
       async () =>

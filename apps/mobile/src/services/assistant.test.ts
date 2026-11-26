@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fromByteArray } from "base64-js";
 import { assistantHeaders } from "./assistant";
 import { session } from "./runtime";
 
@@ -24,7 +25,8 @@ describe("assistant bearer headers", () => {
   });
 
   it("refreshes an expiring token and sends the rotated bearer", async () => {
-    const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1_000) })).toString("base64url");
+    const encoded = new TextEncoder().encode(JSON.stringify({ exp: Math.floor(Date.now() / 1_000) }));
+    const payload = fromByteArray(encoded).replace(/=+$/, "");
     vi.mocked(session.getToken).mockReturnValueOnce(`header.${payload}.signature`).mockReturnValue("rotated");
     vi.mocked(session.refresh).mockResolvedValue(true);
     await expect(assistantHeaders(1)).resolves.toEqual({ Authorization: "Bearer rotated" });

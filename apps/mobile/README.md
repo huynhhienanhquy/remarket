@@ -3,10 +3,9 @@
 App Expo SDK 58 / React Native 0.88.1 cho Android và iOS, dùng API ReMarket thật.
 Có đầy đủ khu vực người dùng và quản trị. Không chứa mock account, dữ liệu demo hoặc database key.
 
-Hiện ghim Expo 58.0.22 và CLI 58.1.18 vì CLI 58.1.19 tham chiếu
-`@expo/env@~2.5.4` chưa có trên npm. Expo Doctor còn khuyến nghị Expo 58.0.23.
-Các override Metro trong `pnpm-workspace.yaml` giữ bản 0.87.1 mà Expo yêu cầu
-và tránh gói `metro-file-map@0.87.3` chưa phát hành.
+Các gói Expo theo bản vá tương thích của SDK 58. Chạy
+`pnpm --filter @remarket/mobile doctor` từ workspace để kiểm tra phiên bản
+và cấu hình trước khi build.
 
 Giao diện native đồng bộ với web mobile-first: trang chủ có hero hai CTA,
 danh mục ba cột và 10 tin mới; trang `/products` riêng cho tìm kiếm, sắp xếp

@@ -33,6 +33,22 @@ describe("HTTP foundation", () => {
     }
   });
 
+  it("logs a stable code when the JSON parser rejects a request", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await request(createApp()).post("/api/v1/auth/login")
+        .set("X-Request-Id", "invalid-json-request")
+        .set("Content-Type", "application/json")
+        .send("sample text")
+        .expect(400);
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("request_id=invalid-json-request code=INVALID_JSON"));
+      expect(warn.mock.calls.flat().join(" ")).not.toContain("sample text");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("rejects unknown and malformed public-list query parameters before database access", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
