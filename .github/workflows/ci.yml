@@ -23,7 +23,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
       DIRECT_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
-      TEST_DATABASE_URL: postgresql://remarket:remarket@localhost:5432/remarket_test
       JWT_SECRET: ci-only-secret-with-at-least-thirty-two-characters
       FRONTEND_URL: http://localhost:5173
       NODE_OPTIONS: --max-old-space-size=4096
@@ -38,18 +37,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @remarket/api prisma:generate
       - run: pnpm --filter @remarket/api contracts:check
-      - run: pnpm --filter @remarket/api prisma:deploy
       - run: pnpm -r typecheck
       - run: pnpm -r lint
-      - run: pnpm -r test
+      - name: Unit and contract tests
+        env:
+          VITEST_MAX_WORKERS: "2"
+        run: pnpm --workspace-concurrency=1 -r test
       - run: pnpm -r build
       - name: Expo dependency and configuration checks
         run: pnpm --filter @remarket/mobile doctor
-      - name: Browser smoke against an isolated database schema
+      - name: PostgreSQL integration and browser smoke in an isolated schema
         run: |
           chrome_path="$(command -v google-chrome || command -v chromium)"
           test -n "$chrome_path"
-          CHROME_BIN="$chrome_path" node apps/api/scripts/verify-isolated.mjs --browser-only
+          CHROME_BIN="$chrome_path" node apps/api/scripts/verify-isolated.mjs --browser
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
