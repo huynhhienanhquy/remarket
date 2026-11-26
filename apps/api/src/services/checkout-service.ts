@@ -13,11 +13,11 @@ import { idempotencyConflict, priceChanged, retryLater, unauthorized, validation
 import { cmpMoney, sumMoney } from "../shared/money.js";
 import { prisma } from "../utils/prisma.js";
 
-export const MAX_ORDER_TTL_MS = env.orderConfirmTimeoutHours * 60 * 60 * 1000;
+const MAX_ORDER_TTL_MS = env.orderConfirmTimeoutHours * 60 * 60 * 1000;
 
-export const ORDER_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const ORDER_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-export function newOrderCode(): string {
+function newOrderCode(): string {
   const bytes = randomBytes(8);
   let code = "";
   for (let index = 0; index < 8; index += 1) {
@@ -26,7 +26,7 @@ export function newOrderCode(): string {
   return `RM-${code}`;
 }
 
-export async function uniqueOrderCode(tx: Prisma.TransactionClient): Promise<string> {
+async function uniqueOrderCode(tx: Prisma.TransactionClient): Promise<string> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const code = newOrderCode();
     const taken = await tx.order.findUnique({ where: { code }, select: { id: true } });
@@ -35,7 +35,7 @@ export async function uniqueOrderCode(tx: Prisma.TransactionClient): Promise<str
   throw retryLater("Không tạo được mã đơn hàng, vui lòng thử lại.");
 }
 
-export function isRetryableError(error: unknown): boolean {
+function isRetryableError(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return error.code === "P2002" || error.code === "P2028" || isTransactionConflict(error);
   }
@@ -50,7 +50,7 @@ export interface CheckoutOutcome {
   rows: OrderRow[];
 }
 
-export async function runCheckout(
+async function runCheckout(
   buyerId: string,
   idempotencyKey: string,
   requestHash: string,

@@ -17,7 +17,7 @@ export function assertEnumValue<T extends string>(
   return value as T;
 }
 
-export const imageSchema = z
+const imageSchema = z
   .object({
     url: z.string({ required_error: "Ảnh không hợp lệ.", invalid_type_error: "Ảnh không hợp lệ." }),
     sort_order: z.number({
@@ -28,7 +28,7 @@ export const imageSchema = z
   })
   .strict();
 
-export const productFields = z.object({
+const productFields = z.object({
   title: z.string({ required_error: "Tên món đồ là bắt buộc.", invalid_type_error: "Tên món đồ không hợp lệ." }),
   description: z.string({
     required_error: "Mô tả là bắt buộc.",
@@ -58,7 +58,7 @@ export const productFields = z.object({
   }),
 });
 
-export const imagesField = z.array(imageSchema);
+const imagesField = z.array(imageSchema);
 
 export const createSchema = productFields.extend({ images: imagesField }).strict();
 
@@ -74,29 +74,26 @@ export const patchSchema = productFields
   })
   .strict();
 
-export type ImagePayload = z.infer<typeof imageSchema>;
+type ImagePayload = z.infer<typeof imageSchema>;
+type ProductFields = z.infer<typeof productFields>;
 
-export type ProductFields = z.infer<typeof productFields>;
-
-export type CreatePayload = z.infer<typeof createSchema>;
-
-export type PatchPayload = z.infer<typeof patchSchema>;
-
-export interface NormalizedProduct {
-  title: string;
-  description: string;
-  categoryId: string;
-  price: string;
-  condition: Condition;
-  usageMonths: number | null;
-  provinceCode: string;
-  deliveryMethod: DeliveryMethod;
-  shippingFee: string;
+interface NormalizedProduct {
+  fields: {
+    title: string;
+    description: string;
+    categoryId: string;
+    price: string;
+    condition: Condition;
+    usageMonths: number | null;
+    provinceCode: string;
+    deliveryMethod: DeliveryMethod;
+    shippingFee: string;
+  };
   images: { url: string; storagePath: string; sortOrder: number }[];
 }
 
 /** 1-8 images, contiguous `sort_order` from 0, every URL present. */
-export function assertImages(images: readonly ImagePayload[]): void {
+function assertImages(images: readonly ImagePayload[]): void {
   if (images.length < 1 || images.length > PRODUCT_LIMITS.imagesMax) {
     throw validationError("Số lượng ảnh không hợp lệ.", {
       images: `Cần từ 1 đến ${PRODUCT_LIMITS.imagesMax} ảnh.`,
@@ -186,15 +183,17 @@ export async function validateAndNormalize(
   const shippingFee = normalizeVndInput(fields.shipping_fee);
 
   return {
-    title: fields.title.trim(),
-    description: fields.description.trim(),
-    categoryId: fields.category_id,
-    price: priceDigits ?? "0",
-    condition: fields.condition as Condition,
-    usageMonths: fields.usage_months ?? null,
-    provinceCode,
-    deliveryMethod: fields.delivery_method as DeliveryMethod,
-    shippingFee: fields.delivery_method === "MEETUP" ? "0" : shippingFee ?? "0",
+    fields: {
+      title: fields.title.trim(),
+      description: fields.description.trim(),
+      categoryId: fields.category_id,
+      price: priceDigits ?? "0",
+      condition: fields.condition as Condition,
+      usageMonths: fields.usage_months ?? null,
+      provinceCode,
+      deliveryMethod: fields.delivery_method as DeliveryMethod,
+      shippingFee: fields.delivery_method === "MEETUP" ? "0" : shippingFee ?? "0",
+    },
     images: (images ?? []).map((image) => ({
       url: `/api/v1/uploads/${image.storage_path!.trim().split("/").at(-1)}`,
       storagePath: image.storage_path!.trim(),

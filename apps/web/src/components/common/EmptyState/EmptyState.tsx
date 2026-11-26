@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { buttonClasses } from "../Button/Button";
 import { InboxIcon } from "../Icon/Icon";
 
-export interface EmptyStateAction {
+interface EmptyStateAction {
   label: string;
   /** `to` renders a router link, otherwise a plain action button. */
   to?: string;
@@ -40,7 +40,7 @@ export function EmptyState({
         <div className="mt-1">
           {action.to !== undefined ? (
             <Link to={action.to} className={buttonClasses("primary", "md")}>
-              {action.label}
+              <span className="rm-button-content inline-block">{action.label}</span>
             </Link>
           ) : (
             <button
@@ -48,7 +48,7 @@ export function EmptyState({
               onClick={action.onClick}
               className={buttonClasses("primary", "md")}
             >
-              {action.label}
+              <span className="rm-button-content inline-block">{action.label}</span>
             </button>
           )}
         </div>

@@ -57,7 +57,14 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("communication performance on Po
     const conversation = await prisma.conversation.create({ data: { buyerId, sellerId } });
     const viewer = (await prisma.user.findUniqueOrThrow({ where: { id: buyerId } }));
     const delivered = vi.fn();
-    const stopListener = onRealtimeEvent(delivered);
+    const stopListener = onRealtimeEvent((event) => {
+      const { aggregateId, payload } = event;
+      // The relay also drains pending events from other fixtures in this schema.
+      if (aggregateId === conversation.id ||
+          (payload && typeof payload === "object" && !Array.isArray(payload) && payload.reference_id === conversation.id)) {
+        delivered(event);
+      }
+    });
     const stopRelay = await startRealtimeRelay(50, backgroundPrisma);
     try {
       const result = await sendChatMessage({ conversationId: conversation.id, viewer, clientMessageId: randomUUID(), content: "Immediate committed message" });

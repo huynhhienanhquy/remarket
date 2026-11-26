@@ -119,11 +119,11 @@ export function AdminShell() {
             </div>
           </div>
           <div className="admin-header-actions">
-            <Link to="/" className="admin-utility admin-marketplace">
+            <Link to="/" className="rm-control admin-utility admin-marketplace">
               <Icon name="store" size={17} />
               <span>Mở marketplace</span>
             </Link>
-            <Link to="/notifications" aria-label="Thông báo" className="admin-header-tool admin-notifications">
+            <Link to="/notifications" aria-label="Thông báo" className="rm-control admin-header-tool admin-notifications">
               <Icon name="bell" size={18} />
               {!!unread?.notifications && <span className="admin-notification-dot" />}
             </Link>

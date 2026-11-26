@@ -67,6 +67,33 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("official admin-user chat on Pos
       const adminView = await request(app).get(`/api/v1/conversations/${conversationId}`).set("Authorization", adminToken).expect(200);
       expect(adminView.body.data).toMatchObject({ is_system: true, unread_count: 1, counterparty: { id: userId, name: "Test user" } });
       expect(adminView.body.data.counterparty.is_system).toBeUndefined();
+
+      const base = `/api/v1/conversations/${conversationId}`;
+      await request(app).delete(base).set("Authorization", outsiderToken).expect(404);
+      await request(app).delete(base).set("Authorization", adminToken).expect(200);
+      await request(app).delete(base).set("Authorization", adminToken).expect(200);
+      const clearedInbox = await request(app).get("/api/v1/conversations").set("Authorization", adminToken).expect(200);
+      expect(clearedInbox.body.data.items).not.toContainEqual(expect.objectContaining({ id: conversationId }));
+      const clearedDetail = await request(app).get(base).set("Authorization", adminToken).expect(200);
+      expect(clearedDetail.body.data).toMatchObject({ last_message: null, unread_count: 0, updated_at: adminView.body.data.updated_at });
+      const clearedHistory = await request(app).get(`${base}/messages`).set("Authorization", adminToken).expect(200);
+      expect(clearedHistory.body.data).toEqual({ items: [], next_cursor: null });
+      await request(app).post(`${base}/read`).set("Authorization", adminToken).send({ last_message_id: reply.body.data.message.id }).expect(404);
+      const badges = await request(app).get("/api/v1/notifications/navigation-counts").set("Authorization", adminToken).expect(200);
+      expect(badges.body.data).toMatchObject({ messages: 0, notifications: 0 });
+      const otherHistory = await request(app).get(`${base}/messages`).set("Authorization", userToken).expect(200);
+      expect(otherHistory.body.data).toEqual(history.body.data);
+
+      const newMessage = { content: "Tin nhắn sau khi xóa", client_message_id: randomUUID() };
+      const fresh = await request(app).post(`${base}/messages`).set("Authorization", userToken).send(newMessage).expect(201);
+      const restoredInbox = await request(app).get("/api/v1/conversations").set("Authorization", adminToken).expect(200);
+      expect(restoredInbox.body.data.items).toContainEqual(expect.objectContaining({
+        id: conversationId, last_message: expect.objectContaining({ content: newMessage.content }), unread_count: 1,
+      }));
+      const restoredHistory = await request(app).get(`${base}/messages`).set("Authorization", adminToken).expect(200);
+      expect(restoredHistory.body.data.items).toEqual([fresh.body.data.message]);
+      const unread = await request(app).get("/api/v1/conversations/unread-count").set("Authorization", adminToken).expect(200);
+      expect(unread.body.data).toBe(1);
     } finally { stop(); }
   }, 120_000);
 });

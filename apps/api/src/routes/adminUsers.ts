@@ -1,3 +1,4 @@
+import { moderationListFields } from "../shared/admin-query.js";
 import type { Prisma } from "@prisma/client";
 import { validateEmail, validateFullName, validatePassword, validatePhone } from "@remarket/shared";
 import bcrypt from "bcryptjs";
@@ -81,11 +82,7 @@ const listQuery = z
     q: z.string().trim().max(100).optional(),
     status: z.enum(["ACTIVE", "LOCKED", "ALL"]).optional(),
     role: z.enum(["USER", "ADMIN", "ALL"]).optional(),
-    handled_by: z.string().trim().min(1).max(64).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    page: z.string().optional(),
-    page_size: z.string().optional(),
+    ...moderationListFields,
   })
   .strict();
 

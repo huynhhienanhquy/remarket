@@ -32,7 +32,7 @@ export function AccountDeletionPage() {
         </Link>
       ) : (
         <form
-          className="space-y-4 rounded-card border border-line bg-surface p-6"
+          className="rm-card-panel space-y-4 rounded-card border border-line bg-surface p-6"
           onSubmit={async (event) => {
             event.preventDefault();
             if (pending || !confirmed) return;

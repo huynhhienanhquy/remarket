@@ -67,7 +67,9 @@ export function VerifyEmailPage() {
         <Link to={loginPathFor("/verify-email", "")} className="block text-brand hover:underline">Liên kết hết hạn? Đăng nhập để gửi yêu cầu</Link>
       </form> : !viewer ? <div className="space-y-3">
         <InlineAlert tone="info" title="Đăng nhập để gửi yêu cầu">Yêu cầu chỉ được gửi cho email của chính tài khoản đang đăng nhập.</InlineAlert>
-        <Link to={loginPathFor("/verify-email", "")} className="block rounded-control bg-brand p-3 text-center t-label text-white">Đăng nhập để xác minh email</Link>
+        <Link to={loginPathFor("/verify-email", "")} className="rm-control rm-button-primary block rounded-control bg-brand p-3 text-center t-label text-white">
+          <span className="rm-button-content inline-block">Đăng nhập để xác minh email</span>
+        </Link>
       </div> : viewer.status === "LOCKED" ? <InlineAlert tone="warning" title="Tài khoản đang bị hạn chế">Liên hệ hỗ trợ để được hướng dẫn.</InlineAlert> : request.isPending ? <Skeleton className="h-32 w-full" /> : request.isError ? <QueryFailure error={request.error} retry={() => void request.refetch()} /> :
       <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="space-y-4">
         <FormField label="Email tài khoản" htmlFor="verification-email"><Input id="verification-email" value={viewer.email} readOnly type="email" /></FormField>

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "../components/HoverPressable";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -113,64 +113,44 @@ export default function Notifications() {
                 styles.card,
                 {
                   borderRadius: 16,
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 12,
+                  gap: 8,
                   borderColor: item.read_at ? colors.border : colors.green,
                 },
               ]}
             >
               <View
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  backgroundColor: item.read_at ? colors.subtle : colors.soft,
-                  alignItems: "center",
-                  justifyContent: "center",
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 8,
                 }}
               >
-                <Ionicons
-                  name="notifications-outline"
-                  size={20}
-                  color={item.read_at ? colors.muted : colors.green}
-                />
-              </View>
-              <View style={{ flex: 1, gap: 8 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 8,
-                  }}
+                <Text
+                  style={[
+                    styles.label,
+                    { flex: 1, fontWeight: item.read_at ? "500" : "600" },
+                  ]}
                 >
-                  <Text
-                    style={[
-                      styles.label,
-                      { flex: 1, fontWeight: item.read_at ? "500" : "600" },
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
-                  {!item.read_at && (
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        marginTop: 6,
-                        backgroundColor: colors.green,
-                      }}
-                    />
-                  )}
-                </View>
-                <Text numberOfLines={2} style={styles.muted}>
-                  {item.content}
+                  {item.title}
                 </Text>
-                <Text style={styles.meta}>
-                  {formatRelative(item.created_at)}
-                </Text>
+                {!item.read_at && (
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      marginTop: 6,
+                      backgroundColor: colors.green,
+                    }}
+                  />
+                )}
               </View>
+              <Text numberOfLines={2} style={styles.muted}>
+                {item.content}
+              </Text>
+              <Text style={styles.meta}>
+                {formatRelative(item.created_at)}
+              </Text>
             </Pressable>
           ))}
           {result.data?.items.length === 0 && (

@@ -1,6 +1,6 @@
 import { useRouteError, isRouteErrorResponse, Link } from "react-router-dom";
 import { errorTitle, isApiError } from "../../../helpers/errors";
-import { Button } from "../Button/Button";
+import { Button, buttonClasses } from "../Button/Button";
 import { InlineAlert } from "../InlineAlert/InlineAlert";
 
 /**
@@ -53,11 +53,11 @@ export function NotFoundBody() {
         Trang bạn tìm không tồn tại hoặc đã bị di chuyển.
       </p>
       <div className="flex gap-3">
-        <Link to="/">
-          <Button variant="primary">Về trang chủ</Button>
+        <Link to="/" className={buttonClasses("primary")}>
+          <span className="rm-button-content inline-block">Về trang chủ</span>
         </Link>
-        <Link to="/products">
-          <Button variant="secondary">Khám phá sản phẩm</Button>
+        <Link to="/products" className={buttonClasses("secondary")}>
+          <span className="rm-button-content inline-block">Khám phá sản phẩm</span>
         </Link>
       </div>
     </div>
@@ -73,8 +73,8 @@ export function ForbiddenBody() {
         Khu vực này chỉ dành cho quản trị viên. Nếu bạn cho rằng đây là nhầm
         lẫn, hãy quay lại trang chủ.
       </p>
-      <Link to="/">
-        <Button variant="primary">Về trang chủ</Button>
+      <Link to="/" className={buttonClasses("primary")}>
+        <span className="rm-button-content inline-block">Về trang chủ</span>
       </Link>
     </div>
   );

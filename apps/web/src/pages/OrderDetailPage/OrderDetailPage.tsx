@@ -109,7 +109,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
       <OfflineNotice online={online} />
       {actionError && <InlineAlert tone="danger" title={actionError} />}
 
-      <section className="rounded-card border border-line bg-surface p-5 mb-6">
+      <section className="rm-card-panel rounded-card border border-line bg-surface p-5 mb-6">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <p className="t-h2 text-ink">Đơn hàng #{order.code.slice(0, 8).toUpperCase()}</p>
@@ -141,7 +141,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="timeline-heading">
+          <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="timeline-heading">
             <h2 id="timeline-heading" className="t-h3 text-ink mb-4">
               Tiến trình đơn hàng
             </h2>
@@ -163,7 +163,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="counterparty-heading">
+          <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="counterparty-heading">
             <h2 id="counterparty-heading" className="t-h3 text-ink mb-4">
               {isBuyer ? "Người bán" : "Người mua"}
             </h2>
@@ -174,7 +174,7 @@ export function OrderDetailPage({ role }: OrderDetailPageProps) {
             )}
           </section>
 
-          <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="actions-heading">
+          <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="actions-heading">
             <h2 id="actions-heading" className="t-h3 text-ink mb-4">Hành động</h2>
             <div className="space-y-3">
               {canConfirm && (

@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import { ZodError, z } from "zod";
 import { API_ERROR_CODES } from "@remarket/shared";
 import type { AuthUser } from "../middleware/auth.js";
+import type { Session } from "@prisma/client";
 import { AppError } from "../middleware/errorHandler.js";
 import { env } from "../config/env.js";
 import { assertConversationParticipant, markConversationRead, sendChatMessage } from "../services/chat-service.js";
@@ -56,18 +57,7 @@ async function identityFromToken(token: string): Promise<SocketIdentity | null> 
     session.revokedAt !== null || !!session.user.deletedAt ||
     session.expiresAt <= new Date()
   ) return null;
-  return {
-    sessionId: session.id,
-    expiresAt: Math.min(claims.expiresAt, session.expiresAt.getTime()),
-    user: {
-      id: session.user.id,
-      email: session.user.email,
-      fullName: session.user.fullName,
-      role: session.user.role,
-      status: session.user.status,
-      emailVerifiedAt: session.user.emailVerifiedAt,
-    },
-  };
+  return socketIdentity(session, claims.expiresAt);
 }
 
 async function refreshIdentity(identity: SocketIdentity): Promise<SocketIdentity | null> {
@@ -76,9 +66,13 @@ async function refreshIdentity(identity: SocketIdentity): Promise<SocketIdentity
     include: { user: true },
   });
   if (!session || session.user.deletedAt || session.revokedAt !== null || session.expiresAt <= new Date()) return null;
+  return socketIdentity(session, identity.expiresAt);
+}
+
+function socketIdentity(session: Pick<Session, "id" | "expiresAt"> & { user: AuthUser }, tokenExpiresAt: number): SocketIdentity {
   return {
     sessionId: session.id,
-    expiresAt: Math.min(identity.expiresAt, session.expiresAt.getTime()),
+    expiresAt: Math.min(tokenExpiresAt, session.expiresAt.getTime()),
     user: {
       id: session.user.id,
       email: session.user.email,

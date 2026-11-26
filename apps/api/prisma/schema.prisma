@@ -439,6 +439,8 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  hiddenForBuyer  Boolean @default(false)
+  hiddenForSeller Boolean @default(false)
   messages  Message[]
 
   @@unique([buyerId, sellerId, productId])
@@ -460,6 +462,8 @@ model Message {
   content            String
   readAt             DateTime?
   createdAt          DateTime @default(now())
+  hiddenForBuyer     Boolean  @default(false)
+  hiddenForSeller    Boolean  @default(false)
 
   @@unique([conversationId, senderId, clientMessageId])
   @@index([conversationId])

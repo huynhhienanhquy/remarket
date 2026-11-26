@@ -6,8 +6,6 @@ import { AppError } from "../middleware/errorHandler.js";
  * Codes and statuses follow detail-project 17.
  */
 
-export const codes = API_ERROR_CODES;
-
 export function validationError(
   message: string,
   fields?: Record<string, string>,

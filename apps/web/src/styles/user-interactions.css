@@ -1,0 +1,421 @@
+:root {
+  --rm-motion-spring: cubic-bezier(.18, 1.32, .33, 1);
+  --rm-motion-settle: cubic-bezier(.19, .73, .25, 1);
+  --rm-motion-mint: #73d7a8;
+  --rm-motion-lime: #d8fbab;
+}
+
+.rm-card-light, .rm-card-open {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(.rm-button, .rm-button-primary, .rm-button-danger, .admin-primary) > .rm-button-content,
+  .rm-button-primary > svg[aria-hidden="true"] {
+    transition: translate 320ms var(--rm-motion-spring), scale 320ms var(--rm-motion-spring);
+  }
+
+  :is(.rm-button, .rm-button-primary, .rm-button-danger, .admin-primary):active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-button-content,
+  .rm-button-primary:active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) > svg[aria-hidden="true"] {
+    translate: 0 2px;
+    scale: .94;
+    transition-duration: 110ms;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  /* Keep hit areas and keyboard outlines stationary while their faces lift. */
+  :where([data-user-interactions] :is(.rm-card-feature, .rm-card-tile, .rm-card-face, .rm-card-preview-face)) {
+    position: relative;
+  }
+
+  :where([data-user-interactions]) :is(.rm-card-feature, .rm-card-tile, .rm-card-link) > :is(.rm-card-face, .rm-card-preview-face) {
+    pointer-events: none;
+  }
+
+  :where([data-user-interactions]) .rm-card-feature :is(.rm-card-layer, .rm-card-copy) {
+    pointer-events: auto;
+  }
+
+  :where([data-user-interactions]) .rm-card-face {
+    overflow: visible;
+    transform-style: preserve-3d;
+    transition:
+      transform 350ms var(--rm-motion-spring),
+      translate 370ms var(--rm-motion-spring),
+      scale 370ms var(--rm-motion-spring),
+      background-color 180ms ease-out,
+      border-color 180ms ease-out,
+      box-shadow 240ms ease-out;
+  }
+
+  :where([data-user-interactions]) .rm-card-media {
+    border-radius: inherit;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  :where([data-user-interactions]) .rm-card-feature > .rm-card-face {
+    --rm-card-lift: -15px;
+    --rm-card-zoom: 1.032;
+    --rm-card-pitch: 12deg;
+    --rm-card-yaw: 13deg;
+    --rm-card-copy-depth: 13px;
+    --rm-card-title-depth: 24px;
+    --rm-card-icon-depth: 37px;
+  }
+
+  .rm-card-preview-face {
+    transition: translate 340ms var(--rm-motion-spring), border-color 190ms ease-out, box-shadow 240ms var(--rm-motion-settle);
+  }
+
+  .rm-card-preview:has(> .rm-card-link:hover) {
+    z-index: 1;
+  }
+
+  .rm-card-link:hover:not(:active) > .rm-card-preview-face {
+    --rm-interaction-depth: 0 14px 22px -13px theme(colors.ink / 44%), 0 7px 16px -10px theme(colors.brand.DEFAULT / 38%);
+    translate: 0 -7px;
+  }
+
+  :where([data-user-interactions]) :is(.rm-card-tile, .rm-card-feature)[data-pointer-active]:hover {
+    z-index: 2;
+  }
+
+  :where([data-user-interactions]) :is(
+    .rm-card-tile[data-pointer-active]:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-card-face,
+    .rm-card-feature[data-pointer-active]:hover > .rm-card-face
+  ) {
+    --rm-interaction-depth: 0 24px 32px -18px theme(colors.ink / 48%), 0 8px 22px -10px theme(colors.brand.DEFAULT / 42%);
+    --rm-card-light-opacity: 1;
+    --rm-card-parallax: 1;
+    translate: 0 var(--rm-card-lift, -8px);
+    scale: var(--rm-card-zoom, 1.023);
+    transform: perspective(860px)
+      rotateX(calc(var(--rm-pointer-y, 0) * var(--rm-card-pitch, 8deg) * -1))
+      rotateY(calc(var(--rm-pointer-x, 0) * var(--rm-card-yaw, 10deg)));
+    /* A short blend covers first paint; the spring interpolates pointer samples. */
+    transition-duration: 85ms, 370ms, 370ms, 180ms, 180ms, 240ms;
+  }
+
+  :where([data-user-interactions]) :is(.rm-card-tile, .rm-card-link):active:not(:where([aria-disabled="true"], [aria-busy="true"]))
+    > :is(.rm-card-face, .rm-card-preview-face) {
+    translate: 0 -2px;
+    scale: .99;
+  }
+
+  /* The clipped optical layer leaves the text and icon free to move in Z. */
+  :where([data-user-interactions]) .rm-card-light {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: var(--rm-card-light-opacity, 0);
+    transition: opacity 260ms var(--rm-motion-settle);
+  }
+
+  :where([data-user-interactions]) .rm-card-light::before,
+  :where([data-user-interactions]) .rm-card-light::after {
+    position: absolute;
+    content: "";
+  }
+
+  :where([data-user-interactions]) .rm-card-light::before {
+    top: 50%;
+    left: 50%;
+    width: 26rem;
+    height: 22rem;
+    background: radial-gradient(ellipse closest-side, rgb(246 255 218 / 80%), rgb(162 241 184 / 40%) 34%, rgb(115 215 168 / 14%) 67%, transparent);
+    translate: calc(var(--rm-light-x, 0px) - 50%) calc(var(--rm-light-y, 0px) - 50%);
+    transition: translate 320ms var(--rm-motion-settle);
+  }
+
+  :where([data-user-interactions]) [data-pointer-active] .rm-card-light::before {
+    transition: none;
+  }
+
+  :where([data-user-interactions]) .rm-card-light::after {
+    inset: -25% -45%;
+    background:
+      radial-gradient(ellipse at 22% 35%, rgb(69 215 163 / 23%), transparent 48%),
+      radial-gradient(ellipse at 65% 78%, rgb(111 123 226 / 21%), transparent 52%),
+      linear-gradient(110deg, transparent 23%, rgb(179 255 184 / 25%) 46%, rgb(126 228 235 / 20%) 55%, transparent 77%);
+    animation: rm-card-aurora 4.8s ease-in-out infinite alternate paused;
+  }
+
+  :where([data-user-interactions]) [data-pointer-active] .rm-card-light::after {
+    animation-play-state: running;
+  }
+
+  :where([data-user-interactions] :is(.rm-card-layer, .rm-card-icon, .rm-card-copy)) {
+    position: relative;
+    z-index: 2;
+    transition: transform 350ms var(--rm-motion-spring), background-color 180ms ease-out;
+  }
+
+  :where([data-user-interactions]) .rm-card-status {
+    z-index: 2;
+  }
+
+  :where([data-user-interactions]) [data-pointer-active] :is(.rm-card-layer, .rm-card-icon, .rm-card-copy) {
+    transform: translate3d(
+      calc(var(--rm-pointer-x, 0) * var(--rm-card-layer-x, 3px) * var(--rm-card-parallax, 0)),
+      calc(var(--rm-pointer-y, 0) * var(--rm-card-layer-y, 2px) * var(--rm-card-parallax, 0)),
+      calc(var(--rm-card-layer-depth, 0px) * var(--rm-card-parallax, 0))
+    );
+    transition-duration: 0s, 180ms;
+  }
+
+  :where([data-user-interactions]) .rm-card-layer {
+    --rm-card-layer-depth: var(--rm-card-title-depth, 12px);
+  }
+
+  :where([data-user-interactions]) .rm-card-copy {
+    --rm-card-layer-x: 1.5px;
+    --rm-card-layer-y: 1px;
+    --rm-card-layer-depth: var(--rm-card-copy-depth, 5px);
+  }
+
+  :where([data-user-interactions]) .rm-card-icon {
+    --rm-card-layer-x: 8px;
+    --rm-card-layer-y: 6px;
+    --rm-card-layer-depth: var(--rm-card-icon-depth, 21px);
+  }
+
+  .rm-card-image {
+    transition: scale 420ms var(--rm-motion-spring);
+  }
+
+  .rm-card-link:hover .rm-card-image {
+    scale: 1.09;
+  }
+
+  /* Keep the preview affordance and image wash inside the thumbnail. */
+  .rm-card-media::after,
+  .rm-card-open {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 230ms ease-out, translate 330ms var(--rm-motion-spring);
+  }
+
+  .rm-card-media::after {
+    content: "";
+    inset: 0;
+    background: linear-gradient(145deg, transparent 43%, rgb(16 76 48 / 24%) 74%, rgb(16 48 34 / 70%));
+  }
+
+  .rm-card-open {
+    display: grid;
+    place-items: center;
+    inset-inline-end: 10px;
+    inset-block-end: 10px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: theme(colors.brand.DEFAULT);
+    background: theme(colors.surface);
+    translate: -7px 4px;
+  }
+
+  .rm-card-link:is(:hover, :focus-visible) .rm-card-open,
+  .rm-card-link:is(:hover, :focus-visible) .rm-card-media::after {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  .rm-card-managed .rm-managed-image {
+    transition: scale 420ms var(--rm-motion-spring);
+  }
+
+  .rm-card-managed:hover:not(:has(button:hover)) .rm-managed-image {
+    scale: 1.06;
+  }
+
+  /* A nav card uses a sliding rail and icon motion instead of tilting its copy. */
+  .rm-card-nav {
+    position: relative;
+  }
+
+  .rm-card-nav::after {
+    position: absolute;
+    inset: auto 12px 2px;
+    height: 2px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, theme(colors.brand.DEFAULT), var(--rm-motion-mint), transparent);
+    content: "";
+    pointer-events: none;
+    opacity: 0;
+    scale: .25 1;
+    transform-origin: left;
+    transition: opacity 170ms ease-out, scale 320ms var(--rm-motion-spring);
+  }
+
+  .rm-card-nav:hover:not(:where([aria-disabled="true"], [aria-busy="true"]))::after {
+    opacity: 1;
+    scale: 1;
+  }
+
+  .rm-card-nav .rm-card-icon {
+    transition: translate 270ms var(--rm-motion-spring), background-color 180ms ease-out;
+  }
+
+  .rm-card-nav:hover:not(:where([aria-disabled="true"], [aria-busy="true"])) .rm-card-icon {
+    background-color: theme(colors.brand.DEFAULT / 16%);
+    translate: 3px 0;
+  }
+
+  .rm-card-nav:focus-visible > .rm-card-face {
+    @apply border-brand/45;
+  }
+
+  /* KPI surfaces lift on their own stationary wrappers. Dense metrics keep
+     numbers fixed and reveal only a tone-specific rim and reflected light. */
+  :is(.dashboard-kpi, .admin-metric) {
+    position: relative;
+    --rm-metric-glow: 67 169 113;
+  }
+
+  .admin-metric[data-tone="warning"],
+  .dashboard-kpi:has([data-warning]) { --rm-metric-glow: 191 126 38; }
+  .admin-metric[data-tone="danger"] { --rm-metric-glow: 203 85 79; }
+  .admin-metric[data-tone="info"] { --rm-metric-glow: 55 115 194; }
+
+  :is(.dashboard-kpi, .admin-metric)::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgb(var(--rm-metric-glow) / 55%);
+    background: radial-gradient(ellipse at 94% 14%, rgb(var(--rm-metric-glow) / 21%), transparent 70%);
+    content: "";
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 240ms var(--rm-motion-settle);
+  }
+
+  .dashboard-kpi {
+    pointer-events: none;
+    transition: translate 360ms var(--rm-motion-spring), box-shadow 260ms var(--rm-motion-settle);
+  }
+
+  .dashboard-kpi > :is(.dashboard-kpi-top, .dashboard-kpi-value) {
+    pointer-events: auto;
+  }
+
+  .dashboard-kpi::after {
+    background-size: 144% 132%;
+    background-position: left bottom;
+    transition: opacity 240ms var(--rm-motion-settle), background-position 480ms var(--rm-motion-settle);
+  }
+
+  .rm-dashboard-card:hover > .dashboard-kpi {
+    translate: 0 -6px;
+    box-shadow: 0 16px 24px -16px rgb(var(--rm-metric-glow) / 75%), 0 7px 15px -12px rgb(23 37 29 / 42%);
+  }
+
+  .rm-dashboard-card:hover > .dashboard-kpi::after,
+  .admin-metric:hover::after {
+    opacity: 1;
+  }
+
+  .rm-dashboard-card:hover > .dashboard-kpi::after {
+    background-position: right top;
+  }
+
+  .admin-metric-icon > svg {
+    transition: rotate 320ms var(--rm-motion-spring), scale 320ms var(--rm-motion-spring);
+  }
+
+  :is(.rm-dashboard-card, .admin-metric):hover .admin-metric-icon > svg {
+    rotate: -9deg;
+    scale: 1.12;
+  }
+
+  /* Panels retain their position. Linked rows get an inset edge and a directional cue. */
+  :where([data-user-interactions], .rm-admin-page)
+    :where(.rm-card-panel, .rm-card-action, .rm-account-card:not(.rm-card-face), .admin-panel:not(.dashboard-kpi, .admin-metric)) {
+    position: relative;
+  }
+
+  :where([data-user-interactions], .rm-admin-page)
+    :is(.rm-card-panel, .rm-card-action, .rm-account-card:not(.rm-card-face), .admin-panel:not(.dashboard-kpi, .admin-metric))::after {
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    content: "";
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(109deg, transparent 24%, var(--rm-motion-lime) 44%, #43966e 53%, transparent 73%);
+    background-size: 250% 100%;
+    background-position: right;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 200ms ease-out, background-position 480ms var(--rm-motion-settle);
+  }
+
+  :where([data-user-interactions], .rm-admin-page)
+    :is(.rm-card-panel, .rm-account-card:not(:where(.rm-card-face, .rm-card-action)), .admin-panel:not(.dashboard-kpi, .admin-metric)):hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    opacity: .6;
+    background-position: 46% 0;
+  }
+
+  :where([data-user-interactions], .rm-admin-page)
+    .rm-card-action[data-pointer-active]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    opacity: 1;
+    background-position: 36% 0;
+  }
+
+  :where([data-user-interactions], .rm-admin-page) .rm-card-action::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(var(--rm-row-angle, 90deg), theme(colors.brand.DEFAULT / 13%), theme(colors.brand.DEFAULT / 3%) 64%, transparent);
+    opacity: 0;
+    scale: .86 .93;
+    transform-origin: var(--rm-row-origin, left);
+    transition: opacity 220ms ease-out, scale 320ms var(--rm-motion-spring);
+  }
+
+  :where([data-user-interactions], .rm-admin-page)
+    .rm-card-action[data-pointer-active]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))::before {
+    opacity: 1;
+    scale: 1;
+  }
+
+  :is(.rm-card-action, .rm-table-action)[data-pointer-side="right"] {
+    --rm-row-origin: right;
+    --rm-row-angle: 270deg;
+  }
+
+  :is(.rm-card-action, .rm-table-action)[data-pointer-side="top"] {
+    --rm-row-origin: top;
+    --rm-row-angle: 180deg;
+  }
+
+  :is(.rm-card-action, .rm-table-action)[data-pointer-side="bottom"] {
+    --rm-row-origin: bottom;
+    --rm-row-angle: 0deg;
+  }
+
+  .rm-table-action {
+    background: linear-gradient(var(--rm-row-angle, 90deg), theme(colors.brand.DEFAULT / 13%), transparent 88%)
+      var(--rm-row-origin, left) / 0% 100% no-repeat;
+    transition: background-size 190ms var(--rm-motion-settle), background-color 170ms ease-out;
+  }
+
+  .rm-table-action[data-pointer-active]:hover {
+    background-size: 100% 100%;
+  }
+}
+
+@keyframes rm-card-aurora {
+  from { translate: -20% -6%; opacity: .52; }
+  to { translate: 20% 6%; opacity: .94; }
+}

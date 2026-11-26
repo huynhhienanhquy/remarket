@@ -130,6 +130,8 @@ Kiểm thử ba tài khoản trong một Chrome profile, dùng schema PostgreSQL
 
 ## Kiểm tra
 
+Rà soát code không dùng và trùng lặp: [báo cáo ngày 17/11/2026](docs/project-cleanup-2026-11-17.md).
+
 ```sh
 pnpm test
 pnpm typecheck
@@ -146,6 +148,8 @@ cổng riêng 5320/5321. Xem [backend runbook](docs/backend-runbook.md) để c�
 worker, production email/storage, tài khoản admin và vận hành.
 
 ## Hiệu năng với Supabase
+
+Tối ưu tải Yêu thích và lookup mobile mới nhất: [báo cáo ngày 17/11/2026](docs/data-loading-performance-2026-11-17.md).
 
 Giữ nguyên DB và dữ liệu hiện có. Danh sách sản phẩm dùng một query snapshot,
 không cache quyền hoặc trạng thái kiểm duyệt. Job/outbox/realtime vẫn chạy trong

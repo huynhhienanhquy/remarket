@@ -20,6 +20,14 @@ describe("owned PostgreSQL adapter pool", () => {
       .toMatchObject({ min: 1, max: 1 });
     expect(pgPoolOptions({ ...options, applicationName: "remarket-background" }).min).toBe(0);
   });
+
+  it("lets warmed HTTP connections expire behind the Supabase transaction pooler", () => {
+    const url = "postgresql://test:test@aws-0-test.pooler.supabase.com:6543/test";
+    expect(pgPoolOptions({ ...options, url, applicationName: "remarket-http" }))
+      .toMatchObject({ min: 0, max: 2, idleTimeoutMillis: 15_000, keepAliveInitialDelayMillis: 10_000 });
+    expect(pgPoolOptions({ ...options, url: url.replace(":6543", ":5432"), applicationName: "remarket-http" }))
+      .toMatchObject({ min: 2, max: 2, idleTimeoutMillis: 60_000 });
+  });
   it("retains explicit pool budgets and namespaces", () => {
     const config = pgPoolOptions({ ...options, url: options.url + "?connection_limit=1&schema=verify&connect_timeout=15" });
     expect(config.max).toBe(1);

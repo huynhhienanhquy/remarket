@@ -1,0 +1,7 @@
+ALTER TABLE "Conversation"
+ADD COLUMN "hiddenForBuyer" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "hiddenForSeller" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "Message"
+ADD COLUMN "hiddenForBuyer" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "hiddenForSeller" BOOLEAN NOT NULL DEFAULT false;

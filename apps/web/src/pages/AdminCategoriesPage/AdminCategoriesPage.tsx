@@ -161,7 +161,7 @@ export function AdminCategoriesPage() {
 
   return <div className="admin-stack">
     <AdminHeading title="Danh mục" description="Quản lý cây danh mục tối đa hai cấp và trạng thái nhận tin đăng."
-      actions={<button type="button" className="admin-utility admin-primary" onClick={addCategory}><Icon name="plus" size={18} />Thêm danh mục</button>} />
+      actions={<button type="button" className="admin-utility admin-primary" onClick={addCategory}><span className="rm-button-content inline-flex items-center gap-2"><Icon name="plus" size={18} />Thêm danh mục</span></button>} />
     <div className="admin-panel">
       <AdminToolbar className="admin-search-inline category-toolbar">
         <SearchInput value={search} onValueChange={setSearch} onSubmit={() => apply({ q: search.trim() || null })} label="Tìm danh mục" placeholder="Tìm tên danh mục" />

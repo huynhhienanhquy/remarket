@@ -57,6 +57,7 @@ export function loginReturnRoute(input: unknown): string {
     return "/(tabs)";
   }
   const pages = [
+    "/assistant",
     "/cart",
     "/checkout",
     "/orders",

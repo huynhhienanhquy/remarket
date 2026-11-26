@@ -12,13 +12,13 @@ import {
   Screen,
   Button,
   Feedback,
-  ProductGrid,
   Pagination,
   EmptyState,
   useAction,
   styles,
   colors,
 } from "../../components/ui";
+import { ProductGrid } from "../../components/ProductCards";
 export default function Profile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useSession();

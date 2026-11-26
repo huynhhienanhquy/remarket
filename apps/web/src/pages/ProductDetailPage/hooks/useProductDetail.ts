@@ -72,17 +72,11 @@ export function useProductDetail() {
     onSuccess: (conversation) => navigate(`/messages/${conversation.id}`),
     onError: (error) => toast.error("Không mở được tin nhắn", { description: error.message }),
   });
-  const purchase = useMutation({
-    mutationFn: () => api.cart.add(id),
-    onSuccess: () => {
-      void invalidateCart(queryClient);
-      navigate(`/checkout?items=${encodeURIComponent(id)}`);
-    },
-    onError: (error) => toast.error("Không khởi tạo được đơn hàng", { description: error.message }),
-  });
-  const actionBusy = !online || sessionStatus !== "ready" || chat.isPending || purchase.isPending || addToCart.isPending || toggleFavorite.isPending;
+  const actionBusy = !online || sessionStatus !== "ready" || chat.isPending || addToCart.isPending || toggleFavorite.isPending;
   function openChat() { if (!actionBusy && requireLogin()) chat.mutate(); }
-  function buyNow() { if (!actionBusy && requireLogin()) purchase.mutate(); }
+  function buyNow() {
+    if (!actionBusy && requireLogin()) navigate(`/checkout?product_id=${encodeURIComponent(id)}`);
+  }
   function addItem() { if (!actionBusy && requireLogin()) addToCart.mutate(); }
 
   const images = product?.images ?? [];
@@ -124,7 +118,6 @@ export function useProductDetail() {
     toggleSaved: () => { if (!actionBusy && requireLogin() && product) toggleFavorite.mutate(!product.is_favorited); },
     addToCart,
     chat,
-    purchase,
     actionBusy,
     openChat,
     buyNow,

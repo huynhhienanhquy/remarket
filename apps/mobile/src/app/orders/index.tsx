@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "../../components/HoverPressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { MarketplaceImage } from "../../components/MarketplaceImage";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
@@ -105,25 +106,31 @@ export default function Orders() {
               accessibilityRole="link"
               accessibilityLabel={`Xem đơn ${order.code}`}
               onPress={() => router.push(`/orders/${order.id}`)}
-              style={[styles.card, { borderRadius: 16, padding: 20, gap: 16 }]}
+              style={[styles.card, { borderRadius: 0, padding: 20, gap: 16 }]}
             >
               <View style={[styles.row, { flexWrap: "nowrap" }]}>
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    backgroundColor: colors.soft,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons
-                    name="receipt-outline"
-                    size={20}
-                    color={colors.green}
+                {order.counterparty.avatar_url ? (
+                  <MarketplaceImage
+                    uri={order.counterparty.avatar_url}
+                    style={{ width: 44, height: 44, borderRadius: 22 }}
+                    contentFit="cover"
                   />
-                </View>
+                ) : (
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: colors.soft,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={[styles.label, { color: colors.green, fontWeight: "700" }]}>
+                      {order.counterparty.name.trim().charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={[styles.label, { fontWeight: "600" }]}>
                     {role === "buyer" ? "Đơn mua" : "Đơn bán"} #
@@ -152,14 +159,15 @@ export default function Orders() {
                 ]}
               >
                 {order.items.length > 0 && (
-                  <View style={styles.row}>
+                  <View style={[styles.row, { flexShrink: 1, gap: 8 }]}>
                     {order.items.slice(0, 3).map((item) => (
                       <MarketplaceImage
                         key={item.id}
                         uri={item.image_url ?? ""}
+                        contentFit="contain"
                         style={{
-                          width: 40,
-                          height: 40,
+                          width: 72,
+                          height: 72,
                           borderRadius: 8,
                           backgroundColor: colors.subtle,
                         }}

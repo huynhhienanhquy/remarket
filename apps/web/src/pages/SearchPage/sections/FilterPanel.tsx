@@ -1,38 +1,18 @@
-import { useState } from "react";
-import type { CategoryNode, Condition, DeliveryMethod, Province } from "@remarket/shared";
-import { CONDITION_LABELS, DELIVERY_LABELS, validatePrice } from "@remarket/shared";
+import { useId, useState } from "react";
+import type { CategoryNode, Province } from "@remarket/shared";
+import { CONDITIONS, CONDITION_LABELS, DELIVERY_METHODS, DELIVERY_LABELS } from "@remarket/shared";
 import { Button } from "../../../components/common/Button/Button";
 import { Input, Select } from "../../../components/common/Input/Input";
 import { Radio } from "../../../components/common/Choice/Choice";
+import { type FilterValues, validatePriceRange } from "../filters";
 
-export interface FilterValues {
-  category_id: string;
-  min_price: string;
-  max_price: string;
-  condition: Condition | "";
-  province_code: string;
-  delivery_method: DeliveryMethod | "";
-}
-
-export function emptyFilters(): FilterValues {
-  return {
-    category_id: "",
-    min_price: "",
-    max_price: "",
-    condition: "",
-    province_code: "",
-    delivery_method: "",
-  };
-}
-
-const CONDITIONS: Condition[] = ["LIKE_NEW", "GOOD", "FAIR", "HEAVILY_USED"];
-const DELIVERY: DeliveryMethod[] = ["COD", "MEETUP", "BOTH"];
+const FILTER_OPTION = "min-h-touch items-center rounded-lg px-2 hover:bg-surface-subtle lg:min-h-8";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <fieldset className="border-t border-line pt-4 first:border-t-0 first:pt-0">
-      <legend className="t-label text-ink">{title}</legend>
-      <div className="mt-2 space-y-2">{children}</div>
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-semibold text-ink">{title}</legend>
+      <div className="mt-2 space-y-1">{children}</div>
     </fieldset>
   );
 }
@@ -53,15 +33,12 @@ export interface FilterPanelProps {
   onChange: (next: FilterValues) => void;
   categories: CategoryNode[];
   provinces: Province[];
-  /** Price commits only on this callback (Enter or "Áp dụng", ui-spec 8). */
-  onSubmitPrice: () => void;
-  onReset: () => void;
+  /** Desktop submits prices separately. The mobile drawer owns its draft. */
+  onSubmitPrice?: (prices: Pick<FilterValues, "min_price" | "max_price">) => void;
+  onReset?: () => void;
+  priceError?: string | null;
 }
 
-/**
- * Filter controls shared by the desktop sidebar and the mobile bottom sheet.
- * Non-price filters emit on change; the price pair waits for an explicit submit.
- */
 export function FilterPanel({
   values,
   onChange,
@@ -69,41 +46,44 @@ export function FilterPanel({
   provinces,
   onSubmitPrice,
   onReset,
+  priceError,
 }: FilterPanelProps) {
-  const [minPrice, setMinPrice] = useState(values.min_price);
-  const [maxPrice, setMaxPrice] = useState(values.max_price);
-  const [priceError, setPriceError] = useState<string | null>(null);
+  const id = useId();
+  const [prices, setPrices] = useState({ min_price: values.min_price, max_price: values.max_price });
+  const [localError, setLocalError] = useState<string | null>(null);
+  const displayed = onSubmitPrice ? prices : values;
+  const error = onSubmitPrice ? localError : priceError;
 
   function patch(next: Partial<FilterValues>) {
     onChange({ ...values, ...next });
   }
 
   function submitPrice() {
-    const minError = minPrice ? validatePrice(minPrice) : null;
-    const maxError = maxPrice ? validatePrice(maxPrice) : null;
-    if (minError || maxError) {
-      setPriceError(minError ?? maxError);
-      return;
+    const nextError = validatePriceRange(prices);
+    setLocalError(nextError);
+    if (!nextError) onSubmitPrice?.(prices);
+  }
+
+  function updatePrice(key: "min_price" | "max_price", input: string) {
+    const value = input.replace(/\D/g, "");
+    if (onSubmitPrice) {
+      setPrices({ ...prices, [key]: value });
+      setLocalError(null);
+    } else {
+      patch({ [key]: value });
     }
-    if (minPrice && maxPrice && BigInt(minPrice) > BigInt(maxPrice)) {
-      setPriceError("Giá tối thiểu không được lớn hơn giá tối đa.");
-      return;
-    }
-    setPriceError(null);
-    patch({ min_price: minPrice, max_price: maxPrice });
-    onSubmitPrice();
   }
 
   const options = flatten(categories.filter((node) => node.status === "ACTIVE"));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Section title="Danh mục">
-        <label htmlFor="filter-category" className="sr-only">
+        <label htmlFor={`${id}-category`} className="sr-only">
           Danh mục
         </label>
         <Select
-          id="filter-category"
+          id={`${id}-category`}
           value={values.category_id}
           onChange={(event) => patch({ category_id: event.target.value })}
         >
@@ -117,57 +97,58 @@ export function FilterPanel({
         </Select>
       </Section>
 
-      <Section title="Khoảng giá">
+      <Section title="Khoảng giá (₫)">
         <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <label htmlFor="filter-min-price" className="sr-only">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${id}-min-price`} className="sr-only">
               Giá tối thiểu
             </label>
             <Input
-              id="filter-min-price"
+              id={`${id}-min-price`}
               inputMode="numeric"
               placeholder="Từ"
-              value={minPrice}
-              error={Boolean(priceError)}
-              onChange={(event) => setMinPrice(event.target.value.replace(/\D/g, ""))}
+              value={displayed.min_price}
+              error={Boolean(error)}
+              aria-describedby={error ? `${id}-price-error` : undefined}
+              onChange={(event) => updatePrice("min_price", event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") submitPrice();
+                if (event.key === "Enter" && onSubmitPrice) submitPrice();
               }}
             />
           </div>
           <span aria-hidden="true" className="pb-3 t-body text-muted">
             –
           </span>
-          <div className="flex-1">
-            <label htmlFor="filter-max-price" className="sr-only">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={`${id}-max-price`} className="sr-only">
               Giá tối đa
             </label>
             <Input
-              id="filter-max-price"
+              id={`${id}-max-price`}
               inputMode="numeric"
               placeholder="Đến"
-              value={maxPrice}
-              error={Boolean(priceError)}
-              onChange={(event) => setMaxPrice(event.target.value.replace(/\D/g, ""))}
+              value={displayed.max_price}
+              error={Boolean(error)}
+              aria-describedby={error ? `${id}-price-error` : undefined}
+              onChange={(event) => updatePrice("max_price", event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") submitPrice();
+                if (event.key === "Enter" && onSubmitPrice) submitPrice();
               }}
             />
           </div>
         </div>
-        {priceError && (
-          <p className="t-meta text-danger" role="alert">
-            {priceError}
+        {error && (
+          <p id={`${id}-price-error`} className="t-meta text-danger" role="alert">
+            {error}
           </p>
         )}
-        <Button variant="secondary" onClick={submitPrice}>
-          Áp dụng
-        </Button>
+        {onSubmitPrice && <Button variant="secondary" onClick={submitPrice} fullWidth>Áp dụng giá</Button>}
       </Section>
 
       <Section title="Tình trạng">
         <Radio
-          name="filter-condition"
+          name={`${id}-condition`}
+          className={FILTER_OPTION}
           checked={values.condition === ""}
           onChange={() => patch({ condition: "" })}
           label="Tất cả"
@@ -175,7 +156,8 @@ export function FilterPanel({
         {CONDITIONS.map((condition) => (
           <Radio
             key={condition}
-            name="filter-condition"
+            name={`${id}-condition`}
+            className={FILTER_OPTION}
             checked={values.condition === condition}
             onChange={() => patch({ condition })}
             label={CONDITION_LABELS[condition]}
@@ -184,11 +166,11 @@ export function FilterPanel({
       </Section>
 
       <Section title="Khu vực">
-        <label htmlFor="filter-province" className="sr-only">
+        <label htmlFor={`${id}-province`} className="sr-only">
           Khu vực
         </label>
         <Select
-          id="filter-province"
+          id={`${id}-province`}
           value={values.province_code}
           onChange={(event) => patch({ province_code: event.target.value })}
         >
@@ -203,15 +185,17 @@ export function FilterPanel({
 
       <Section title="Giao nhận">
         <Radio
-          name="filter-delivery"
+          name={`${id}-delivery`}
+          className={FILTER_OPTION}
           checked={values.delivery_method === ""}
           onChange={() => patch({ delivery_method: "" })}
           label="Tất cả"
         />
-        {DELIVERY.map((method) => (
+        {DELIVERY_METHODS.map((method) => (
           <Radio
             key={method}
-            name="filter-delivery"
+            name={`${id}-delivery`}
+            className={FILTER_OPTION}
             checked={values.delivery_method === method}
             onChange={() => patch({ delivery_method: method })}
             label={DELIVERY_LABELS[method]}
@@ -219,9 +203,11 @@ export function FilterPanel({
         ))}
       </Section>
 
-      <Button variant="ghost" onClick={onReset} className="w-full">
-        Đặt lại bộ lọc
-      </Button>
+      {onReset && <Button variant="ghost" onClick={() => {
+        setPrices({ min_price: "", max_price: "" });
+        setLocalError(null);
+        onReset();
+      }} fullWidth>Đặt lại bộ lọc</Button>}
     </div>
   );
 }

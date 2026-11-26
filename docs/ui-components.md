@@ -1,14 +1,14 @@
 # Toast và icon dùng chung
 
 Các component dùng React, SVG và timer của trình duyệt, không dùng thư viện toast/icon.
-Import từ `apps/web/src/components/common` (hoặc `@/components/common` trong frontend).
+Import trực tiếp từ module của từng component trong `apps/web/src/components/common`.
 
 ## Toast
 
 `ToastProvider` đã được gắn tại root router. Trong component:
 
 ```tsx
-import { useToast } from "@/components/common";
+import { useToast } from "@/components/common/Toast/Toast";
 
 function SaveButton() {
   const toast = useToast();
@@ -39,7 +39,7 @@ Chỉ cần nằm trong router khi truyền `action`.
 ## Icon
 
 ```tsx
-import { Icon, CategoryIcon, HeartIcon } from "@/components/common";
+import { Icon, CategoryIcon, HeartIcon } from "@/components/common/Icon/Icon";
 
 <Icon name="search" size={20} className="text-muted" />
 <HeartIcon size={24} />

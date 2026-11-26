@@ -8,6 +8,7 @@ import { FormField } from "../../components/common/FormField/FormField";
 import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 import { Input } from "../../components/common/Input/Input";
 import { Radio } from "../../components/common/Choice/Choice";
+import { checkoutBackLink } from "../../utils/checkoutNavigation";
 
 export function CheckoutPage() {
   const {
@@ -15,7 +16,9 @@ export function CheckoutPage() {
     submissionError,
     draft,
     priceChangedAlert,
-    cart,
+    source,
+    sourcePending,
+    productId,
     provinces,
     groups,
     availableItems,
@@ -24,12 +27,16 @@ export function CheckoutPage() {
     methodsFor,
     updateDelivery,
     subtotal,
+    shippingTotal,
+    orderTotal,
     checkout,
     handleSubmit,
     handlePriceChangedRefresh,
   } = useCheckout();
 
-  if (cart.isPending || provinces.isPending || (availableItems.length > 0 && cart.isPending)) {
+  const back = checkoutBackLink(productId);
+
+  if (sourcePending) {
     return (
       <div className="rm-container py-6 lg:py-8">
         <h1 className="t-h1 text-ink mb-6">Đặt hàng</h1>
@@ -46,15 +53,15 @@ export function CheckoutPage() {
     );
   }
 
-  if (cart.isError) {
+  if (source.isError) {
     return (
       <div className="rm-container py-6 lg:py-8">
         <h1 className="t-h1 text-ink mb-6">Đặt hàng</h1>
         <InlineAlert
           tone="danger"
-          title="Không tải được giỏ hàng"
+          title={productId !== null ? "Không tải được sản phẩm" : "Không tải được giỏ hàng"}
           action={
-            <Button variant="secondary" onClick={() => cart.refetch()}>
+            <Button variant="secondary" onClick={() => source.refetch()}>
               Tải lại
             </Button>
           }
@@ -69,8 +76,10 @@ export function CheckoutPage() {
         <h1 className="t-h1 text-ink mb-6">Đặt hàng</h1>
         <EmptyState
           title="Không có món đồ khả dụng"
-          description="Giỏ hàng trống hoặc các món đã chọn không còn khả dụng."
-          action={{ label: "Quay lại giỏ hàng", to: "/cart" }}
+          description={productId !== null
+            ? groups[0]?.items[0]?.unavailable_reason ?? "Sản phẩm này hiện không thể đặt mua."
+            : "Giỏ hàng trống hoặc các món đã chọn không còn khả dụng."}
+          action={back}
         />
       </div>
     );
@@ -99,7 +108,7 @@ export function CheckoutPage() {
       <div className="space-y-6">
         <h1 className="t-h1 text-ink">Đặt hàng</h1>
 
-        <div className="rounded-card border border-line bg-surface p-5 space-y-4">
+        <div className="rm-card-panel rounded-card border border-line bg-surface p-5 space-y-4">
           <h2 className="t-h3 text-ink">Thông tin người nhận & giao nhận</h2>
 
           {sellerIds.map((sellerId) => {
@@ -109,7 +118,7 @@ export function CheckoutPage() {
 
             return (
               <section key={sellerId} className="space-y-4 border-t border-line pt-4 first:border-t-0 first:pt-0">
-                {methodsFor(sellerId).length === 0 && <InlineAlert tone="warning" title={cart.isPending ? "Đang tải hình thức giao nhận…" : "Các món này không có phương thức giao nhận chung"}>Hãy đặt riêng từng món nếu các phương thức không tương thích.</InlineAlert>}
+                {methodsFor(sellerId).length === 0 && <InlineAlert tone="warning" title="Các món này không có phương thức giao nhận chung">Hãy đặt riêng từng món nếu các phương thức không tương thích.</InlineAlert>}
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="t-label text-ink">{sellerGroup.seller.name}</p>
@@ -141,10 +150,14 @@ export function CheckoutPage() {
                     <select
                       id={`province-${sellerId}`}
                       value={delivery.province_code}
+                      disabled={provinces.isPending}
+                      aria-busy={provinces.isPending}
                       onChange={(e) => updateDelivery(sellerId, { province_code: e.target.value })}
                       className="h-11 w-full rounded-control border border-input-line bg-surface px-3 t-body text-ink focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/30"
                     >
-                      <option value="">Chọn khu vực</option>
+                      {provinces.isPending
+                        ? <option value={delivery.province_code}>Đang tải khu vực…</option>
+                        : <option value="">Chọn khu vực</option>}
                       {provinces.data?.map((p) => (
                         <option key={p.code} value={p.code}>
                           {p.name}
@@ -198,8 +211,8 @@ export function CheckoutPage() {
           })}
         </div>
 
-        <div className="rounded-card border border-line bg-surface p-5 space-y-3">
-          <h2 className="t-h3 text-ink">Xác nhận đơn hàng</h2>
+        <section aria-labelledby="checkout-summary-heading" className="rm-card-panel rounded-card border border-line bg-surface p-5 space-y-3">
+          <h2 id="checkout-summary-heading" className="t-h3 text-ink">Xác nhận đơn hàng</h2>
           <div className="divide-y divide-line">
             {availableItems.map((item) => {
               const product = groups.flatMap((g) => g.items).find((i) => i.product_id === item.product_id);
@@ -220,19 +233,23 @@ export function CheckoutPage() {
             </div>
             <div className="flex justify-between py-3">
               <span className="t-meta text-muted">Phí giao hàng</span>
-              <span className="t-meta text-muted">Tính theo từng người bán</span>
+              <span className="t-meta text-muted">{formatVnd(shippingTotal)}</span>
+            </div>
+            <div className="flex justify-between py-3 font-semibold">
+              <span className="t-body text-ink">Tổng tiền đơn hàng</span>
+              <span className="t-body text-ink">{formatVnd(orderTotal)}</span>
             </div>
           </div>
-        </div>
+        </section>
 
-        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} disabled={!online || !cart.data || sellerIds.some((sellerId) => methodsFor(sellerId).length === 0)} onClick={handleSubmit}>
+        <Button size="lg" fullWidth variant="primary" loading={checkout.isPending} disabled={!online || !source.data || sellerIds.some((sellerId) => methodsFor(sellerId).length === 0)} onClick={handleSubmit}>
           {checkout.isPending ? "Đang xử lý..." : "Đặt hàng"}
         </Button>
       </div>
 
       <p className="mt-6 t-meta text-muted text-center">
-        <Link to="/cart" className="t-label text-brand hover:underline">
-          ← Quay lại giỏ hàng
+        <Link to={back.to} className="t-label text-brand hover:underline">
+          ← {back.label}
         </Link>
       </p>
     </div>

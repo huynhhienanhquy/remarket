@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { useProductSearch } from "./hooks/useProductSearch";
 import { FilterChip } from "./sections/FilterChip";
 import { Link } from "react-router-dom";
@@ -10,7 +11,8 @@ import { Pagination } from "../../components/common/Pagination/Pagination";
 import { ProductCard } from "../../components/common/ProductCard/ProductCard";
 import { ProductCardSkeleton } from "../../components/common/Skeleton/Skeleton";
 import { Select } from "../../components/common/Input/Input";
-import { FilterPanel, type FilterValues, emptyFilters } from "./sections/FilterPanel";
+import { FilterPanel } from "./sections/FilterPanel";
+import { type FilterValues, emptyFilters, validatePriceRange } from "./filters";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới nhất" },
@@ -19,12 +21,12 @@ const SORT_OPTIONS = [
 ] as const;
 
 export function SearchPage() {
+  const filterFormId = useId();
+  const [priceError, setPriceError] = useState<string | null>(null);
   const {
     q,
     sort,
     filters,
-    keyword,
-    setKeyword,
     sheetOpen,
     setSheetOpen,
     draft,
@@ -34,7 +36,6 @@ export function SearchPage() {
     applyParams,
     listQuery,
     toggleFavorite,
-    submitKeyword,
     clearFilters,
     removeChip,
     chips,
@@ -46,19 +47,19 @@ export function SearchPage() {
     title,
   } = useProductSearch();
 
-  const filterPanel = (values: FilterValues, onChange: (next: FilterValues) => void) => (
-    <FilterPanel
-      values={values}
-      onChange={onChange}
-      categories={categories.data ?? []}
-      provinces={provinces.data ?? []}
-      onSubmitPrice={() => applyParams({
-        min_price: values.min_price || null,
-        max_price: values.max_price || null,
-      })}
-      onReset={() => onChange(emptyFilters())}
-    />
-  );
+  const options = { categories: categories.data ?? [], provinces: provinces.data ?? [] };
+
+  function applyFilters(values: FilterValues) {
+    applyParams({ ...values });
+  }
+
+  function applyDraft() {
+    const error = validatePriceRange(draft);
+    setPriceError(error);
+    if (error) return;
+    applyFilters(draft);
+    setSheetOpen(false);
+  }
 
   return (
     <div className="rm-container py-4 lg:py-8">
@@ -71,21 +72,25 @@ export function SearchPage() {
         <span className="text-ink">Sản phẩm</span>
       </nav>
 
-      <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="t-h1 text-ink">{title}</h1>
+      <div className="rm-card-panel mt-3 flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-subtle sm:p-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="t-h1 break-words text-ink">{title}</h1>
           <p className="mt-1 t-body text-muted" aria-live="polite">
             {listQuery.isPending
               ? "Đang tải kết quả…"
-              : `${meta?.total ?? 0} kết quả`}
+              : listQuery.isError ? "Không thể tải kết quả" : `${meta?.total ?? 0} kết quả`}
             {isRefetching && <span className="ml-2 t-meta">· Đang cập nhật</span>}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
           <Button
             variant="secondary"
             className="flex-1 lg:hidden"
-            onClick={() => setSheetOpen(true)}
+            onClick={() => {
+              setDraft(filters);
+              setPriceError(null);
+              setSheetOpen(true);
+            }}
           >
             <span className="flex items-center gap-2 whitespace-nowrap">
               <FilterIcon />
@@ -99,7 +104,7 @@ export function SearchPage() {
             id="sort-select"
             value={sort}
             onChange={(event) => applyParams({ sort: event.target.value })}
-            className="h-touch min-w-[160px] flex-[2] text-sm lg:min-w-[180px]"
+            className="h-touch min-w-0 flex-[2] text-sm lg:min-w-[180px]"
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -116,10 +121,7 @@ export function SearchPage() {
           {q !== "" && (
             <FilterChip
               label={`Từ khóa: ${q}`}
-              onRemove={() => {
-                setKeyword("");
-                applyParams({ q: null });
-              }}
+              onRemove={() => applyParams({ q: null })}
             />
           )}
           {chips.map((chip) => (
@@ -129,27 +131,30 @@ export function SearchPage() {
               onRemove={() => removeChip(chip.key)}
             />
           ))}
-          <button
+          {chips.length > 0 && <button
             type="button"
             onClick={clearFilters}
-            className="t-label text-danger hover:underline"
+            className="min-h-touch px-1 text-sm font-semibold text-brand hover:underline"
           >
             Xóa bộ lọc
-          </button>
+          </button>}
         </div>
       )}
 
       <div className="mt-6 flex gap-6">
         {/* Desktop sidebar */}
         <aside className="hidden w-60 shrink-0 lg:block" aria-label="Bộ lọc">
-          <div className="sticky top-[104px]">{filterPanel(filters, (next) => applyParams({
-            category_id: next.category_id || null,
-            min_price: next.min_price || null,
-            max_price: next.max_price || null,
-            condition: next.condition || null,
-            province_code: next.province_code || null,
-            delivery_method: next.delivery_method || null,
-          }))}</div>
+          <div className="rm-card-panel sticky top-[140px] max-h-[calc(100dvh-156px)] overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-subtle">
+            <h2 className="mb-4 flex items-center gap-2 border-b border-line pb-4 text-base font-semibold text-ink"><FilterIcon size={18} /> Bộ lọc</h2>
+            <FilterPanel
+              key={`${filters.min_price}:${filters.max_price}`}
+              {...options}
+              values={filters}
+              onChange={applyFilters}
+              onSubmitPrice={(prices) => applyParams(prices)}
+              onReset={clearFilters}
+            />
+          </div>
         </aside>
 
         {/* Results */}
@@ -181,9 +186,11 @@ export function SearchPage() {
                   : "Chưa có tin đăng nào ở thời điểm này."
               }
               action={
-                filtered
+                activeCount > 0
                   ? { label: "Xóa bộ lọc", onClick: clearFilters }
-                  : { label: "Về trang chủ", to: "/" }
+                  : q !== ""
+                    ? { label: "Xóa từ khóa", onClick: () => applyParams({ q: null }) }
+                    : { label: "Về trang chủ", to: "/" }
               }
             />
           ) : (
@@ -215,58 +222,38 @@ export function SearchPage() {
         onClose={() => setSheetOpen(false)}
         title="Bộ lọc"
         widthClassName="max-w-none"
-        className="!inset-x-0 !bottom-0 !top-auto !h-auto max-h-[90dvh] rounded-t-modal"
+        className="!inset-x-0 !bottom-0 !top-auto !h-auto max-h-[90dvh] rounded-t-modal sm:mx-auto sm:!max-w-[560px]"
         footer={
           <div className="flex gap-3">
             <Button
               variant="ghost"
               className="flex-1"
-              onClick={() => setDraft(emptyFilters())}
+              onClick={() => {
+                setDraft(emptyFilters());
+                setPriceError(null);
+              }}
             >
               Đặt lại
             </Button>
             <Button
               variant="primary"
               className="flex-1"
-              onClick={() => {
-                applyParams({
-                  category_id: draft.category_id || null,
-                  min_price: draft.min_price || null,
-                  max_price: draft.max_price || null,
-                  condition: draft.condition || null,
-                  province_code: draft.province_code || null,
-                  delivery_method: draft.delivery_method || null,
-                });
-                setSheetOpen(false);
-              }}
+              form={filterFormId}
+              type="submit"
             >
               Áp dụng
             </Button>
           </div>
         }
       >
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="sheet-keyword" className="t-label text-ink">
-              Từ khóa
-            </label>
-            <input
-              id="sheet-keyword"
-              type="search"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  submitKeyword();
-                  setSheetOpen(false);
-                }
-              }}
-              placeholder="Bạn đang tìm món đồ gì?"
-              className="mt-1.5 h-11 w-full rounded-control border border-input-line bg-surface px-3 t-body text-ink placeholder:text-muted focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/30"
-            />
-          </div>
-          {filterPanel(draft, setDraft)}
-        </div>
+        <form id={filterFormId} onSubmit={(event) => { event.preventDefault(); applyDraft(); }}>
+          <FilterPanel
+            {...options}
+            values={draft}
+            onChange={(next) => { setDraft(next); setPriceError(null); }}
+            priceError={priceError}
+          />
+        </form>
       </Drawer>
     </div>
   );

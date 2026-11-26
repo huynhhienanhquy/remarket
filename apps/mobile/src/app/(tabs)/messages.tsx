@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "../../components/HoverPressable";
 import { formatRelative } from "@remarket/shared";
 import { MarketplaceImage } from "../../components/MarketplaceImage";
 import { useRouter } from "expo-router";
@@ -25,6 +26,13 @@ export default function Messages() {
     queryFn: () => api.chat.conversations(page),
     enabled: !!user,
   });
+  const inbox = result.data;
+  const meta = inbox?.meta;
+  useEffect(() => {
+    if (page > 1 && inbox?.items.length === 0) {
+      setPage(inbox.meta.total > 0 ? page - 1 : 1);
+    }
+  }, [inbox, page]);
   return (
     <Screen
       title="Tin nhắn"
@@ -172,17 +180,17 @@ export default function Messages() {
               ))}
             </View>
           )}
-          {result.data?.items.length === 0 && (
+          {meta?.total === 0 && (
             <EmptyState
               icon="chatbubble-outline"
               title="Chưa có cuộc trò chuyện"
               description="Mở một món đồ và nhấn Nhắn tin để trao đổi với người bán."
             />
           )}
-          {result.data && (
+          {meta && (
             <Pagination
               page={page}
-              total={result.data.meta.total}
+              total={meta.total}
               onChange={setPage}
             />
           )}

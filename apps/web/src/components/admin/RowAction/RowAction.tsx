@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 type RowActionTone = "brand" | "danger" | "muted";
 
 const ROW_ACTION_TONES: Record<RowActionTone, string> = {
-  brand: "text-brand hover:bg-brand-soft",
-  danger: "text-danger hover:bg-danger-bg",
-  muted: "text-ink hover:bg-surface-subtle",
+  brand: "text-brand enabled:hover:bg-brand-soft",
+  danger: "text-danger enabled:hover:bg-danger-bg",
+  muted: "text-ink enabled:hover:bg-surface-subtle",
 };
 
 /**
@@ -33,6 +33,7 @@ export function RowAction({
         type="button"
         onClick={onClick}
         disabled={disabled}
+        data-tone={tone}
         aria-label={label}
         title={label}
         className={[

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CopilotKitProvider, CopilotPopup, useRenderTool } from "@copilotkit/react-core/v2";
 import type { CopilotChatLabels } from "@copilotkit/react-core/v2";
@@ -13,7 +13,6 @@ import { copilotHeaders, lastUserMessage } from "../../services/copilotSession";
 import { errorTitle } from "../../helpers/errors";
 import { Button } from "../common/Button/Button";
 import { ProductCard } from "../common/ProductCard/ProductCard";
-import "./marketplace-ai.css";
 
 const ai = aiEndpoints(http);
 const AGENT = "marketplace";
@@ -80,7 +79,7 @@ function SearchCards({ result }: { result: SearchResult }) {
     if (value) filters.set(key, value);
   }
   return (
-    <section className="space-y-2 rounded-card border border-line bg-surface p-3 text-sm" aria-label="Kết quả tìm sản phẩm">
+    <section className="rm-card-panel space-y-2 rounded-card border border-line bg-surface p-3 text-sm" aria-label="Kết quả tìm sản phẩm">
       <p className="font-semibold">{result.total ? `${result.total} tin phù hợp lúc tìm` : "Chưa có tin phù hợp"}</p>
       {!!result.labels.length && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Bộ lọc đã áp dụng">
@@ -115,7 +114,7 @@ const accountLinks: Record<AccountStatsTopic, { to: string; label: string }> = {
 
 function AccountNumbers({ result }: { result: AiAccountStats }) {
   return (
-    <section className="space-y-2 rounded-card border border-line bg-surface p-3 text-sm" aria-label="Số liệu tài khoản">
+    <section className="rm-card-panel space-y-2 rounded-card border border-line bg-surface p-3 text-sm" aria-label="Số liệu tài khoản">
       <p className="font-semibold">{result.period_label}</p>
       <p className="text-xs text-muted">Ghi nhận lúc {formatDateTime(result.as_of)}</p>
       <dl className="divide-y divide-line">
@@ -173,13 +172,13 @@ function PlainText({ content }: { content: string }) {
   return <p className="whitespace-pre-wrap break-words">{content}</p>;
 }
 
-export default function MarketplaceAi({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(false);
+export default function MarketplaceAi({ userId, open, onOpenChange }: {
+  userId: string;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+}) {
   const [selectedId, setSelectedId] = useState<string>();
   const [problem, setProblem] = useState("");
-  const launcher = useRef<HTMLButtonElement>(null);
-  const locationKey = useLocation().key;
-  useEffect(() => { setOpen(false); }, [locationKey]);
   const client = useQueryClient();
   const key = ["ai-threads", userId];
   const threads = useQuery({ queryKey: key, queryFn: ai.listThreads, enabled: open });
@@ -203,14 +202,6 @@ export default function MarketplaceAi({ userId }: { userId: string }) {
     onError: (error) => setProblem(errorTitle(error)),
   });
   const headers = useCallback(() => copilotHeaders(userId), [userId]);
-  function changeOpen(value: boolean) {
-    setOpen(value);
-    if (!value) launcher.current?.focus();
-  }
-  const toggle = <button ref={launcher} type="button" onClick={() => changeOpen(!open)} aria-expanded={open}
-    className="rm-ai-launcher rounded-full bg-brand px-4 py-3 text-sm font-semibold text-white shadow-pop">
-    {open ? "Đóng trợ lý" : "Trợ lý ReMarket"}
-  </button>;
   const failure = problem || (threads.isError ? errorTitle(threads.error) : "");
   const errorHelp = failure && (
     <div role="status" className="mt-2 rounded-card bg-surface-subtle p-2 text-sm">
@@ -220,53 +211,47 @@ export default function MarketplaceAi({ userId }: { userId: string }) {
       <Link className="text-brand underline" to="/support/new">Gửi yêu cầu hỗ trợ</Link>
     </div>
   );
-  if (!threadId) return (
-    <>
-      {toggle}
-      {open && <section aria-label="Trợ lý ReMarket" className="rm-ai-empty rounded-modal border border-line bg-surface p-4 shadow-pop">
-        <h2 className="mb-2 font-semibold">Trợ lý ReMarket</h2>
-        {threads.isPending ? <p role="status">Đang tải cuộc trò chuyện…</p>
-          : threads.isError ? <Button onClick={() => void threads.refetch()}>Thử lại</Button>
-            : <Button onClick={() => create.mutate()} disabled={create.isPending}>Bắt đầu trò chuyện</Button>}
-        {errorHelp}
-      </section>}
-    </>
-  );
+  if (!threadId) return open ? (
+    <section aria-label="Trợ lý ReMarket" className="rm-ai-empty rounded-modal border border-line bg-surface p-4 shadow-pop">
+      <h2 className="mb-2 font-semibold">Trợ lý ReMarket</h2>
+      {threads.isPending ? <p role="status">Đang tải cuộc trò chuyện…</p>
+        : threads.isError ? <Button onClick={() => void threads.refetch()}>Thử lại</Button>
+          : <Button onClick={() => create.mutate()} disabled={create.isPending}>Bắt đầu trò chuyện</Button>}
+      {errorHelp}
+    </section>
+  ) : null;
   return (
-    <>
-      {toggle}
-      <div className="rm-marketplace-ai">
-        <CopilotKitProvider key={threadId} runtimeUrl={`${API_BASE_URL.replace(/\/$/, "")}/ai/copilotkit`}
-          agentId={AGENT} headers={headers} useSingleEndpoint={false} messageFilter={lastUserMessage} enableInspector={false}
-          onError={() => setProblem("Chưa thể nhận phản hồi. Hãy thử gửi lại câu hỏi.")}>
-          <ToolRenderers />
-          <CopilotPopup
-            threadId={threadId} open={open} onOpenChange={changeOpen} labels={labels}
-            width="min(460px, calc(100vw - 24px))" height="min(650px, calc(100dvh - 145px))"
-            clickOutsideToClose={false} messageView={{ assistantMessage: { markdownRenderer: PlainText, toolbarVisible: false } }}
-            input={{ textArea: { maxLength: MAX_MESSAGE_LENGTH }, showDisclaimer: true, onFocus: () => setProblem("") }}
-            header={{
-              children: ({ titleContent, closeButton }) => (
-                <header className="border-b border-line bg-surface p-3">
-                  <div className="flex items-center justify-between gap-2">{titleContent}{closeButton}</div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                    <select aria-label="Cuộc trò chuyện" value={threadId} className="min-w-0 flex-1 rounded border border-line bg-surface p-1"
-                      onChange={(event) => { setSelectedId(event.target.value); setProblem(""); }}>
-                      {threads.data?.map((thread, index) => <option key={thread.id} value={thread.id}>
-                        {new Date(thread.updated_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })} · Phiên {threads.data!.length - index}
-                      </option>)}
-                    </select>
-                    <button type="button" className="p-1 text-brand" disabled={create.isPending || remove.isPending} onClick={() => create.mutate()}>Phiên mới</button>
-                    <button type="button" className="p-1 text-danger" disabled={create.isPending || remove.isPending}
-                      onClick={() => { if (window.confirm("Xóa cuộc trò chuyện này?")) remove.mutate(threadId); }}>Xóa phiên</button>
-                  </div>
-                  {errorHelp}
-                </header>
-              ),
-            }}
-          />
-        </CopilotKitProvider>
-      </div>
-    </>
+    <div className="rm-marketplace-ai">
+      <CopilotKitProvider key={threadId} runtimeUrl={`${API_BASE_URL.replace(/\/$/, "")}/ai/copilotkit`}
+        agentId={AGENT} headers={headers} useSingleEndpoint={false} messageFilter={lastUserMessage} enableInspector={false}
+        onError={() => setProblem("Chưa thể nhận phản hồi. Hãy thử gửi lại câu hỏi.")}>
+        <ToolRenderers />
+        <CopilotPopup
+          threadId={threadId} open={open} onOpenChange={onOpenChange} labels={labels}
+          width="min(460px, calc(100vw - 24px))" height="min(650px, calc(100dvh - 145px))"
+          clickOutsideToClose={false} messageView={{ assistantMessage: { markdownRenderer: PlainText, toolbarVisible: false } }}
+          input={{ textArea: { maxLength: MAX_MESSAGE_LENGTH }, showDisclaimer: true, onFocus: () => setProblem("") }}
+          header={{
+            children: ({ titleContent, closeButton }) => (
+              <header className="border-b border-line bg-surface p-3">
+                <div className="flex items-center justify-between gap-2">{titleContent}{closeButton}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <select aria-label="Cuộc trò chuyện" value={threadId} className="min-w-0 flex-1 rounded border border-line bg-surface p-1"
+                    onChange={(event) => { setSelectedId(event.target.value); setProblem(""); }}>
+                    {threads.data?.map((thread, index) => <option key={thread.id} value={thread.id}>
+                      {new Date(thread.updated_at).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })} · Phiên {threads.data!.length - index}
+                    </option>)}
+                  </select>
+                  <button type="button" className="p-1 text-brand" disabled={create.isPending || remove.isPending} onClick={() => create.mutate()}>Phiên mới</button>
+                  <button type="button" className="p-1 text-danger" disabled={create.isPending || remove.isPending}
+                    onClick={() => { if (window.confirm("Xóa cuộc trò chuyện này?")) remove.mutate(threadId); }}>Xóa phiên</button>
+                </div>
+                {errorHelp}
+              </header>
+            ),
+          }}
+        />
+      </CopilotKitProvider>
+    </div>
   );
 }

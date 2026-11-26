@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   FlatList,
   KeyboardAvoidingView,
@@ -30,6 +31,7 @@ import {
   Field,
   Button,
   Feedback,
+  IconButton,
   LoginPrompt,
   useAction,
   styles,
@@ -146,12 +148,39 @@ export default function Conversation() {
       void queryClient.invalidateQueries({ queryKey: ["chat", "inbox"] });
     });
   };
+  const confirmDelete = (viewerId: string) => {
+    const generation = session.getGeneration();
+    Alert.alert(
+      "Xóa cuộc trò chuyện?",
+      "Tin nhắn cũ sẽ bị xóa khỏi hộp thư của bạn. Người còn lại vẫn xem được lịch sử của họ. Cuộc trò chuyện sẽ xuất hiện lại khi có tin nhắn mới.",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: () => {
+            if (!focused.current || session.getGeneration() !== generation) return;
+            void action.run(async () => {
+              await api.chat.deleteConversation(id);
+              if (session.getGeneration() !== generation) return;
+              queryClient.removeQueries({ queryKey: ["chat", "detail", id, viewerId], exact: true });
+              queryClient.removeQueries({ queryKey: ["chat", "messages", id, viewerId], exact: true });
+              void queryClient.resetQueries({ queryKey: ["chat", "inbox", viewerId] });
+              void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+              if (focused.current) router.dismissTo("/messages");
+            });
+          },
+        },
+      ],
+    );
+  };
   if (!user)
     return (
       <Screen title="Tin nhắn">
         <LoginPrompt />
       </Screen>
     );
+  const conversation = detail.data;
   const items = Array.from(
     new Map(
       [...(messages.data?.pages.flatMap((page) => page.items) ?? []),
@@ -172,18 +201,31 @@ export default function Conversation() {
       keyboardVerticalOffset={90}
     >
       <View style={{ padding: 16, gap: 6 }}>
-        {detail.data && (
-          detail.data.counterparty.is_system ? <View style={{ gap: 4 }}>
-            <Text accessibilityRole="header" style={styles.heading}>Hệ thống ReMarket</Text>
-            <Text style={styles.muted}>Kênh nhắn tin chính thức của ReMarket</Text>
-          </View> : <MenuRow
-            title={detail.data.counterparty.name}
-            description={detail.data.is_system ? "Kênh nhắn tin chính thức của ReMarket" : detail.data.product?.title}
-            icon="person-circle-outline"
-            onPress={() =>
-              router.push(`/users/${detail.data!.counterparty.id}`)
-            }
-          />
+        {conversation && (
+          <View style={[styles.row, { flexWrap: "nowrap" }]}>
+            <View style={{ flex: 1, gap: 4 }}>
+              {conversation.counterparty.is_system ? (
+                <>
+                  <Text accessibilityRole="header" style={styles.heading}>Hệ thống ReMarket</Text>
+                  <Text style={styles.muted}>Kênh nhắn tin chính thức của ReMarket</Text>
+                </>
+              ) : (
+                <MenuRow
+                  title={conversation.counterparty.name}
+                  description={conversation.is_system ? "Kênh nhắn tin chính thức của ReMarket" : conversation.product?.title}
+                  icon="person-circle-outline"
+                  onPress={() => router.push(`/users/${conversation.counterparty.id}`)}
+                />
+              )}
+            </View>
+            <IconButton
+              icon="trash-outline"
+              label="Xóa cuộc trò chuyện"
+              color={colors.red}
+              disabled={action.pending}
+              onPress={() => confirmDelete(user.id)}
+            />
+          </View>
         )}
         {detail.data?.product && (
           <Button
@@ -210,6 +252,8 @@ export default function Conversation() {
       <FlatList
         data={items}
         inverted
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, gap: 12 }}

@@ -3,7 +3,7 @@ import { DELIVERY_LABELS, conditionLabel, formatVnd } from "@remarket/shared";
 import { MarketplaceImage } from "../../../components/common/MarketplaceImage/MarketplaceImage";
 export function OrderContents({ order }: { order: OrderDetail }) {
   const deliveryLabel = DELIVERY_LABELS[order.delivery_method];
-  return <><section className="rounded-card border border-line bg-surface p-5" aria-labelledby="items-heading">
+  return <><section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="items-heading">
     <h2 id="items-heading" className="t-h3 text-ink mb-4">Món đồ</h2>
     <div className="divide-y divide-line">
       {order.items.map((snap) => (
@@ -30,7 +30,7 @@ export function OrderContents({ order }: { order: OrderDetail }) {
     </div>
   </section>
 
-    <section className="rounded-card border border-line bg-surface p-5" aria-labelledby="delivery-heading">
+    <section className="rm-card-panel rounded-card border border-line bg-surface p-5" aria-labelledby="delivery-heading">
       <h2 id="delivery-heading" className="t-h3 text-ink mb-4">Giao nhận</h2>
       <dl className="space-y-2">
         <div className="flex justify-between">

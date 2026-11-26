@@ -83,6 +83,7 @@ x-operation-error-codes:
   listConversations: *ActiveReadErrors
   unreadMessageCount: *ActiveReadErrors
   getConversation: *ActiveReadErrors
+  deleteConversation: *ActiveReadErrors
   openConversation: *ActiveMutationErrors
   listMessages: *ActiveReadErrors
   sendMessage: *ActiveMutationErrors
@@ -673,6 +674,22 @@ paths:
       responses: { '200': { $ref: '#/components/responses/CountSuccess' } }
   /conversations/{conversationId}:
     get: { tags: [Chat], operationId: getConversation, security: [{ bearerAuth: [] }], parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { '200': { $ref: '#/components/responses/ConversationSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
+    delete:
+      tags: [Chat]
+      operationId: deleteConversation
+      description: Clears existing history and removes the thread from the caller's inbox. A new message makes the thread visible again.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Conversation cleared for the caller.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/SuccessEnvelope' }
+                  - { type: object, properties: { data: { type: object, required: [deleted], properties: { deleted: { type: boolean, enum: [true] } } } } }
+        '404': { $ref: '#/components/responses/Error' }
   /conversations/{conversationId}/messages:
     parameters: [{ name: conversationId, in: path, required: true, schema: { type: string, format: uuid } }]
     get: { tags: [Chat], operationId: listMessages, security: [{ bearerAuth: [] }], parameters: [{ name: cursor, in: query, schema: { type: string, maxLength: 1024 } }, { $ref: '#/components/parameters/PageSize' }], responses: { '200': { $ref: '#/components/responses/MessagePageSuccess' } } }

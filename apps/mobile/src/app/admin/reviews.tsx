@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { formatDateTime } from "@remarket/shared";
 import { api } from "../../services/runtime";
-import { SelectField } from "../../components/SelectField";
 import { Button, styles } from "../../components/ui";
 import {
+  AdminFilter,
   AdminList,
   AdminSearch,
   AdvancedFilters,
@@ -43,45 +43,35 @@ export default function AdminReviews() {
       filters={
         <>
           <AdminSearch
-            onSearch={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
+            onSearch={setQ}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Số sao"
             value={rating}
             items={[
-              { value: "", label: "Tất cả" },
               ...[1, 2, 3, 4, 5].map((value) => ({
                 value: String(value),
                 label: `${value} sao`,
               })),
             ]}
-            onChange={(value) => {
-              setRating(value);
-              setPage(1);
-            }}
+            onChange={setRating}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Hiển thị"
             value={visibility}
             items={[
-              { value: "", label: "Tất cả" },
               { value: "VISIBLE", label: "Đang hiển thị" },
               { value: "HIDDEN", label: "Đã ẩn" },
             ]}
-            onChange={(value) => {
-              setVisibility(value);
-              setPage(1);
-            }}
+            onChange={setVisibility}
+            onPage={setPage}
           />
           <AdvancedFilters
             fields={moderationFields}
-            onApply={(value) => {
-              setAdvanced(value);
-              setPage(1);
-            }}
+            onApply={setAdvanced}
+            onPage={setPage}
           />
         </>
       }

@@ -7,7 +7,7 @@ import { Link, useLocation } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
-import { BellIcon, CartIcon, ChatIcon, ChevronLeftIcon } from "../common/Icon/Icon";
+import { BellIcon, CartIcon, ChatIcon, PlusIcon } from "../common/Icon/Icon";
 import { SearchInput } from "../common/SearchInput/SearchInput";
 import { Logo } from "../Logo/Logo";
 
@@ -31,8 +31,8 @@ export function MarketplaceHeader({
   const location = useLocation();
   const { messages, notifications, cart } = useUnreadCounts(viewer !== null);
   const loginFor = loginPathFor(location.pathname, location.search);
-  const sellTarget = viewer ? "/account/products/new" : loginFor;
-  const cartTarget = viewer ? "/cart" : loginFor;
+  const sellTarget = viewer ? "/account/products/new" : loginPathFor("/account/products/new", "");
+  const cartTarget = viewer ? "/cart" : loginPathFor("/cart", "");
 
   return (
     <header className="sticky top-0 z-header bg-surface">
@@ -42,7 +42,7 @@ export function MarketplaceHeader({
           <div className="w-40 shrink-0">
             <Logo />
           </div>
-          <div className="max-w-[520px] flex-1">
+          <div className="min-w-0 max-w-[580px] flex-1">
             <SearchInput
               value={search}
               onValueChange={onSearchChange}
@@ -71,7 +71,7 @@ export function MarketplaceHeader({
             ) : (
               <Link
                 to={loginFor}
-                className="flex h-11 items-center rounded-control px-3 t-label text-ink transition-colors hover:bg-surface-subtle"
+                className="rm-control flex h-11 items-center rounded-control px-3 t-label text-ink hover:bg-surface-subtle"
               >
                 Đăng nhập
               </Link>
@@ -79,9 +79,12 @@ export function MarketplaceHeader({
 
             <Link
               to={sellTarget}
-              className="ml-1 flex h-11 items-center rounded-control bg-brand px-4 t-label text-white transition-colors hover:bg-brand-hover"
+              className="rm-control rm-button-primary ml-2 flex h-11 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white"
             >
-              Đăng bán
+              <span className="rm-button-content inline-flex items-center gap-2">
+                <PlusIcon size={17} />
+                Đăng bán
+              </span>
             </Link>
           </nav>
         </div>
@@ -105,28 +108,6 @@ export function MarketplaceHeader({
             />
           </div>
         )}
-      </div>
-    </header>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Compact header for deep task pages (mobile)                         */
-/* ------------------------------------------------------------------ */
-
-export function CompactHeader({ title, backTo }: { title: string; backTo: string }) {
-  return (
-    <header className="sticky top-0 z-header border-b border-line bg-surface lg:hidden">
-      <div className="rm-container flex h-mobile-header items-center gap-2">
-        <Link
-          to={backTo}
-          aria-label="Quay lại"
-          className="-ml-2 flex h-touch w-touch shrink-0 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
-        >
-          <ChevronLeftIcon />
-        </Link>
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{title}</h1>
-        <MobileHeaderActions />
       </div>
     </header>
   );

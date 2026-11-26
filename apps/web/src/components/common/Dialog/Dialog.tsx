@@ -161,7 +161,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-overlay flex items-center justify-center overflow-y-auto bg-ink/40 p-4 animate-fade-in"
+      className="fixed inset-0 z-overlay !m-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4 animate-fade-in"
       onClick={(event) => {
         if (dismissible && event.target === event.currentTarget) onClose();
       }}
@@ -204,7 +204,7 @@ export function Dialog({
   );
 }
 
-export interface ConfirmReasonField {
+interface ConfirmReasonField {
   label: string;
   required?: boolean;
   value: string;

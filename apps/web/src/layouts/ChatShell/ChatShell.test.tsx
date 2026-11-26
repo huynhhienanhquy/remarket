@@ -11,7 +11,7 @@ import { AdminUsersPage } from "../../pages/AdminUsersPage/AdminUsersPage";
 import { ConversationPage } from "../../pages/ConversationPage/ConversationPage";
 import { httpContext, page } from "../../tests/http-context";
 import { member, timestamp } from "../../tests/test-data";
-import { ChatShell } from "./ChatShell";
+import { AccountShell } from "../AccountShell/AccountShell";
 
 const admin = { ...member, id: "admin-test", role: "ADMIN" as const };
 const target = { ...member, id: "alice", full_name: "Người nhận", created_at: timestamp, province_label: "Hà Nội", lock_reason: null, locked_at: null };
@@ -27,7 +27,7 @@ function show(path: string) {
   render(<QueryClientProvider client={client}><SessionProvider><Ready><MemoryRouter initialEntries={[path]}><ToastProvider>
     <Location /><Routes>
       <Route path="/admin/users" element={<AdminUsersPage />} />
-      <Route element={<ChatShell />}><Route path="/messages/:id" element={<ConversationPage />} /></Route>
+      <Route element={<AccountShell />}><Route path="/messages/:id" element={<ConversationPage />} /></Route>
       <Route path="/messages" element={<h1>Hộp thư người dùng</h1>} />
     </Routes>
   </ToastProvider></MemoryRouter></Ready></SessionProvider></QueryClientProvider>);
@@ -56,7 +56,7 @@ describe("return from admin chat", () => {
     const user = userEvent.setup();
     show(origin);
     await user.click(await screen.findByRole("button", { name: "Nhắn tin hệ thống" }));
-    const composer = await screen.findByLabelText("Tin nhắn");
+    const composer = await screen.findByRole("textbox", { name: "Tin nhắn" });
     await waitFor(() => expect(composer).not.toBeDisabled());
     await user.type(composer, "Thông báo kiểm thử");
     await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));

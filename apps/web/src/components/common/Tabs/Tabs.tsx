@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
-export interface TabItem {
+interface TabItem {
   value: string;
   label: ReactNode;
 }
@@ -46,7 +46,7 @@ export function Tabs({
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
       className={[
-        "flex gap-1 overflow-x-auto border-b border-line scrollbar-thin",
+        "flex gap-1 overflow-x-auto border-b border-line",
         className ?? "",
       ].join(" ")}
     >

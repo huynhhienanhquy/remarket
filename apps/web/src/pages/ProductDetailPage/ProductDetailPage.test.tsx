@@ -13,13 +13,22 @@ beforeEach(() => { context = httpContext({ ...member }); context.reply("GET", "/
 afterEach(() => { harness.cleanup(); vi.unstubAllGlobals(); });
 
 describe("member workflows through the HTTP adapter", () => {
-it("buys only the viewed product, not every existing item in the cart", async () => {
+  it.each([0, 1])("opens direct checkout without adding to the cart from buy button %i", async (index) => {
+    show(<ProductDetailPage />, "/products/" + product.id, "/products/:id");
+    const buttons = await screen.findAllByRole("button", { name: "Mua ngay" });
+    await userEvent.click(buttons[index]!);
+    expect(await screen.findByRole("heading", { name: "Checkout ?product_id=" + product.id })).toBeInTheDocument();
+    expect(context.requests("POST", "/cart/items")).toHaveLength(0);
+  });
+
+  it("adds the viewed product when the cart button is clicked", async () => {
     context.reply("POST", "/cart/items", { groups: [], total_items: 0 });
     show(<ProductDetailPage />, "/products/" + product.id, "/products/:id");
-    await waitFor(() => expect(screen.getAllByRole("button", { name: "Mua ngay" })[0]).not.toBeDisabled());
-    await userEvent.click(screen.getAllByRole("button", { name: "Mua ngay" })[0]!);
-    expect(await screen.findByRole("heading", { name: "Checkout ?items=" + product.id })).toBeInTheDocument();
-    expect(context.requests("POST", "/cart/items")[0]?.body).toEqual({ product_id: product.id });
+    await userEvent.click(await screen.findByRole("button", { name: "Thêm vào giỏ" }));
+    expect(await screen.findByText("Đã thêm vào giỏ hàng")).toBeInTheDocument();
+    const requests = context.requests("POST", "/cart/items");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.body).toEqual({ product_id: product.id });
   });
 it("asks a guest to log in before adding an item to the cart", async () => {
     context.viewer = null;

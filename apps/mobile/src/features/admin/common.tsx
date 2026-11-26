@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import type { PageMeta } from "@remarket/shared";
@@ -16,6 +16,16 @@ import {
   useAction,
 } from "../../components/ui";
 import { Sheet } from "../../components/Sheet";
+import { SelectField } from "../../components/SelectField";
+
+/** All queue filters share the all-option and reset pagination on selection. */
+export function AdminFilter({ items, onChange, onPage, ...props }:
+  ComponentProps<typeof SelectField> & { onPage: (page: number) => void }) {
+  return <SelectField {...props}
+    items={[{ value: "", label: "Tất cả" }, ...items]}
+    onChange={(value) => { onChange(value); onPage(1); }}
+  />;
+}
 
 export function useAdminList<T>(
   area: string,
@@ -89,10 +99,13 @@ export function AdminList<T>({
 
 export function AdminSearch({
   onSearch,
+  onPage,
 }: {
   onSearch: (value: string) => void;
+  onPage: (page: number) => void;
 }) {
   const [text, setText] = useState("");
+  const submit = () => { onSearch(text.trim()); onPage(1); };
   return (
     <View style={styles.card}>
       <Field
@@ -101,12 +114,12 @@ export function AdminSearch({
         onChangeText={setText}
         maxLength={100}
         returnKeyType="search"
-        onSubmitEditing={() => onSearch(text.trim())}
+        onSubmitEditing={submit}
       />
       <Button
         title="Tìm kiếm"
         secondary
-        onPress={() => onSearch(text.trim())}
+        onPress={submit}
       />
     </View>
   );
@@ -115,9 +128,11 @@ export function AdminSearch({
 export function AdvancedFilters({
   fields,
   onApply,
+  onPage,
 }: {
   fields: { key: string; label: string }[];
   onApply: (values: Record<string, string>) => void;
+  onPage: (page: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -163,6 +178,7 @@ export function AdvancedFilters({
                   .map(([key, value]) => [key, value.trim()]),
               ),
             );
+            onPage(1);
             setOpen(false);
             setError(undefined);
           }}
@@ -173,6 +189,7 @@ export function AdvancedFilters({
           onPress={() => {
             setDraft({});
             onApply({});
+            onPage(1);
             setOpen(false);
             setError(undefined);
           }}

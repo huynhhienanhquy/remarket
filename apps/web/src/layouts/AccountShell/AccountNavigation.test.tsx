@@ -50,6 +50,30 @@ afterEach(() => {
 });
 
 describe("account navigation through the application router", () => {
+  it("keeps the same topbar and sidebar when navigating between account pages and messages", async () => {
+    const user = userEvent.setup();
+    show("/favorites");
+    await screen.findByRole("heading", { name: "Yêu thích", level: 1 });
+    const sidebar = screen.getByRole("navigation", { name: "Tài khoản" });
+    const search = screen.getByRole("searchbox", { name: "Tìm kiếm sản phẩm" });
+    const main = screen.getByRole("main");
+    await user.type(search, "Máy ảnh");
+    sidebar.scrollTop = 120;
+    main.scrollTop = 240;
+
+    for (const label of ["Tin nhắn", "Giỏ hàng", "Thông báo", "Hồ sơ cá nhân"]) {
+      await user.click(within(sidebar).getByRole("link", { name: label }));
+      await screen.findByRole("heading", { name: label, level: 1 });
+      expect(screen.getAllByRole("navigation", { name: "Tài khoản" })[0]).toBe(sidebar);
+      expect(screen.getByRole("searchbox", { name: "Tìm kiếm sản phẩm" })).toBe(search);
+      expect(search).toHaveValue("Máy ảnh");
+      expect(sidebar.scrollTop).toBe(120);
+      expect(screen.getByRole("main")).toBe(main);
+      expect(main.scrollTop).toBe(0);
+      expect(within(sidebar).getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+    }
+  });
+
   it.each(destinations)("keeps the shared menu and active destination on %s", async (path, label) => {
     show(path);
     await screen.findAllByRole("heading", { name: label, level: 1 });
@@ -140,6 +164,73 @@ describe("account navigation through the application router", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/orders"));
     await screen.findAllByRole("heading", { name: "Đơn mua", level: 1 });
     expect(context.requests("GET", "/conversations")).toHaveLength(0);
+  });
+
+  it("asks before deleting a conversation and returns to the inbox after success", async () => {
+    const conversation = {
+      id: "seller-chat", can_send: true, unavailable_reason: null,
+      counterparty: { id: seller.id, name: seller.name, avatar_url: null },
+      product: null, last_message: null, unread_count: 0, updated_at: timestamp,
+    };
+    context.reply("GET", "/conversations", page([conversation]));
+    context.reply("GET", "/conversations/seller-chat", conversation);
+    context.reply("GET", "/conversations/seller-chat/messages", { items: [], next_cursor: null });
+    context.on("DELETE", "/conversations/seller-chat", () => {
+      context.reply("GET", "/conversations", page([]));
+      return { deleted: true };
+    });
+
+    show("/messages/seller-chat");
+    const user = userEvent.setup();
+    const remove = await screen.findByRole("button", { name: "Xóa cuộc trò chuyện" });
+    await user.click(remove);
+    const dialog = screen.getByRole("dialog", { name: "Xóa cuộc trò chuyện?" });
+    await user.click(within(dialog).getByRole("button", { name: "Hủy" }));
+    expect(context.requests("DELETE", "/conversations/seller-chat")).toHaveLength(0);
+
+    await user.click(remove);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa cuộc trò chuyện" }));
+    await screen.findByRole("heading", { name: "Bạn chưa có tin nhắn" });
+    expect(window.location.pathname).toBe("/messages");
+    expect(context.requests("DELETE", "/conversations/seller-chat")).toHaveLength(1);
+  });
+
+  it("deletes the requested row without opening or closing a different conversation", async () => {
+    vi.stubGlobal("matchMedia", (media: string) => ({ matches: true, media, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const active = {
+      id: "active-chat", can_send: true, unavailable_reason: null,
+      counterparty: { id: seller.id, name: seller.name, avatar_url: null },
+      product: null, last_message: null, unread_count: 0, updated_at: timestamp,
+    };
+    const other = { ...active, id: "other-chat", counterparty: { id: "other", name: "Người bán khác", avatar_url: null } };
+    context.reply("GET", "/conversations", page([active, other]));
+    context.reply("GET", "/conversations/active-chat", active);
+    context.reply("GET", "/conversations/active-chat/messages", { items: [], next_cursor: null });
+    context.on("DELETE", "/conversations/other-chat", () => {
+      context.reply("GET", "/conversations", page([active]));
+      return { deleted: true };
+    });
+    context.on("DELETE", "/conversations/active-chat", () => {
+      context.reply("GET", "/conversations", page([]));
+      return { deleted: true };
+    });
+
+    show("/messages/active-chat");
+    const user = userEvent.setup();
+    const list = await screen.findByRole("complementary", { name: "Danh sách cuộc trò chuyện" });
+    await user.click(await within(list).findByRole("button", { name: "Xóa cuộc trò chuyện với Người bán khác" }));
+    expect(window.location.pathname).toBe("/messages/active-chat");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa cuộc trò chuyện" }));
+    await waitFor(() => expect(within(list).queryByRole("link", { name: /Người bán khác/ })).not.toBeInTheDocument());
+    expect(context.requests("DELETE", "/conversations/other-chat")).toHaveLength(1);
+    expect(context.requests("GET", "/conversations/other-chat")).toHaveLength(0);
+    expect(window.location.pathname).toBe("/messages/active-chat");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(within(list).getByRole("button", { name: `Xóa cuộc trò chuyện với ${seller.name}` }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa cuộc trò chuyện" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/messages"));
+    expect(context.requests("DELETE", "/conversations/active-chat")).toHaveLength(1);
   });
 
   it("shows the number of available cart items in the checkout action", async () => {

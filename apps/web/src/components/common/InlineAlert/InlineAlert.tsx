@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import { AlertTriangleIcon, CheckIcon, InfoIcon, XIcon } from "../Icon/Icon";
 import type { IconProps } from "../Icon/Icon";
 
-export type InlineAlertTone = "info" | "warning" | "danger" | "success" | "neutral";
+type InlineAlertTone = "info" | "warning" | "danger" | "success" | "neutral";
 
 interface ToneStyle {
   panel: string;

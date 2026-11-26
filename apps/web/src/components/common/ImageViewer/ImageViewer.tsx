@@ -21,7 +21,7 @@ function clampIndex(index: number, length: number): number {
 }
 
 const NAV_BUTTON =
-  "absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-ink shadow-pop transition-colors hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed";
+  "absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/90 text-ink shadow-pop enabled:hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed";
 
 export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerProps) {
   const [index, setIndex] = useState(() => clampIndex(startIndex, images.length));
@@ -43,7 +43,7 @@ export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerPro
       aria-modal="true"
       aria-label={alt}
       tabIndex={-1}
-      className="fixed inset-0 z-dialog flex flex-col bg-ink/95 animate-fade-in"
+      className="fixed inset-0 z-dialog !m-0 flex flex-col bg-ink/95 animate-fade-in"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -89,11 +89,11 @@ export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerPro
           aria-label="Ảnh sau"
           className={[NAV_BUTTON, "right-2"].join(" ")}
         >
-          <ChevronRightIcon />
+          <ChevronRightIcon className="rm-icon-forward" />
         </button>
       </div>
 
-      <div className="scrollbar-thin flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 p-3">
+      <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 p-3">
         {images.map((image, imageIndex) => {
           const active = imageIndex === index;
           return (
@@ -104,7 +104,7 @@ export function ImageViewer({ images, startIndex, onClose, alt }: ImageViewerPro
               aria-label={`Chọn ảnh ${imageIndex + 1}`}
               aria-current={active ? "true" : undefined}
               className={[
-                "h-16 w-16 shrink-0 overflow-hidden rounded-control transition-opacity",
+                "rm-photo-control h-16 w-16 shrink-0 overflow-hidden rounded-control focus-visible:-outline-offset-2",
                 active ? "outline outline-2 outline-brand" : "opacity-70 hover:opacity-100",
               ].join(" ")}
             >

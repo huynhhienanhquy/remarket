@@ -38,7 +38,7 @@ export function AdminUserProducts({ userId }: { userId: string }) {
                 const badge = PRODUCT_STATUS_LABELS[product.status];
                 const target = new URLSearchParams({ seller_id: userId, status, page: String(query.data.meta.page), selected: product.id });
                 return <li key={product.id}>
-                  <Link to={`/admin/products?${target.toString()}`} className="flex gap-3 rounded-card border border-line p-3 transition-colors hover:bg-surface-subtle">
+                  <Link to={`/admin/products?${target.toString()}`} className="rm-card-action flex gap-3 rounded-card border border-line p-3 hover:bg-surface-subtle">
                     {product.image_url ? <ApiImage src={product.image_url} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <div aria-hidden="true" className="h-20 w-20 shrink-0 rounded-xl bg-surface-subtle" />}
                     <div className="min-w-0 flex-1 space-y-1">
                       <p className="line-clamp-2 t-label text-ink">{product.title}</p>

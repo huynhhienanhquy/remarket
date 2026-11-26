@@ -125,7 +125,7 @@ export function AdminUsersPage() {
           exportAdminCsv("nguoi-dung.csv", ["Người dùng", "Email", "Vai trò", "Trạng thái", "Ngày tham gia"],
             (query.data?.items ?? []).map(row => [row.full_name, row.email, row.role, USER_STATUS_LABELS[row.status].label, row.created_at]));
         }}><Icon name="download" size={16} />Xuất dữ liệu</button>
-        <button type="button" className="admin-utility admin-primary" onClick={() => setCreateOpen(true)}><Icon name="users" size={17} />Thêm người dùng mới</button></>} />
+        <button type="button" className="admin-utility admin-primary" onClick={() => setCreateOpen(true)}><span className="rm-button-content inline-flex items-center gap-2"><Icon name="users" size={17} />Thêm người dùng mới</span></button></>} />
       <AdminMetrics metrics={[
         { label: "Tổng tài khoản", value: summary?.total, icon: "users", note: "Tài khoản hiện tại" },
         { label: "Đang hoạt động", value: summary?.active, icon: "check", note: summary?.total ? `Chiếm ${formatAdminPercent(summary.active * 100 / summary.total)} tổng số` : "Đã xác minh email" },
@@ -172,7 +172,7 @@ export function AdminUsersPage() {
           }}>{quickActionsUser.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa tài khoản"}</Button>
         </div>
       </Dialog>}
-      <Drawer open={selectedId !== null} onClose={() => apply({ selected: null }, { replace: true })} title="Chi tiết người dùng" footer={selected?.role === "USER" ? <button type="button" className={selected.status === "ACTIVE" ? "min-h-[44px] rounded-control bg-danger px-4 t-label text-white" : "min-h-[44px] rounded-control bg-brand px-4 t-label text-white"} onClick={() => setAction(selected.status === "ACTIVE" ? "lock" : "unlock")}>{selected.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa tài khoản"}</button> : undefined}>
+      <Drawer open={selectedId !== null} onClose={() => apply({ selected: null }, { replace: true })} title="Chi tiết người dùng" footer={selected?.role === "USER" ? <button type="button" className={selected.status === "ACTIVE" ? "rm-button-danger min-h-[44px] rounded-control bg-danger px-4 t-label text-white" : "rm-button-primary min-h-[44px] rounded-control bg-brand px-4 t-label text-white"} onClick={() => setAction(selected.status === "ACTIVE" ? "lock" : "unlock")}><span className="rm-button-content inline-block">{selected.status === "ACTIVE" ? "Khóa tài khoản" : "Mở khóa tài khoản"}</span></button> : undefined}>
         {selectedQuery.isPending ? <p className="t-body text-muted">Đang tải người dùng…</p> : selectedQuery.isError ? <QueryErrorAlert error={selectedQuery.error} onRetry={() => selectedQuery.refetch()} /> : selected && <div className="space-y-6">
           <UserIdentity user={selected} />
           {selected.role === "USER" && <div className="space-y-2">

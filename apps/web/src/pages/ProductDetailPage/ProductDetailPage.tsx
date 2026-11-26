@@ -7,7 +7,7 @@ import {
   formatVnd,
 } from "@remarket/shared";
 import { Link } from "react-router-dom";
-import { Button } from "../../components/common/Button/Button";
+import { Button, buttonClasses } from "../../components/common/Button/Button";
 import { CartIcon, ChatIcon, HeartIcon } from "../../components/common/Icon/Icon";
 import { EmptyState } from "../../components/common/EmptyState/EmptyState";
 import { ImageViewer } from "../../components/common/ImageViewer/ImageViewer";
@@ -39,7 +39,6 @@ export function ProductDetailPage() {
     toggleSaved,
     addToCart,
     chat,
-    purchase,
     actionBusy,
     openChat,
     buyNow,
@@ -149,9 +148,9 @@ export function ProductDetailPage() {
         <ProductGallery {...{ product, hidden, images, mainImage, activeImage, openViewer, selectImage }} />
 
         {/* Summary */}
-        <div className="min-w-0 lg:col-span-5">
+        <div className="rm-card-panel min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-subtle sm:p-6 lg:col-span-5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-surface-subtle px-2.5 py-1 t-meta text-muted">
+            <span className="rounded-full bg-brand-soft px-2.5 py-1 t-meta text-brand">
               {CONDITION_LABELS[product.condition]}
             </span>
             <StatusBadge label={statusMeta.label} tone={statusMeta.tone} />
@@ -173,89 +172,83 @@ export function ProductDetailPage() {
             </time>
           </p>
 
-          <dl className="mt-5 divide-y divide-line rounded-card border border-line bg-surface">
+          {/* Desktop actions */}
+          <div className="mt-5 hidden lg:grid lg:grid-cols-2 lg:gap-2">
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!canBuy || actionBusy}
+              onClick={buyNow}
+              className="col-span-2"
+            >
+              Mua ngay
+            </Button>
+            <Button
+              variant="secondary"
+              fullWidth
+              disabled={!canCart || actionBusy}
+              loading={addToCart.isPending}
+              onClick={addItem}
+            >
+              Thêm vào giỏ
+            </Button>
+            <Button
+              variant="secondary"
+              fullWidth
+              disabled={!canChat || actionBusy}
+              loading={chat.isPending}
+              onClick={openChat}
+            >
+              <ChatIcon className="mr-1 inline-block" />
+              Nhắn tin
+            </Button>
+          </div>
+          {product.capabilities.unavailable_reason && !unavailableBanner && (
+            <p className="mt-2 t-meta text-muted">{product.capabilities.unavailable_reason}</p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-2">
+            <button
+              type="button"
+              aria-pressed={product.is_favorited}
+              disabled={!product.capabilities.can_favorite || actionBusy}
+              onClick={toggleSaved}
+              className="flex min-h-touch items-center gap-2 t-label text-ink enabled:hover:text-danger disabled:opacity-50"
+            >
+              <HeartIcon
+                className={product.is_favorited ? "rm-icon-favorite fill-current text-danger" : "rm-icon-favorite"}
+              />
+              {product.is_favorited ? "Đã yêu thích" : "Yêu thích"}
+            </button>
+            <button
+              type="button"
+              disabled={!product.capabilities.can_report || isOwner || actionBusy}
+              onClick={openReport}
+              className="min-h-touch t-label text-muted enabled:hover:text-ink disabled:opacity-50"
+            >
+              Báo cáo tin đăng
+            </button>
+          </div>
+          {(isOwner || viewer?.role === "ADMIN") && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {product.capabilities.can_edit && (
+                <Link to={`/account/products/${product.id}/edit`} className={buttonClasses("secondary")}>
+                  Chỉnh sửa tin
+                </Link>
+              )}
+              <Link to="/account/products" className={buttonClasses("ghost")}>
+                Quản lý tin
+              </Link>
+            </div>
+          )}
+          <dl className="mt-4 divide-y divide-line border-t border-line">
             {specs.map((spec) => (
-              <div key={spec.label} className="flex items-baseline justify-between gap-4 px-4 py-3">
+              <div key={spec.label} className="flex items-baseline justify-between gap-3 py-2.5">
                 <dt className="shrink-0 text-sm text-muted">{spec.label}</dt>
                 <dd className="min-w-0 break-words text-right text-sm font-medium text-ink">{spec.value}</dd>
               </div>
             ))}
           </dl>
-
-          {/* Desktop actions */}
-          <div className="mt-5 hidden lg:block">
-            <div className="space-y-3">
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                disabled={!canBuy || actionBusy}
-                loading={purchase.isPending}
-                onClick={buyNow}
-              >
-                Mua ngay
-              </Button>
-              <Button
-                variant="secondary"
-                fullWidth
-                disabled={!canCart || actionBusy}
-                loading={addToCart.isPending}
-                onClick={addItem}
-              >
-                Thêm vào giỏ
-              </Button>
-              <Button
-                variant="secondary"
-                fullWidth
-                disabled={!canChat || actionBusy}
-                loading={chat.isPending}
-                onClick={openChat}
-              >
-                <ChatIcon />
-                Chat với người bán
-              </Button>
-            </div>
-            {product.capabilities.unavailable_reason && (
-              <p className="mt-2 t-meta text-muted">{product.capabilities.unavailable_reason}</p>
-            )}
-            <div className="mt-4 flex items-center justify-between">
-              <button
-                type="button"
-                disabled={!product.capabilities.can_favorite || actionBusy}
-                onClick={toggleSaved}
-                className="flex items-center gap-2 t-label text-ink hover:text-danger disabled:opacity-50"
-              >
-                <HeartIcon
-                  className={product.is_favorited ? "fill-current text-danger" : undefined}
-                />
-                {product.is_favorited ? "Đã yêu thích" : "Yêu thích"}
-              </button>
-              <button
-                type="button"
-                disabled={!product.capabilities.can_report || isOwner || actionBusy}
-                onClick={openReport}
-                className="t-label text-muted hover:text-ink disabled:opacity-50"
-              >
-                Báo cáo tin đăng
-              </button>
-            </div>
-            {(isOwner || viewer?.role === "ADMIN") && (
-              <div className="mt-4 flex gap-3">
-                {product.capabilities.can_edit && (
-                  <Link to={`/account/products/${product.id}/edit`} className="flex-1">
-                    <Button variant="secondary" fullWidth>
-                      Chỉnh sửa tin
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/account/products" className="flex-1">
-                  <Button variant="ghost" fullWidth>
-                    Quản lý tin
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -276,7 +269,7 @@ export function ProductDetailPage() {
       </div>
 
       {/* Mobile sticky action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-action-bar border-t border-line bg-surface px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-action-bar border-t border-line bg-surface px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-pop lg:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-2">
           <button
             type="button"
@@ -300,7 +293,6 @@ export function ProductDetailPage() {
           <Button
             variant="primary"
             disabled={!canBuy || actionBusy}
-            loading={purchase.isPending}
             onClick={buyNow}
             className="min-h-[44px] flex-1"
           >

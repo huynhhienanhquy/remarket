@@ -1,11 +1,13 @@
 import { Prisma, type ProductImage, type ProductStatus } from "@prisma/client";
+import { categoryPathsSql } from "../services/category-policy.js";
 import { prisma } from "../utils/prisma.js";
 import type { ProductDetailRow, SellerProfile, ViewerContext } from "./dto-mappers.js";
 
 type Viewer = Omit<ViewerContext, "favorited" | "aggregates">;
 type ReadScope = { kind: "detail"; id: string }
   | { kind: "own"; sellerId: string; status?: ProductStatus; offset: number; limit: number }
-  | { kind: "seller"; sellerId: string; offset: number; limit: number };
+  | { kind: "seller"; sellerId: string; offset: number; limit: number }
+  | { kind: "favorites"; userId: string; offset: number; limit: number };
 
 type ReadRow = Omit<ProductDetailRow, "images" | "seller"> & {
   total: bigint;
@@ -43,7 +45,13 @@ export async function readProducts(scope: ReadScope, viewer: Viewer): Promise<{
 }> {
   const conditions: Prisma.Sql[] = [];
   if (scope.kind === "detail") conditions.push(Prisma.sql`p.id = ${scope.id} AND p."deletedAt" IS NULL`);
+  else if (scope.kind === "favorites") conditions.push(Prisma.sql`saved."userId" = ${scope.userId}`);
   else conditions.push(Prisma.sql`p."sellerId" = ${scope.sellerId}`);
+  // Saved listings retain unavailable rows and use the time they were saved,
+  // rather than the listing creation time used by the seller/owner scopes.
+  const savedJoin = scope.kind === "favorites"
+    ? Prisma.sql`JOIN "Favorite" saved ON saved."productId" = p.id` : Prisma.empty;
+  const sortTime = scope.kind === "favorites" ? Prisma.sql`saved."createdAt"` : Prisma.sql`p."createdAt"`;
   if (scope.kind === "own" && scope.status) conditions.push(Prisma.sql`p.status = ${scope.status}::text::"ProductStatus"`);
   if (scope.kind === "seller") conditions.push(Prisma.sql`
     p.status IN ('ACTIVE', 'RESERVED', 'SOLD') AND p."deletedAt" IS NULL AND NOT p."isBlocked"
@@ -54,18 +62,12 @@ export async function readProducts(scope: ReadScope, viewer: Viewer): Promise<{
     SELECT 1 FROM "User" WHERE id = ${scope.sellerId} AND status = 'ACTIVE' AND "emailVerifiedAt" IS NOT NULL
   )` : Prisma.sql`true`;
   const rows = await prisma.$queryRaw<Array<ReadRow | { id: null; total: bigint; ownerExists: boolean }>>(Prisma.sql`
-    WITH RECURSIVE category_paths AS (
-      SELECT id, ARRAY[name]::text[] AS path, status = 'ACTIVE' AS active
-      FROM "Category" WHERE "parentId" IS NULL
-      UNION ALL
-      SELECT c.id, a.path || c.name::text, a.active AND c.status = 'ACTIVE'
-      FROM "Category" c JOIN category_paths a ON c."parentId" = a.id
-    ), filtered AS MATERIALIZED (
-      SELECT p.id FROM "Product" p JOIN "User" u ON u.id = p."sellerId"
+    WITH RECURSIVE category_paths AS (${categoryPathsSql}), filtered AS MATERIALIZED (
+      SELECT p.id, ${sortTime} AS "sortTime" FROM "Product" p JOIN "User" u ON u.id = p."sellerId" ${savedJoin}
       WHERE ${Prisma.join(conditions, " AND ")}
     ), page AS MATERIALIZED (
-      SELECT p.* FROM "Product" p JOIN filtered f ON f.id = p.id
-      ORDER BY p."createdAt" DESC, p.id DESC
+      SELECT p.*, f."sortTime" FROM "Product" p JOIN filtered f ON f.id = p.id
+      ORDER BY f."sortTime" DESC, p.id DESC
       LIMIT ${scope.kind === "detail" ? 1 : scope.limit} OFFSET ${scope.kind === "detail" ? 0 : scope.offset}
     ), sellers AS (SELECT DISTINCT "sellerId" FROM page), reviews AS (
       SELECT "reviewedUserId", AVG(rating)::double precision AS rating, COUNT(*) AS count FROM "Review"
@@ -96,7 +98,7 @@ export async function readProducts(scope: ReadScope, viewer: Viewer): Promise<{
     ) images ON true
     LEFT JOIN reviews ON reviews."reviewedUserId" = p."sellerId"
     LEFT JOIN sales ON sales."sellerId" = p."sellerId"
-    ORDER BY p."createdAt" DESC, p.id DESC
+    ORDER BY p."sortTime" DESC, p.id DESC
   `);
   const items = rows.flatMap((row): ProductSnapshot[] => {
     if (row.id === null) return [];

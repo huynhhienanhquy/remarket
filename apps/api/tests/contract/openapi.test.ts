@@ -32,7 +32,7 @@ const requiredOperations: Array<[string, HttpMethod]> = [
   ["/orders/{id}", "get"], ["/orders/{id}/actions", "post"],
   ["/orders/{orderId}/reviews", "post"], ["/conversations", "get"],
   ["/conversations", "post"], ["/conversations/{conversationId}/messages", "get"],
-  ["/conversations/{conversationId}", "get"],
+  ["/conversations/{conversationId}", "get"], ["/conversations/{conversationId}", "delete"],
   ["/conversations/unread-count", "get"],
   ["/conversations/{conversationId}/messages", "post"],
   ["/conversations/{conversationId}/read", "post"], ["/users/{id}", "get"],

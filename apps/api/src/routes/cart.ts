@@ -1,5 +1,4 @@
 import { loadCategoryEligibility } from "../services/category-policy.js";
-import type { User } from "@prisma/client";
 import { Router } from "express";
 import type { Response } from "express";
 import { z } from "zod";
@@ -12,8 +11,7 @@ import type { AuthRequest } from "../middleware/auth.js";
 import { ok } from "../shared/api-response.js";
 import { notFound, productNotAvailable, unauthorized, validationError } from "../shared/errors.js";
 import { toSellerSummary } from "../shared/dto-mappers.js";
-import type { ProductRow } from "../shared/dto-mappers.js";
-import { EMPTY_AGGREGATES, loadSellerAggregates } from "../shared/seller-aggregates.js";
+import { readCart, type CartAvailability } from "../shared/cart-reads.js";
 import { createPublicStorageUrl } from "../services/storage.js";
 import { usableImageUrl } from "../shared/image-url.js";
 
@@ -46,9 +44,9 @@ function viewerIdOf(req: AuthRequest): string {
 
 /** Why one listing cannot be checked out right now; null when it is buyable. */
 function unavailableReason(
-  product: ProductRow,
+  product: CartAvailability,
   viewerId: string,
-  isValidCategory: (categoryId: string) => boolean,
+  categoryEligible: boolean,
 ): string | null {
   if (product.deletedAt !== null || product.isBlocked) return "Tin đăng không còn khả dụng.";
   if (product.sellerId === viewerId) return OWN_LISTING_MESSAGE;
@@ -60,47 +58,27 @@ function unavailableReason(
   if (product.seller.status !== "ACTIVE" || product.seller.emailVerifiedAt === null) {
     return "Người bán chưa đủ điều kiện giao dịch.";
   }
-  if (!isValidCategory(product.categoryId)) return "Danh mục sản phẩm không còn hoạt động.";
+  if (!categoryEligible) return "Danh mục sản phẩm không còn hoạt động.";
   return null;
 }
 
-async function buildCartView(
-  viewerId: string,
-  isValidCategory?: (categoryId: string) => boolean,
-): Promise<CartView> {
-  const [validCategory, entries, totalItems] = await Promise.all([
-    isValidCategory ? Promise.resolve(isValidCategory) : loadCategoryEligibility(prisma).then((ids) => (id: string) => ids.has(id)),
-    prisma.cartItem.findMany({
-      where: { userId: viewerId },
-      orderBy: { createdAt: "desc" },
-      take: MAX_CART_ITEMS,
-      include: {
-        product: { include: { images: { orderBy: { sortOrder: "asc" } }, seller: true } },
-      },
-    }),
-    prisma.cartItem.count({ where: { userId: viewerId } }),
-  ]);
+async function buildCartView(viewerId: string): Promise<CartView> {
+  const { items, total } = await readCart(viewerId, MAX_CART_ITEMS);
+  const groups = new Map<string, CartGroup>();
 
-  const sellers = new Map<string, User>();
-  const itemsBySeller = new Map<string, CartItemView[]>();
-
-  for (const entry of entries) {
-    const product = entry.product;
-    if (!sellers.has(product.sellerId)) sellers.set(product.sellerId, product.seller);
-
-    const reason = unavailableReason(product, viewerId, validCategory);
+  for (const product of items) {
+    const seller = { status: product.sellerStatus, emailVerifiedAt: product.sellerVerifiedAt };
+    const reason = unavailableReason({ ...product, seller }, viewerId, product.categoryEligible);
     const hidden = product.deletedAt !== null || product.isBlocked;
-    const image = product.images[0];
     const publicImage = !hidden && ["ACTIVE", "RESERVED", "SOLD"].includes(product.status)
-      && product.seller.status === "ACTIVE" && product.seller.emailVerifiedAt !== null
-      && validCategory(product.categoryId);
+      && seller.status === "ACTIVE" && seller.emailVerifiedAt !== null && product.categoryEligible;
     const item: CartItemView = {
       delivery_method: product.deliveryMethod,
       shipping_fee: hidden ? "0" : product.shippingFee.toString(),
       product_id: product.id,
       title: hidden ? "" : product.title,
       price: hidden ? "0" : product.price.toString(),
-      image_url: !publicImage || !image ? null : image.storagePath ? createPublicStorageUrl(image.storagePath) : usableImageUrl(image.url),
+      image_url: !publicImage ? null : product.imagePath ? createPublicStorageUrl(product.imagePath) : usableImageUrl(product.imageUrl),
       condition: product.condition,
       status: product.status,
       province_label: provinceLabel(product.provinceCode),
@@ -108,21 +86,27 @@ async function buildCartView(
       unavailable_reason: reason,
     };
 
-    const bucket = itemsBySeller.get(product.sellerId) ?? [];
-    bucket.push(item);
-    itemsBySeller.set(product.sellerId, bucket);
+    let group = groups.get(product.sellerId);
+    if (!group) {
+      group = {
+        seller: toSellerSummary({
+          ...seller, id: product.sellerId, fullName: product.sellerName, avatarUrl: product.sellerAvatar,
+          provinceCode: product.sellerProvince, joinedAt: product.sellerJoinedAt,
+        }, {
+          rating: product.rating === null ? null : Math.round(product.rating * 10) / 10,
+          review_count: Number(product.reviewCount), completed_sales_count: Number(product.completedSalesCount),
+        }),
+        items: [],
+      };
+      groups.set(product.sellerId, group);
+    }
+    group.items.push(item);
   }
 
-  const aggregates = await loadSellerAggregates([...sellers.keys()]);
-  const groups: CartGroup[] = [...sellers.entries()]
-    .map(([sellerId, seller]) => ({
-      seller: toSellerSummary(seller, aggregates.get(sellerId) ?? EMPTY_AGGREGATES),
-      items: itemsBySeller.get(sellerId) ?? [],
-    }))
-    // Sellers are ordered by name so the checkout summary is stable.
-    .sort((a, b) => a.seller.name.localeCompare(b.seller.name, "vi"));
-
-  return { groups, total_items: totalItems };
+  return {
+    groups: [...groups.values()].sort((a, b) => a.seller.name.localeCompare(b.seller.name, "vi")),
+    total_items: total,
+  };
 }
 
 export const cartRouter = Router();
@@ -147,19 +131,22 @@ cartRouter.post(
     const viewerId = viewerIdOf(req);
     const { product_id: productId } = addCartItemSchema.parse(req.body);
 
-    const [product, validCategory] = await Promise.all([
+    const [product, eligibleCategories] = await Promise.all([
       prisma.product.findUnique({
         where: { id: productId },
-        include: { images: { orderBy: { sortOrder: "asc" } }, seller: true },
+        select: {
+          deletedAt: true, isBlocked: true, sellerId: true, status: true, categoryId: true,
+          seller: { select: { status: true, emailVerifiedAt: true } },
+        },
       }),
-      loadCategoryEligibility(prisma).then((ids) => (id: string) => ids.has(id)),
+      loadCategoryEligibility(prisma),
     ]);
     if (!product || product.deletedAt !== null) throw notFound(NOT_FOUND_MESSAGE);
 
     if (product.sellerId === viewerId) {
       throw validationError(OWN_LISTING_MESSAGE, { product_id: OWN_LISTING_MESSAGE });
     }
-    const reason = unavailableReason(product, viewerId, validCategory);
+    const reason = unavailableReason(product, viewerId, eligibleCategories.has(product.categoryId));
     if (reason !== null) throw productNotAvailable(reason);
 
     // Quantity is fixed at 1: adding twice must not duplicate or increment.
@@ -173,7 +160,7 @@ cartRouter.post(
       await tx.cartItem.create({ data: { userId: viewerId, productId } });
     });
 
-    return ok(res, await buildCartView(viewerId, validCategory));
+    return ok(res, await buildCartView(viewerId));
   }),
 );
 

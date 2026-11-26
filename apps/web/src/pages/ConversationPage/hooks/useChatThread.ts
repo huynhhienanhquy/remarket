@@ -54,7 +54,7 @@ export function useChatThread(id: string) {
       return remaining.length === entries.length ? entries : remaining;
     });
   }, [serverIds]);
-  const send = useMutation({ scope: { id: `chat-send:${id}` }, mutationFn: (entry: Message) => api.chat.send(id, { content: entry.content, client_message_id: entry.client_message_id }),
+  const send = useMutation({ mutationKey: ["chat", "send", id], scope: { id: `chat-send:${id}` }, mutationFn: (entry: Message) => api.chat.send(id, { content: entry.content, client_message_id: entry.client_message_id }),
     onSuccess: async ({ message }, input) => {
       if (activeViewer.current !== input.sender_id) return;
       setLocal((entries) => entries.map((entry) => entry.message.client_message_id === input.client_message_id ? { message, status: "sent" } : entry));

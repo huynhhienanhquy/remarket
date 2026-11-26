@@ -7,6 +7,7 @@ import { Providers, useSession } from "../services/session-context";
 import { colors } from "../components/ui";
 import { CompactHeader } from "../components/MarketplaceHeader";
 import { MobileBottomNav } from "../components/MobileBottomNav";
+import { PointerMotionProvider } from "../components/HoverPressable";
 export { ErrorBoundary } from "expo-router";
 
 function AccessWatcher() {
@@ -27,7 +28,7 @@ function AccessWatcher() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
+    <PointerMotionProvider><SafeAreaProvider>
       <Providers>
         <AccessWatcher />
         <StatusBar style="dark" />
@@ -48,6 +49,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="assistant" options={{ title: "Trợ lý ReMarket" }} />
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ headerShown: false }} />
             <Stack.Screen
@@ -114,6 +116,6 @@ export default function RootLayout() {
           <MobileBottomNav />
         </View>
       </Providers>
-    </SafeAreaProvider>
+    </SafeAreaProvider></PointerMotionProvider>
   );
 }

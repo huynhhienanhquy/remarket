@@ -1,7 +1,7 @@
 import { validApiResponse, apiResponseIssue } from "@remarket/shared";
 import { ApiError } from "./errors.js";
 
-export type Query = Record<
+type Query = Record<
   string,
   string | number | boolean | null | undefined
 >;
@@ -23,7 +23,7 @@ export function mediaUrl(value: string, baseUrl: string): string {
     ? new URL(value, baseUrl).toString()
     : value;
 }
-export function resolveMedia(value: unknown, baseUrl: string): unknown {
+function resolveMedia(value: unknown, baseUrl: string): unknown {
   if (Array.isArray(value))
     return value.map((item) => resolveMedia(item, baseUrl));
   if (value && typeof value === "object")
@@ -47,8 +47,10 @@ export interface TransportOptions {
   onExpired?: () => Promise<void>;
   /** Revalidate identity after a policy denial; never repeat the denied operation. */
   onForbidden?: () => Promise<void>;
-  timeoutMs?: number;
+  timeoutMs?: number | ((method: string, path: string) => number | undefined);
 }
+
+const timeoutMessage = "Máy chủ phản hồi quá lâu. Vui lòng thử lại.";
 
 export function createTransport(options: TransportOptions): HttpTransport {
   const base = new URL(options.baseUrl);
@@ -93,10 +95,11 @@ export function createTransport(options: TransportOptions): HttpTransport {
         : path === "/mobile/delete-account"
           ? 60_000
           : 20_000;
-    const timer = setTimeout(
-      () => controller.abort(),
-      options.timeoutMs ?? defaultTimeout,
-    );
+    const timeout =
+      typeof options.timeoutMs === "function"
+        ? options.timeoutMs(method, path)
+        : options.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), timeout ?? defaultTimeout);
     try {
       let response: Response;
       try {
@@ -116,7 +119,9 @@ export function createTransport(options: TransportOptions): HttpTransport {
         assertCurrent();
         throw new ApiError({
           code: "NETWORK_ERROR",
-          message: "Không thể kết nối máy chủ. Vui lòng thử lại.",
+          message: controller.signal.aborted
+            ? timeoutMessage
+            : "Không thể kết nối máy chủ. Vui lòng thử lại.",
           status: 0,
         });
       }
@@ -150,7 +155,7 @@ export function createTransport(options: TransportOptions): HttpTransport {
       if (controller.signal.aborted)
         throw new ApiError({
           code: "NETWORK_ERROR",
-          message: "Máy chủ chưa hoàn tất phản hồi. Vui lòng thử lại.",
+          message: timeoutMessage,
           status: 0,
         });
       if (!response.ok) {

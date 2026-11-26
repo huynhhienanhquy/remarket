@@ -1,0 +1,24 @@
+{
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs"],
+      "project": ["scripts/**/*.mjs"]
+    },
+    "apps/api": {
+      // Operational CLIs and isolated verification fixtures are invoked by
+      // commands/child processes, rather than imported by the HTTP server.
+      "entry": ["src/index.ts", "src/worker.ts", "scripts/*.{ts,mjs,cjs}", "tests/fixtures/*.ts"],
+      "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs,cjs}", "tests/**/*.ts"],
+      // Coverage is optional; the normal Vitest command does not request it.
+      "ignoreDependencies": ["@vitest/coverage-v8"]
+    },
+    "apps/web": {},
+    "apps/mobile": {
+      // Knip infers these from ExpoConfig properties. This app has no OTA
+      // updates integration or expo-system-ui imports/config plugin.
+      "ignoreDependencies": ["expo-updates", "expo-system-ui"]
+    },
+    "packages/shared": {},
+    "packages/api-client": {}
+  }
+}

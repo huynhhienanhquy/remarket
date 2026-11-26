@@ -6,13 +6,13 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "md" | "lg";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-control text-sm font-semibold leading-5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+  "rm-button inline-flex items-center justify-center gap-2 rounded-control text-sm font-semibold leading-5 disabled:opacity-60 disabled:cursor-not-allowed";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-white hover:bg-brand-hover",
-  secondary: "border border-brand bg-surface text-brand hover:bg-brand-soft",
-  ghost: "text-ink hover:bg-surface-subtle",
-  danger: "bg-danger text-white hover:bg-danger/90",
+  primary: "rm-button-primary bg-brand text-white",
+  secondary: "rm-button-secondary border border-brand bg-surface text-brand",
+  ghost: "rm-button-ghost text-ink",
+  danger: "rm-button-danger bg-danger text-white",
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -65,7 +65,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={[buttonClasses(variant, size, fullWidth), className ?? ""].join(" ")}
       {...rest}
     >
-      <span className="relative inline-flex items-center">
+      <span className="rm-button-content relative inline-flex items-center">
         {/* Opacity instead of visibility: the label keeps its width and stays
             announced by screen readers while the spinner shows. */}
         <span className={loading ? "opacity-0" : undefined}>{children}</span>

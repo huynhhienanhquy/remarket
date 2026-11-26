@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "../../components/HoverPressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
@@ -19,11 +20,10 @@ import {
   Feedback,
   Field,
   Pagination,
-  ProductGrid,
-  ProductGridSkeleton,
   Screen,
   styles,
 } from "../../components/ui";
+import { ProductGrid, ProductGridSkeleton } from "../../components/ProductCards";
 import { SelectField } from "../../components/SelectField";
 import { Sheet } from "../../components/Sheet";
 import {
@@ -33,48 +33,33 @@ import {
 import {
   validateSearchFilters,
   deliveryLabel,
+  productSearchFromParams,
 } from "../../services/marketplace";
 
 export default function Products() {
   const params = useLocalSearchParams();
-  const initialQ = typeof params.q === "string" ? params.q.slice(0, 100) : "";
-  const initialCategory =
-    typeof params.category_id === "string" ? params.category_id : undefined;
-  return (
-    <ProductSearch
-      key={JSON.stringify([initialQ, initialCategory])}
-      initialQ={initialQ}
-      initialCategory={initialCategory}
-    />
-  );
+  const initial = productSearchFromParams(params);
+  return <ProductSearch key={JSON.stringify(initial)} initial={initial} />;
 }
 
 function ProductSearch({
-  initialQ,
-  initialCategory,
+  initial,
 }: {
-  initialQ: string;
-  initialCategory?: string;
+  initial: ReturnType<typeof productSearchFromParams>;
 }) {
   const { user } = useSession();
-  const [input, setInput] = useState(initialQ);
-  const [q, setQ] = useState(initialQ);
-  const [category, setCategory] = useState<string | undefined>(initialCategory);
-  const [sort, setSort] = useState<SortOption>("newest");
+  const [input, setInput] = useState(initial.q);
+  const [q, setQ] = useState(initial.q);
+  const [category, setCategory] = useState<string | undefined>(initial.category);
+  const [sort, setSort] = useState<SortOption>(initial.sort);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<ProductQuery>({});
+  const [filters, setFilters] = useState<ProductQuery>(initial.filters);
   const [draft, setDraft] = useState<ProductQuery>({});
   const [draftCategory, setDraftCategory] = useState<string>();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const provinces = useQuery({
-    queryKey: ["provinces"],
-    queryFn: api.categories.provinces,
-  });
-  const categories = useQuery({
-    queryKey: ["categories"],
-    queryFn: api.categories.tree,
-  });
+  // Subscribe to the main content first so lookup requests do not take both
+  // database connections ahead of the product list.
   const products = useQuery({
     queryKey: [
       "products",
@@ -94,6 +79,17 @@ function ProductSearch({
         sort,
         page,
       }),
+  });
+  const categories = useQuery({
+    queryKey: ["categories"],
+    queryFn: api.categories.tree,
+    staleTime: 5 * 60_000,
+  });
+  const provinces = useQuery({
+    queryKey: ["provinces"],
+    queryFn: api.categories.provinces,
+    enabled: open || !!filters.province_code,
+    staleTime: 5 * 60_000,
   });
   const activeFilters =
     Object.values(filters).filter(Boolean).length + (category ? 1 : 0);
@@ -161,16 +157,17 @@ function ProductSearch({
       }}
       refreshing={products.isRefetching}
     >
-      <View style={{ gap: 4 }}>
-        <Text style={styles.meta}>Trang chủ / Sản phẩm</Text>
+      <View style={[styles.card, { gap: 4, borderRadius: 16, padding: 16 }]}>
         <Text accessibilityRole="header" style={styles.title}>
           {q ? `Kết quả cho “${q}”` : "Khám phá sản phẩm"}
         </Text>
-        {products.data && (
+        {products.isPending ? (
+          <Text style={styles.muted}>Đang tải kết quả…</Text>
+        ) : products.data && (
           <Text style={styles.muted}>{products.data.meta.total} kết quả</Text>
         )}
       </View>
-      <View style={[styles.row, { justifyContent: "space-between", gap: 8 }]}>
+      <View style={[styles.row, { flexWrap: "nowrap", justifyContent: "space-between", gap: 8 }]}>
         <Button
           title={`Bộ lọc${activeFilters ? ` (${activeFilters})` : ""}`}
           icon="funnel-outline"
@@ -182,7 +179,7 @@ function ProductSearch({
             setError(null);
           }}
         />
-        <View style={{ flex: 1, minWidth: 160 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <SelectField
             compact
             label="Sắp xếp"

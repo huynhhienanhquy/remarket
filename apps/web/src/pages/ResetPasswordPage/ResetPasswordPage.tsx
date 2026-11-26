@@ -1,8 +1,7 @@
-import { PasswordInput } from "@/components/common/Input/PasswordInput";
+import { PasswordField } from "@/components/common/Input/PasswordInput";
 import { useResetPasswordForm } from "./hooks/useResetPasswordForm";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/common/Button/Button";
-import { FormField } from "../../components/common/FormField/FormField";
 import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 
 export function ResetPasswordPage() {
@@ -57,48 +56,32 @@ export function ResetPasswordPage() {
       {formSuccess !== null && <InlineAlert tone="success" title={formSuccess} />}
 
       {formSuccess === null && <form noValidate onSubmit={submit} className="space-y-4">
-        <FormField
+        <PasswordField
           label="Mật khẩu mới"
-          htmlFor="reset-password"
+          id="reset-password"
           required
           helper="Tối thiểu 12 ký tự"
           error={passwordError ?? undefined}
-        >
-          <PasswordInput
-              ref={passwordRef}
-              id="reset-password"
+          ref={passwordRef}
+          autoComplete="new-password"
+          placeholder="Tối thiểu 12 ký tự"
+          value={password}
+          onChange={(event) => changePassword(event.target.value)}
+          onBlur={blurPassword}
+        />
 
-              autoComplete="new-password"
-              placeholder="Tối thiểu 12 ký tự"
-              value={password}
-              error={passwordError !== null}
-              aria-describedby={passwordError !== null ? "reset-password-error" : undefined}
-              className="pr-20"
-              onChange={(event) => changePassword(event.target.value)}
-              onBlur={blurPassword}
-            />
-        </FormField>
-
-        <FormField
+        <PasswordField
           label="Nhập lại mật khẩu"
-          htmlFor="reset-confirm"
+          id="reset-confirm"
           required
           error={confirmError ?? undefined}
-        >
-          <PasswordInput
-              ref={confirmRef}
-              id="reset-confirm"
-
-              autoComplete="new-password"
-              placeholder="Nhập lại mật khẩu mới"
-              value={confirm}
-              error={confirmError !== null}
-              aria-describedby={confirmError !== null ? "reset-confirm-error" : undefined}
-              className="pr-20"
-              onChange={(event) => changeConfirm(event.target.value)}
-              onBlur={blurConfirm}
-            />
-        </FormField>
+          ref={confirmRef}
+          autoComplete="new-password"
+          placeholder="Nhập lại mật khẩu mới"
+          value={confirm}
+          onChange={(event) => changeConfirm(event.target.value)}
+          onBlur={blurConfirm}
+        />
 
         <Button type="submit" size="lg" fullWidth loading={pending} variant="primary">
           Cập nhật mật khẩu

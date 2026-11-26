@@ -13,6 +13,18 @@ interface ProcessedEventRow {
 
 const BATCH_SIZE = 100;
 
+async function retryConnectionReset<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    // Prisma can wrap the adapter's reset and leave the code only in the message.
+    const reset = ("code" in error && error.code === "ECONNRESET") || /\bECONNRESET\s*$/.test(error.message);
+    if (!reset) throw error;
+    return operation();
+  }
+}
+
 /**
  * Relays durable events from PostgreSQL into this API process. Every API
  * instance runs its own relay, so each instance can notify the sockets it
@@ -21,9 +33,9 @@ const BATCH_SIZE = 100;
 export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClient = prisma): Promise<() => void> {
   // Bootstrap before accepting sockets. Already-visible events are irrelevant
   // to this process, while uncommitted updates receive a later sequence.
-  const [baseline] = await client.$queryRaw<Array<{ sequence: bigint | null }>>`
+  const [baseline] = await retryConnectionReset(() => client.$queryRaw<Array<{ sequence: bigint | null }>>`
     SELECT MAX("relaySequence") AS sequence FROM "OutboxEvent"
-  `;
+  `);
   let cursor = baseline?.sequence ?? 0n;
   let running = false;
   let stopped = false;
@@ -35,8 +47,10 @@ export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClien
     running = true;
     try {
       while (!stopped) {
-        const promoted = await processRealtimeOutboxBatch(client, BATCH_SIZE);
-        const rows = await client.$queryRaw<ProcessedEventRow[]>`
+        // Promotion only updates unprocessed rows, so repeating it after a lost
+        // reply leaves committed events available to the cursor query.
+        const promoted = await retryConnectionReset(() => processRealtimeOutboxBatch(client, BATCH_SIZE));
+        const rows = await retryConnectionReset(() => client.$queryRaw<ProcessedEventRow[]>`
           SELECT "id", "eventType", "aggregateId", "payload", "relaySequence"
           FROM "OutboxEvent"
           WHERE "processedAt" IS NOT NULL
@@ -44,7 +58,7 @@ export async function startRealtimeRelay(intervalMs = 1_000, client: PrismaClien
             AND "relaySequence" > ${cursor}
           ORDER BY "relaySequence" ASC
           LIMIT ${BATCH_SIZE}
-        `;
+        `);
         if (rows.length === 0 && promoted < BATCH_SIZE) break;
         for (const row of rows) {
           publishRealtimeEvent({

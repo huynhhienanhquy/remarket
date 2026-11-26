@@ -6,12 +6,12 @@ import { z } from "zod";
 import type { AuthRequest, AuthUser } from "../middleware/auth.js";
 import { requireActive, requireVerified } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { completionBlockReason } from "../services/entity-policy.js";
 import { createNotification } from "../services/notifications.js";
 import { DAY_MS, applyOrderAction, hasOpenOrderTicket } from "../services/order-actions.js";
 import { ok, okList } from "../shared/api-response.js";
 import type { OrderRow } from "../shared/dto-mappers.js";
 import {
-  completionBlockReason,
   toOrderDetail,
   toOrderListItem,
   toReview,

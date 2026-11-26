@@ -1,5 +1,24 @@
-import { CONDITION_LABELS, DELIVERY_LABELS, type Condition, type DeliveryMethod } from "@remarket/shared";
-import { type FilterValues } from "@/pages/SearchPage/sections/FilterPanel";
+import { CONDITION_LABELS, DELIVERY_LABELS, validatePrice, type Condition, type DeliveryMethod } from "@remarket/shared";
+
+export interface FilterValues {
+  category_id: string;
+  min_price: string;
+  max_price: string;
+  condition: Condition | "";
+  province_code: string;
+  delivery_method: DeliveryMethod | "";
+}
+
+export function emptyFilters(): FilterValues {
+  return {
+    category_id: "",
+    min_price: "",
+    max_price: "",
+    condition: "",
+    province_code: "",
+    delivery_method: "",
+  };
+}
 
 export function readFilters(params: URLSearchParams): FilterValues {
   return {
@@ -14,6 +33,15 @@ export function readFilters(params: URLSearchParams): FilterValues {
 
 export function countFilters(values: FilterValues): number {
   return Object.values(values).filter((value) => value !== "").length;
+}
+
+export function validatePriceRange({ min_price, max_price }: Pick<FilterValues, "min_price" | "max_price">) {
+  const error = (min_price && validatePrice(min_price)) || (max_price && validatePrice(max_price));
+  if (error) return error;
+  if (min_price && max_price && BigInt(min_price) > BigInt(max_price)) {
+    return "Giá tối thiểu không được lớn hơn giá tối đa.";
+  }
+  return null;
 }
 
 interface ChipSpec {

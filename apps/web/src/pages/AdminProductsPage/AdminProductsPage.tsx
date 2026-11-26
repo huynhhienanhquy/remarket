@@ -119,8 +119,8 @@ export function AdminProductsPage() {
   ];
 
   const footer = selected ? <>
-    {selected.is_blocked ? <button type="button" className="min-h-[44px] rounded-control border border-brand px-4 t-label text-brand" onClick={() => setAction("unblock")}>Gỡ hạn chế</button> : <button type="button" className="min-h-[44px] rounded-control border border-danger px-4 t-label text-danger" onClick={() => setAction("block")}>Hạn chế tin</button>}
-    {selected.status === "PENDING" && !selected.is_blocked && <><button type="button" className="min-h-[44px] rounded-control border border-danger px-4 t-label text-danger" onClick={() => setAction("reject")}>Từ chối</button><button type="button" className="min-h-[44px] rounded-control bg-brand px-4 t-label text-white" onClick={() => setAction("approve")}>Duyệt tin</button></>}
+    {selected.is_blocked ? <button type="button" className="rm-button-secondary min-h-[44px] rounded-control border border-brand px-4 t-label text-brand" onClick={() => setAction("unblock")}>Gỡ hạn chế</button> : <button type="button" className="min-h-[44px] rounded-control border border-danger px-4 t-label text-danger" onClick={() => setAction("block")}>Hạn chế tin</button>}
+    {selected.status === "PENDING" && !selected.is_blocked && <><button type="button" className="min-h-[44px] rounded-control border border-danger px-4 t-label text-danger" onClick={() => setAction("reject")}>Từ chối</button><button type="button" className="rm-button-primary min-h-[44px] rounded-control bg-brand px-4 t-label text-white" onClick={() => setAction("approve")}><span className="rm-button-content inline-block">Duyệt tin</span></button></>}
   </> : undefined;
 
   return <div className="admin-stack">

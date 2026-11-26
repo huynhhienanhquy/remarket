@@ -8,9 +8,9 @@ new screens match them.
 
 - `apps/web/src/App.tsx` and `main.tsx` — Vite/React entry points. Keep them
   at the source root.
-- `apps/web/src/assets/**` — static visual assets. The existing inline SVG
-  hero illustration lives in `images/illustrations/HeroArt.tsx`; preserve its
-  SVG markup and accessibility. Add fonts/images only when the app uses them.
+- `apps/web/src/assets/**` — web assets such as fonts. The marketplace hero
+  image shared by web/mobile lives in `packages/shared/assets/marketplace-hero.jpg`.
+  Add fonts/images only when the app uses them.
 - `apps/web/src/components/common/<ComponentName>/<ComponentName>.tsx` — the
   shared UI kit, with existing tests beside each component. Import directly
   from each component module so Vite does not load the entire kit in development.
@@ -31,9 +31,10 @@ new screens match them.
 - `apps/web/src/data/**` — static application data, such as auth benefit copy.
   HTTP test fixtures remain in `tests/`; runtime data comes from the API.
 - `apps/web/src/helpers/**` — application/domain helpers: API error titles,
-  auth field-message parsing and admin error formatting.
+  `apiFieldErrors` in `errors.ts` for all form field messages, and admin errors.
 - `apps/web/src/hooks/**` — shared custom hooks: browser connectivity,
-  unread counts and admin URL parameters. Keep single-page hooks local.
+  unread counts, admin URL parameters and `useValidatedField` for text inputs.
+  Keep single-page hooks local.
 - `apps/web/src/layouts/<LayoutName>/<LayoutName>.tsx` — composed root and
   route shells, with navigation tests next to the owning shell. The router
   mounts `RootLayout` inside routing so toast links and session expiry work.
@@ -54,7 +55,7 @@ new screens match them.
   endpoints shared by web and mobile. `apps/web/src/services/endpoints/auth.ts`
   owns browser authentication; `httpAdapter.ts` assembles the shared endpoints
   with the browser transport. `http.ts` owns transport/session behavior, and
-  `types/api.ts` re-exports the shared API contract with a browser upload type.
+  `types/api.ts` re-exports the shared API contract.
   Service tests belong in `services/__tests__/`.
 - `apps/web/src/stores/**` — existing session identity/revision/listeners and
   per-tab scope. Keep tokens, cookie coordination and HTTP transport in

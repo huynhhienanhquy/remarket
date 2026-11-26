@@ -1,7 +1,6 @@
 ﻿import type { NextFunction, Request, Response } from "express";
 import { API_ERROR_CODES } from "@remarket/shared";
 import { prisma } from "../utils/prisma.js";
-import { env } from "../config/env.js";
 import { verifyAccessToken } from "../shared/tokens.js";
 import { envelopeMeta } from "../shared/api-response.js";
 import { sessionProfileSelect } from "../shared/dto-mappers.js";
@@ -174,5 +173,3 @@ export function requireVerified(req: AuthRequest, res: Response, next: NextFunct
   }
   next();
 }
-
-export { env };

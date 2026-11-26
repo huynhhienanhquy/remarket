@@ -33,14 +33,12 @@ export function networkError(message = "Không thể kết nối máy chủ."): 
  */
 export function apiFieldErrors(error: unknown): Record<string, string> | undefined {
   if (!isApiError(error)) return undefined;
-  if (error.fields !== undefined) return error.fields;
-
-  const fields = error.details?.fields;
-  if (fields === null || typeof fields !== "object") return undefined;
+  const fields = error.fields ?? error.details?.fields;
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) return undefined;
 
   const collected: Record<string, string> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (typeof value === "string") collected[key] = value;
+    if (typeof value === "string" && value !== "") collected[key] = value;
   }
   return Object.keys(collected).length > 0 ? collected : undefined;
 }

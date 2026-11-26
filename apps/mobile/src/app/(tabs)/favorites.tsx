@@ -7,12 +7,11 @@ import {
   Screen,
   Feedback,
   LoginPrompt,
-  ProductGrid,
   Pagination,
   Button,
   EmptyState,
-  ProductGridSkeleton,
 } from "../../components/ui";
+import { ProductGrid, ProductGridSkeleton } from "../../components/ProductCards";
 export default function Favorites() {
   const { user } = useSession();
   const router = useRouter();

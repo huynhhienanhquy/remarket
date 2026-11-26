@@ -37,7 +37,7 @@ export function Drawer({
 
   return (
     <div
-      className="fixed inset-0 z-overlay bg-ink/40 animate-fade-in"
+      className="fixed inset-0 z-overlay !m-0 bg-ink/40 animate-fade-in"
       onClick={(event) => {
         if (dismissible && event.target === event.currentTarget) onClose();
       }}

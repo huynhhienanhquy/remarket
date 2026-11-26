@@ -1,10 +1,22 @@
 @import "./typography.css";
+@import "./interactions.css";
+@import "./user-interactions.css";
+@import "./interaction-controls.css";
+@import "./perimeter.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  * {
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
   }
@@ -103,9 +115,4 @@
   .rm-account-page textarea:focus {
     @apply border-brand bg-surface;
   }
-}
-
-/* Keep scrollbar of horizontal thumbnail rows out of the layout flow. */
-.scrollbar-thin {
-  scrollbar-width: thin;
 }

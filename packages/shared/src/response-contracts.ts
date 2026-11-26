@@ -4718,6 +4718,37 @@ const contracts: { schemas: Record<string, unknown>; routes: Array<{ path: strin
       }
     },
     {
+      "path": "/conversations/{conversationId}",
+      "method": "DELETE",
+      "status": 200,
+      "schema": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "deleted"
+                ],
+                "properties": {
+                  "deleted": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "path": "/conversations/{conversationId}/messages",
       "method": "GET",
       "status": 200,

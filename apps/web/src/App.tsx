@@ -3,6 +3,7 @@ import { SessionProvider } from "./contexts/SessionContext";
 import { AppRouter } from "./config/route/router";
 import { createQueryClient } from "./config/queryClient";
 import { RealtimeProvider } from "./contexts/RealtimeContext";
+import { usePointerInteractions } from "./hooks/usePointerInteractions";
 
 const queryClient = createQueryClient();
 
@@ -13,6 +14,8 @@ const queryClient = createQueryClient();
  * <Link>; see `RootLayout` in layouts/RootLayout/RootLayout.tsx.
  */
 export function App() {
+  usePointerInteractions("root");
+
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>

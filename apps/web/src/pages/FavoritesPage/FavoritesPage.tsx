@@ -21,8 +21,10 @@ export function FavoritesPage() {
   const remove = useMutation({
     mutationFn: (id: string) => api.favorites.set(id, false),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["favorites"] });
-      await client.invalidateQueries({ queryKey: ["products"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["favorites"] }),
+        client.invalidateQueries({ queryKey: ["products"] }),
+      ]);
       if (favorites.data?.items.length === 1 && page > 1) setParams({ page: String(page - 1) });
       toast.success("Đã bỏ lưu sản phẩm");
     },
@@ -34,7 +36,7 @@ export function FavoritesPage() {
       <AccountEmptyState icon="heart" title="Bạn chưa lưu món đồ nào" description="Chạm vào biểu tượng trái tim trên món đồ bạn thích. Những món đã lưu sẽ xuất hiện tại đây." action={{ label: "Khám phá sản phẩm", to: "/products" }} /> : <>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 xl:grid-cols-4" aria-busy={remove.isPending}>
           {favorites.data.items.map((product) => <div key={product.id}>
-            <ProductCard className="rounded-2xl shadow-subtle" product={product} onToggleFavorite={() => { if (online && !remove.isPending) remove.mutate(product.id); }} />
+            <ProductCard product={product} onToggleFavorite={() => { if (online && !remove.isPending) remove.mutate(product.id); }} />
           </div>)}
         </div>
         <Pagination page={page} totalPages={favorites.data.meta.total_pages} total={favorites.data.meta.total} onPageChange={(next) => setParams({ page: String(next) })} />

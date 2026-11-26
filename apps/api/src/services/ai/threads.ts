@@ -11,7 +11,7 @@ import type { Prisma } from "@prisma/client";
 const DAY_MS = 86_400_000;
 const THREAD_TTL = 30 * DAY_MS;
 const HISTORY_MESSAGES = 60;
-export const CONTEXT_MESSAGES = 12;
+const CONTEXT_MESSAGES = 12;
 export const MAX_OUTPUT_TOKENS = 600;
 export const MAX_STEPS = 2;
 const RESERVED_MICROS = Math.ceil(28_000 * env.ai.inputRate + MAX_STEPS * MAX_OUTPUT_TOKENS * env.ai.outputRate);
@@ -29,7 +29,7 @@ function hiddenThread() {
   return notFound("Không tìm thấy phiên trò chuyện.");
 }
 
-export function summarize(thread: { id: string; updatedAt: Date; expiresAt: Date }): AiThreadSummary {
+function summarize(thread: { id: string; updatedAt: Date; expiresAt: Date }): AiThreadSummary {
   return { id: thread.id, updated_at: thread.updatedAt.toISOString(), expires_at: thread.expiresAt.toISOString() };
 }
 

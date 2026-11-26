@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupportTicket } from "@prisma/client";
-import {
-  orderAllowedActions,
-  supportAllowedActions,
-} from "../../src/shared/dto-mappers.js";
+import { orderAllowedActions, supportAllowedActions } from "../../src/services/entity-policy.js";
 import type { OrderRow } from "../../src/shared/dto-mappers.js";
 import { primaryOrderAction } from "@remarket/shared";
 

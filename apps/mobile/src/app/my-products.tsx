@@ -11,12 +11,12 @@ import {
   Button,
   Feedback,
   LoginPrompt,
-  ProductCard,
   useAction,
   styles,
   EmptyState,
   Pagination,
 } from "../components/ui";
+import { ProductCard } from "../components/ProductCards";
 export default function MyProducts() {
   const { user } = useSession();
   const router = useRouter();

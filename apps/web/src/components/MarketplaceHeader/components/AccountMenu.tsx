@@ -76,7 +76,7 @@ export function AccountMenu() {
               to={item.to}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block rounded-control px-3 py-2.5 t-body text-ink transition-colors hover:bg-surface-subtle"
+              className="rm-control block rounded-control px-3 py-2.5 t-body text-ink hover:bg-surface-subtle"
             >
               {item.label}
             </Link>
@@ -86,7 +86,7 @@ export function AccountMenu() {
               to="/admin"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block rounded-control px-3 py-2.5 t-body text-ink transition-colors hover:bg-surface-subtle"
+              className="rm-control block rounded-control px-3 py-2.5 t-body text-ink hover:bg-surface-subtle"
             >
               Trang quản trị
             </Link>

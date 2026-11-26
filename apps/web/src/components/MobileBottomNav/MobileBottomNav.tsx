@@ -42,9 +42,8 @@ export function MobileBottomNav() {
   if (hidden) return null;
 
   const tabs = TABS.map((tab) => {
-    if (!tab.authOnly || viewer) return tab;
-    // Guests: protected tabs route to login with a safe return target.
-    return { ...tab, to: loginPathFor(pathname, location.search) };
+    if (viewer || (!tab.authOnly && tab.icon !== PlusIcon)) return tab;
+    return { ...tab, to: loginPathFor(tab.to, "") };
   });
 
   return (
@@ -62,7 +61,7 @@ export function MobileBottomNav() {
                 to={tab.to}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "flex h-full min-h-touch flex-col items-center justify-center gap-0.5 rounded-control py-1",
+                  "rm-control flex h-full min-h-touch flex-col items-center justify-center gap-0.5 rounded-control py-1",
                   active ? "text-brand" : "text-muted hover:text-brand",
                 ].join(" ")}
               >
@@ -91,14 +90,14 @@ export function MobileBottomNav() {
     </nav>
     <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" widthClassName="max-w-none" className="!inset-x-0 !bottom-0 !top-auto !h-auto max-h-[90dvh] rounded-t-modal pb-[env(safe-area-inset-bottom)] sm:mx-auto sm:max-w-[560px] sm:rounded-bl-none">
       <nav aria-label="Menu điều hướng" className="space-y-5">
-        <Link to="/products" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center gap-3 rounded-xl bg-brand-soft px-3 py-2.5 text-sm font-semibold text-brand"><HomeIcon />Khám phá sản phẩm</Link>
+        <Link to="/products" onClick={() => setMenuOpen(false)} className="rm-control flex min-h-[44px] items-center gap-3 rounded-xl bg-brand-soft px-3 py-2.5 text-sm font-semibold text-brand"><HomeIcon />Khám phá sản phẩm</Link>
         {viewer ? <>
           <AccountLinks onNavigate={() => setMenuOpen(false)} />
-          {viewer.role === "ADMIN" && <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface-subtle"><Icon name="inbox" />Trang quản trị</Link>}
+          {viewer.role === "ADMIN" && <Link to="/admin" onClick={() => setMenuOpen(false)} className="rm-control flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface-subtle"><Icon name="inbox" />Trang quản trị</Link>}
         </> : <div className="space-y-2">
           <p className="px-3 text-sm text-muted">Đăng nhập để quản lý tài khoản, tin đăng và đơn hàng.</p>
-          <Link to={loginPathFor(pathname, location.search)} onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand"><UserIcon />Đăng nhập</Link>
-          <Link to="/register" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface-subtle">Tạo tài khoản</Link>
+          <Link to={loginPathFor(pathname, location.search)} onClick={() => setMenuOpen(false)} className="rm-control flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-brand"><UserIcon />Đăng nhập</Link>
+          <Link to="/register" onClick={() => setMenuOpen(false)} className="rm-control flex min-h-[44px] items-center rounded-xl px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface-subtle">Tạo tài khoản</Link>
         </div>}
       </nav>
     </Drawer></>

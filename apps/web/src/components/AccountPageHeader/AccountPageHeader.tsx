@@ -11,7 +11,7 @@ export function AccountPageHeader({ title, description, action }: {
   action?: ReactNode;
 }) {
   return (
-    <div className="rm-account-heading flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+    <div className="rm-account-heading rm-card-panel flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex min-w-0 items-start gap-4">
         <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand sm:flex">
           <Icon name={ACCOUNT_ITEMS.find((item) => item.label === title)?.icon ?? "user"} size={24} />

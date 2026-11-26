@@ -1,5 +1,4 @@
 import { productCapabilities, ownProductActions, completionBlockReason, orderAllowedActions, orderRole, supportAllowedActions } from "../services/entity-policy.js";
-export { productCapabilities, ownProductActions, completionBlockReason, orderAllowedActions, orderRole, supportAllowedActions } from "../services/entity-policy.js";
 import type {
   Prisma,
   Category,
@@ -60,12 +59,8 @@ import type { SellerAggregates } from "./seller-aggregates.js";
  * geography dataset.
  */
 
-export function iso(value: Date | null | undefined): string | null {
+function iso(value: Date | null | undefined): string | null {
   return value ? value.toISOString() : null;
-}
-
-export function isoRequired(value: Date): string {
-  return value.toISOString();
 }
 
 /* ------------------------------------------------------------------ *
@@ -91,7 +86,7 @@ export function toSessionUser(user: SessionProfile): SessionUser {
     phone: user.phone,
     province_code: user.provinceCode,
     default_address: user.defaultAddress,
-    joined_at: isoRequired(user.joinedAt),
+    joined_at: user.joinedAt.toISOString(),
   };
 }
 
@@ -117,7 +112,7 @@ export function toSellerSummary(user: SellerProfile, aggregates: SellerAggregate
     avatar_url: avatarReadUrl(user),
     province_code: user.provinceCode,
     province_label: provinceLabel(user.provinceCode),
-    joined_at: isoRequired(user.joinedAt),
+    joined_at: user.joinedAt.toISOString(),
     rating: aggregates.rating,
     review_count: aggregates.review_count,
     completed_sales_count: aggregates.completed_sales_count,
@@ -137,7 +132,7 @@ export function toAdminUserItem(user: User): AdminUserItem {
     email_verified_at: iso(user.emailVerifiedAt),
     role: user.role,
     status: user.status,
-    created_at: isoRequired(user.joinedAt),
+    created_at: user.joinedAt.toISOString(),
     lock_reason: user.lockReason,
     locked_at: iso(user.lockedAt),
   };
@@ -256,7 +251,7 @@ export function toProductListItem(product: ProductListRow, ctx: ViewerContext, p
     province_code: product.provinceCode,
     province_label: provinceLabel(product.provinceCode),
     published_at: iso(product.publishedAt),
-    created_at: isoRequired(product.createdAt),
+    created_at: product.createdAt.toISOString(),
     status: product.status,
     is_favorited: ctx.viewerId !== null && ctx.favorited.has(product.id),
     seller: toSellerSummary(
@@ -276,7 +271,7 @@ export function toProductListItem(product: ProductListRow, ctx: ViewerContext, p
  * it, while suppressing listing content after a block or soft delete.
  */
 export function toSavedProductListItem(
-  product: ProductRow,
+  product: ProductListRow,
   ctx: ViewerContext,
 ): ProductListItem {
   // Saved rows can remain after category/seller visibility changes. Without
@@ -344,8 +339,8 @@ export function toAdminProductItem(
     block_reason: product.blockReason,
     rejection_reason: product.rejectionReason,
     version: product.version,
-    updated_at: isoRequired(product.updatedAt),
-    created_at: isoRequired(product.createdAt),
+    updated_at: product.updatedAt.toISOString(),
+    created_at: product.createdAt.toISOString(),
     seller: toSellerSummary(product.seller, aggregates),
     category_name: categoryName,
     description: product.description,
@@ -397,7 +392,7 @@ function toStatusHistory(entry: OrderStatusHistory): OrderStatusHistoryEntry {
     actor_type: (entry.actorType as "USER" | "ADMIN" | "SYSTEM") ?? "SYSTEM",
     actor_name: entry.actorName,
     reason: entry.reason,
-    created_at: isoRequired(entry.createdAt),
+    created_at: entry.createdAt.toISOString(),
   };
 }
 
@@ -428,7 +423,7 @@ export function toOrderListItem(order: OrderRow, viewerId: string): OrderListIte
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(toOrderItemSnapshot),
     total_amount: order.totalAmount.toString(),
-    created_at: isoRequired(order.createdAt),
+    created_at: order.createdAt.toISOString(),
     expires_at: iso(order.expiresAt),
   };
 }
@@ -539,10 +534,10 @@ export function toConversationListItem(
         }
       : null,
     last_message: last
-      ? { content: last.content, created_at: isoRequired(last.createdAt), sender_id: last.senderId }
+      ? { content: last.content, created_at: last.createdAt.toISOString(), sender_id: last.senderId }
       : null,
     unread_count: unreadCount,
-    updated_at: isoRequired(conversation.updatedAt),
+    updated_at: conversation.updatedAt.toISOString(),
   };
 }
 
@@ -559,7 +554,7 @@ export function toMessage(message: {
     client_message_id: message.clientMessageId,
     sender_id: message.senderId,
     content: message.content,
-    created_at: isoRequired(message.createdAt),
+    created_at: message.createdAt.toISOString(),
     read_at: iso(message.readAt),
     ...(isSystem ? { is_system: true } : {}),
   };
@@ -575,7 +570,7 @@ export function toReview(review: Review, reviewer: User): ReviewDto {
     order_id: review.orderId,
     rating: review.rating,
     comment: review.comment,
-    created_at: isoRequired(review.createdAt),
+    created_at: review.createdAt.toISOString(),
     reviewer: {
       id: reviewer.id,
       name: reviewer.fullName,
@@ -623,8 +618,8 @@ export function toReportRecord(report: ReportRow): ReportRecord {
     description: report.description,
     status: report.status,
     resolution_note: report.resolutionNote,
-    created_at: isoRequired(report.createdAt),
-    updated_at: isoRequired(report.updatedAt),
+    created_at: report.createdAt.toISOString(),
+    updated_at: report.updatedAt.toISOString(),
   };
 }
 
@@ -664,7 +659,7 @@ export function toNotification(notification: {
     reference_id: notification.referenceId,
     dedupe_key: notification.dedupeKey ?? undefined,
     read_at: iso(notification.readAt),
-    created_at: isoRequired(notification.createdAt),
+    created_at: notification.createdAt.toISOString(),
   };
 }
 
@@ -676,8 +671,8 @@ export function toSupportTicketListItem(ticket: SupportTicket): SupportTicketLis
     type: ticket.type,
     status: ticket.status,
     order_id: ticket.orderId,
-    created_at: isoRequired(ticket.createdAt),
-    updated_at: isoRequired(ticket.updatedAt),
+    created_at: ticket.createdAt.toISOString(),
+    updated_at: ticket.updatedAt.toISOString(),
   };
 }
 
@@ -719,7 +714,7 @@ export function toSupportTicketDetail(
           role: message.role === "ADMIN" ? "ADMIN" : "USER",
         },
         message: message.message,
-        created_at: isoRequired(message.createdAt),
+        created_at: message.createdAt.toISOString(),
       };
     }),
     allowed_actions: supportAllowedActions(ticket, viewerIsAdmin),
@@ -747,7 +742,7 @@ export function toAdminSupportTicketDetail(
   };
 }
 
-export function toAdminSupportOrderSummary(
+function toAdminSupportOrderSummary(
   order: Order & {
     items: OrderItem[];
     buyer: Pick<User, "id" | "fullName">;
@@ -768,7 +763,7 @@ export function toAdminSupportOrderSummary(
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(toOrderItemSnapshot),
     total_amount: order.totalAmount.toString(),
-    created_at: isoRequired(order.createdAt),
+    created_at: order.createdAt.toISOString(),
     status_history: order.statusHistory
       .slice()
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
@@ -799,6 +794,6 @@ export function toAuditLogItem(log: {
     entity_id: log.entityId,
     reason: log.reason,
     metadata: (log.metadata ?? {}) as Record<string, unknown>,
-    created_at: isoRequired(log.createdAt),
+    created_at: log.createdAt.toISOString(),
   };
 }

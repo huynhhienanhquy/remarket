@@ -22,10 +22,10 @@ async function expoRequest(path: string, body: unknown): Promise<unknown> {
   if (!response.ok) throw new Error(`Expo push HTTP ${response.status}`);
   return response.json();
 }
-export function pushRetryDelay(attempt: number) {
+function pushRetryDelay(attempt: number) {
   return Math.min(3_600_000, 15_000 * 2 ** Math.min(attempt, 8));
 }
-export function pushData(notification: {
+function pushData(notification: {
   id: string;
   referenceType: string;
   referenceId: string | null;

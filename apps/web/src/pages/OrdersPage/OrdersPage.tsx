@@ -9,6 +9,7 @@ import {
 import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Icon } from "../../components/common/Icon/Icon";
+import { ApiImage } from "../../components/common/ApiImage/ApiImage";
 import { MarketplaceImage } from "../../components/common/MarketplaceImage/MarketplaceImage";
 import { Pagination } from "../../components/common/Pagination/Pagination";
 import { StatusBadge } from "../../components/common/StatusBadge/StatusBadge";
@@ -68,11 +69,22 @@ export function OrdersPage({ role }: OrdersPageProps) {
               <Link
                 key={order.id}
                 to={isBuyer ? `/orders/${order.id}` : `/sales/${order.id}`}
-                className="rm-account-card block p-5 transition-colors hover:border-brand"
+                className="rm-account-card rm-card-action block rounded-none p-5 hover:bg-page/60"
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Icon name="inbox" /></span>
+                    {order.counterparty.avatar_url ? (
+                      <ApiImage
+                        src={order.counterparty.avatar_url}
+                        alt=""
+                        loading="lazy"
+                        className="h-11 w-11 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-semibold text-brand">
+                        {order.counterparty.name.trim().charAt(0).toUpperCase()}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-semibold text-ink">
                         {isBuyer ? "Đơn mua" : "Đơn bán"} #{order.code.slice(0, 8).toUpperCase()}
@@ -83,18 +95,19 @@ export function OrdersPage({ role }: OrdersPageProps) {
                           : `Người mua: ${order.counterparty.name}`}
                       </p>
                     </div>
-                    <Icon name="chevron-right" className="shrink-0 text-muted" />
+                    <Icon name="chevron-right" className="rm-icon-forward shrink-0 text-muted" />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {order.items.slice(0, 3).map((snap) => (
                         <MarketplaceImage
                           variant="card"
                           key={snap.id}
                           src={snap.image_url ?? ""}
                           alt=""
-                          className="h-10 w-10 rounded-control object-cover border border-line"
+                          loading="lazy"
+                          className="h-[72px] w-[72px] shrink-0 rounded-control border border-line bg-surface-subtle object-contain sm:h-20 sm:w-20"
                         />
                       ))}
                     </div>

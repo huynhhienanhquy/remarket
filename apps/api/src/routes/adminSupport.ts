@@ -1,3 +1,4 @@
+import { adminListFields } from "../shared/admin-query.js";
 import { createNotification } from "../services/notifications.js";
 import type { Prisma, User } from "@prisma/client";
 import type { TicketStatus } from "@remarket/shared";
@@ -32,10 +33,7 @@ const listQuery = z
     q: z.string().trim().max(100).optional(),
     type: z.enum(["ACCOUNT", "ORDER_PROBLEM", "PRODUCT", "OTHER", "ALL"]).optional(),
     assigned_admin_id: z.string().trim().min(1).max(64).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    page: z.string().optional(),
-    page_size: z.string().optional(),
+    ...adminListFields,
   })
   .strict();
 

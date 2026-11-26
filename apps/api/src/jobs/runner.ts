@@ -25,6 +25,8 @@ const snapshot: WorkerSnapshot = {
   last_error: null,
 };
 let outboxRunning = false;
+let outboxRetryAt = 0;
+let outboxBackoffMs = 0;
 let pushRunning = false;
 
 async function pumpPush(): Promise<void> {
@@ -160,7 +162,7 @@ export async function collectWorkerMetrics(): Promise<{
   };
 }
 
-export async function runJobsOnce(): Promise<void> {
+async function runJobsOnce(): Promise<void> {
   if (snapshot.running) return;
   snapshot.running = true;
   snapshot.last_run_at = new Date().toISOString();
@@ -188,7 +190,7 @@ export async function runJobsOnce(): Promise<void> {
 }
 
 async function drainOutbox(): Promise<void> {
-  if (outboxRunning) return;
+  if (outboxRunning || Date.now() < outboxRetryAt) return;
   outboxRunning = true;
   try {
     await processOutboxBatch(async (event) => {
@@ -209,6 +211,13 @@ async function drainOutbox(): Promise<void> {
         await deleteStorageObject(payload.storage_path);
       }
     }, BATCH_SIZE, prisma, true);
+    if (outboxBackoffMs > 0) console.info("Outbox pump recovered.");
+    outboxBackoffMs = 0;
+    outboxRetryAt = 0;
+  } catch (error) {
+    outboxBackoffMs = Math.min(30_000, Math.max(1_000, outboxBackoffMs * 2));
+    outboxRetryAt = Date.now() + outboxBackoffMs;
+    throw error;
   } finally {
     outboxRunning = false;
   }

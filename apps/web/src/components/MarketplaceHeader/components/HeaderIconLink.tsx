@@ -24,7 +24,7 @@ export function IconButton({
     <Link
       to={to}
       aria-label={badge && badge > 0 ? `${label}: ${badge} chưa đọc` : label}
-      className="relative flex h-11 w-11 items-center justify-center rounded-control text-ink transition-colors hover:bg-surface-subtle"
+      className="rm-control relative flex h-11 w-11 items-center justify-center rounded-control text-ink hover:bg-surface-subtle"
     >
       {children}
       {badge !== undefined && <UnreadBadge count={badge} label={label} />}

@@ -1,3 +1,4 @@
+import { moderationListFields } from "../shared/admin-query.js";
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -22,11 +23,7 @@ const listQuery = z
     rating: z.coerce.number().int().min(1).max(5).optional(),
     q: z.string().trim().max(200).optional(),
     visibility: z.enum(["VISIBLE", "HIDDEN", "ALL"]).optional(),
-    handled_by: z.string().trim().min(1).max(64).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    page: z.string().optional(),
-    page_size: z.string().optional(),
+    ...moderationListFields,
   })
   .strict();
 

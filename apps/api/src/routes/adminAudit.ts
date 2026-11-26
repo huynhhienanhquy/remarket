@@ -1,3 +1,4 @@
+import { adminListFields } from "../shared/admin-query.js";
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -24,10 +25,7 @@ const listQuery = z
     actor_id: z.string().trim().max(64).optional(),
     actor_type: z.enum(["USER", "ADMIN", "SYSTEM"]).optional(),
     q: z.string().trim().max(100).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    page: z.string().optional(),
-    page_size: z.string().optional(),
+    ...adminListFields,
   })
   .strict();
 

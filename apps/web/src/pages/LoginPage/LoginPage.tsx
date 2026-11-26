@@ -1,4 +1,4 @@
-import { PasswordInput } from "@/components/common/Input/PasswordInput";
+import { PasswordField } from "@/components/common/Input/PasswordInput";
 import { useLoginForm } from "./hooks/useLoginForm";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/common/Button/Button";
@@ -51,26 +51,18 @@ export function LoginPage() {
           />
         </FormField>
 
-        <FormField
+        <PasswordField
           label="Mật khẩu"
-          htmlFor="login-password"
+          id="login-password"
           required
           error={passwordError ?? undefined}
-        >
-          <PasswordInput
-              ref={passwordRef}
-              id="login-password"
-
-              autoComplete="current-password"
-              placeholder="Ít nhất 12 ký tự"
-              value={password}
-              error={passwordError !== null}
-              aria-describedby={passwordError !== null ? "login-password-error" : undefined}
-              className="pr-20"
-              onChange={(event) => changePassword(event.target.value)}
-              onBlur={blurPassword}
-            />
-        </FormField>
+          ref={passwordRef}
+          autoComplete="current-password"
+          placeholder="Ít nhất 12 ký tự"
+          value={password}
+          onChange={(event) => changePassword(event.target.value)}
+          onBlur={blurPassword}
+        />
 
         <div className="flex justify-end">
           <Link to="/forgot-password" className="t-label text-brand hover:underline">

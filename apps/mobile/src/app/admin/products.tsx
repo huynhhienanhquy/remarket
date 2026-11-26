@@ -12,11 +12,11 @@ import {
 import { api } from "../../services/runtime";
 import { deliveryLabel } from "../../services/marketplace";
 import { ProductGallery } from "../../components/ProductGallery";
-import { SelectField } from "../../components/SelectField";
 import { Sheet } from "../../components/Sheet";
 import { Button, Feedback, styles } from "../../components/ui";
 import { useSession } from "../../services/session-context";
 import {
+  AdminFilter,
   AdminList,
   AdminSearch,
   AdvancedFilters,
@@ -76,16 +76,13 @@ function AdminProductsView({ params }: { params: { selected?: string; seller_id?
       filters={
         <>
           <AdminSearch
-            onSearch={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
+            onSearch={setQ}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Trạng thái"
             value={status}
             items={[
-              { value: "", label: "Tất cả" },
               ...PRODUCT_STATUSES.map((value) => ({
                 value,
                 label: PRODUCT_STATUS_LABELS[value].label,
@@ -94,33 +91,28 @@ function AdminProductsView({ params }: { params: { selected?: string; seller_id?
             ]}
             onChange={(value) => {
               setStatus(value);
-              setPage(1);
               setId(undefined);
             }}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Danh mục"
             value={category}
             items={[
-              { value: "", label: "Tất cả" },
               ...(tree.data ?? [])
                 .flatMap((root) => [root, ...(root.children ?? [])])
                 .map((item) => ({ value: item.id, label: item.name })),
             ]}
-            onChange={(value) => {
-              setCategory(value);
-              setPage(1);
-            }}
+            onChange={setCategory}
+            onPage={setPage}
           />
           <AdvancedFilters
             fields={[
               { key: "seller_id", label: "Mã người bán" },
               ...moderationFields,
             ]}
-            onApply={(value) => {
-              setAdvanced(value);
-              setPage(1);
-            }}
+            onApply={setAdvanced}
+            onPage={setPage}
           />
         </>
       }

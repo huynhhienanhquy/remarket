@@ -81,6 +81,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           void client.invalidateQueries({ queryKey: ["chat", "conversations"] });
           invalidate(["notifications"]);
         }
+        else if (event === "conversation.cleared" && payload?.conversation_id) {
+          void client.invalidateQueries({ queryKey: ["chat", "detail", payload.conversation_id] });
+          void client.invalidateQueries({ queryKey: ["chat", "messages", payload.conversation_id] });
+          void client.invalidateQueries({ queryKey: ["chat", "conversations"] });
+          void client.invalidateQueries({ queryKey: ["chat", "unread-count"] });
+          invalidate(["notifications"]);
+        }
         else if (event === "message:created") invalidate(["chat", "notifications"]);
         else if (event.startsWith("order")) invalidate(["orders", "products", "cart", "checkout", "notifications", "admin"]);
         else if (event.startsWith("support")) invalidate(["support", "orders", "admin", "notifications"]);

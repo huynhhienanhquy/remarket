@@ -13,7 +13,6 @@ import { authMiddleware, optionalAuth, requireActive, requireVerified } from "..
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { loadCategoryEligibility } from "../services/category-policy.js";
 import { claimUploads, detachUnusedUploads, lockEligibleUploads } from "../services/product-assets.js";
-import type { CreatePayload, PatchPayload } from "../services/product-input.js";
 import { assertEnumValue, createSchema, ownListQuerySchema, patchSchema, searchQuerySchema, validateAndNormalize } from "../services/product-input.js";
 import { ok, okList } from "../shared/api-response.js";
 import type { ProductRow } from "../shared/dto-mappers.js";
@@ -214,33 +213,25 @@ async function getProductDetail(req: AuthRequest, res: Response): Promise<Respon
  * ------------------------------------------------------------------ */
 
 async function createProduct(req: AuthRequest, res: Response): Promise<Response> {
-  const payload: CreatePayload = createSchema.parse(req.body);
+  const payload = createSchema.parse(req.body);
   const viewerId = viewerIdOf(req);
-  const normalized = await validateAndNormalize(payload, payload.images);
+  const { fields, images } = await validateAndNormalize(payload, payload.images);
 
   const created = await prisma.$transaction(async (tx) => {
     const productId = crypto.randomUUID();
     await assertSellerEligibleInTransaction(tx, viewerId, true);
-    await assertCategoryEligibleInTransaction(tx, normalized.categoryId, true);
-    const assetIds = await lockEligibleUploads(tx, viewerId, productId, normalized.images);
+    await assertCategoryEligibleInTransaction(tx, fields.categoryId, true);
+    const assetIds = await lockEligibleUploads(tx, viewerId, productId, images);
     // UploadAsset.productId has an immediate FK: create the referenced row
     // before claiming uploads, within the same rollback-safe transaction.
     const product = await tx.product.create({
       data: {
         id: productId,
-        title: normalized.title,
-        description: normalized.description,
-        price: normalized.price,
-        condition: normalized.condition,
-        usageMonths: normalized.usageMonths,
-        categoryId: normalized.categoryId,
-        provinceCode: normalized.provinceCode,
-        deliveryMethod: normalized.deliveryMethod,
-        shippingFee: normalized.shippingFee,
+        ...fields,
         sellerId: viewerId,
         status: "PENDING",
         version: 1,
-        images: { create: imageCreateMany(normalized.images) },
+        images: { create: imageCreateMany(images) },
       },
       include: PRODUCT_INCLUDE,
     });
@@ -256,7 +247,7 @@ async function createProduct(req: AuthRequest, res: Response): Promise<Response>
  * ------------------------------------------------------------------ */
 
 async function updateProduct(req: AuthRequest, res: Response): Promise<Response> {
-  const payload: PatchPayload = patchSchema.parse(req.body);
+  const payload = patchSchema.parse(req.body);
   const product = await loadOwnedProduct(req);
 
   if (product.status === "RESERVED" || product.status === "SOLD") {
@@ -269,7 +260,7 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
     throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại để xem thông tin mới nhất.");
   }
 
-  const normalized = await validateAndNormalize(payload, payload.images);
+  const { fields, images } = await validateAndNormalize(payload, payload.images);
   const updated = await prisma.$transaction(async (tx) => {
     await assertSellerEligibleInTransaction(tx, product.sellerId, false);
     await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" = ${product.id} FOR UPDATE`;
@@ -284,27 +275,19 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
     if (current.version !== payload.expected_version) {
       throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại để xem thông tin mới nhất.");
     }
-    await assertCategoryEligibleInTransaction(tx, normalized.categoryId, current.categoryId !== normalized.categoryId);
+    await assertCategoryEligibleInTransaction(tx, fields.categoryId, current.categoryId !== fields.categoryId);
     let previousPaths: string[] = [];
     if (payload.images) {
       previousPaths = (await tx.productImage.findMany({
         where: { productId: product.id, storagePath: { not: null } },
         select: { storagePath: true },
       })).flatMap((image) => image.storagePath ? [image.storagePath] : []);
-      await claimUploads(tx, current.sellerId, current.id, normalized.images);
+      await claimUploads(tx, current.sellerId, current.id, images);
     }
     const result = await tx.product.updateMany({
       where: { id: current.id, version: current.version },
       data: {
-        title: normalized.title,
-        description: normalized.description,
-        price: normalized.price,
-        condition: normalized.condition,
-        usageMonths: normalized.usageMonths,
-        categoryId: normalized.categoryId,
-        provinceCode: normalized.provinceCode,
-        deliveryMethod: normalized.deliveryMethod,
-        shippingFee: normalized.shippingFee,
+        ...fields,
         // Editing an ACTIVE listing sends it back to moderation; publishedAt
         // stays unchanged so the first publication time survives.
         status: current.status === "ACTIVE" ? "PENDING" : current.status,
@@ -315,7 +298,7 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
       throw versionConflict("Tin đăng đã thay đổi. Vui lòng tải lại để xem thông tin mới nhất.");
     }
     if (payload.images) {
-      const nextPaths = new Set(normalized.images.map((image) => image.storagePath));
+      const nextPaths = new Set(images.map((image) => image.storagePath));
       await detachUnusedUploads(
         tx,
         product.id,
@@ -323,7 +306,7 @@ async function updateProduct(req: AuthRequest, res: Response): Promise<Response>
       );
       await tx.productImage.deleteMany({ where: { productId: product.id } });
       await tx.productImage.createMany({
-        data: imageCreateMany(normalized.images).map((image) => ({ ...image, productId: product.id })),
+        data: imageCreateMany(images).map((image) => ({ ...image, productId: product.id })),
       });
     }
     return tx.product.findUniqueOrThrow({ where: { id: product.id }, include: PRODUCT_INCLUDE });

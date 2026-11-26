@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { orderShippingFee, addVnd, validateShippingFee, validatePhone } from "@remarket/shared";
+import { orderShippingFee, addVnd, productAsCart, validateShippingFee, validatePhone } from "@remarket/shared";
 import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { invalidateCart } from "@/helpers/cartCache";
@@ -45,7 +45,9 @@ export function useCheckout() {
   const [draft, setDraft] = useState<Record<string, CheckoutDeliveryInput>>({});
   const [priceChangedAlert, setPriceChangedAlert] = useState<CheckoutPriceChangedDetails | null>(null);
 
-  const itemsParam = searchParams.get("items");
+  const productId = searchParams.get("product_id");
+  const isDirectPurchase = productId !== null;
+  const itemsParam = isDirectPurchase ? null : searchParams.get("items");
   const selectedIds = useMemo(
     () => (itemsParam ? itemsParam.split(",").filter(Boolean) : []),
     [itemsParam],
@@ -54,7 +56,18 @@ export function useCheckout() {
   const cart = useQuery({
     queryKey: queryKeys.cart,
     queryFn: ({ signal }) => apiForQuery(signal).cart.get(),
+    enabled: !isDirectPurchase,
   });
+  const directPurchase = useQuery({
+    queryKey: queryKeys.product(productId ?? ""),
+    queryFn: ({ signal }) => productId
+      ? apiForQuery(signal).products.detail(encodeURIComponent(productId))
+      : null,
+    select: productAsCart,
+    enabled: isDirectPurchase,
+  });
+  const source = isDirectPurchase ? directPurchase : cart;
+  const sourcePending = source.isPending || (isDirectPurchase && source.isStale && source.isFetching);
 
   const provinces = useQuery({
     queryKey: queryKeys.provinces,
@@ -62,7 +75,7 @@ export function useCheckout() {
     staleTime: 5 * 60_000,
   });
 
-  const groups = useMemo(() => cart.data?.groups ?? [], [cart.data?.groups]);
+  const groups = useMemo(() => source.data?.groups ?? [], [source.data?.groups]);
   const availableItems = useMemo(() => {
     const items: Array<{
       product_id: string;
@@ -72,7 +85,7 @@ export function useCheckout() {
     for (const group of groups) {
       for (const item of group.items) {
         if (
-          (selectedIds.length === 0 || selectedIds.includes(item.product_id)) &&
+          (itemsParam === null || selectedIds.includes(item.product_id)) &&
           item.available &&
           !item.unavailable_reason
         ) {
@@ -85,7 +98,7 @@ export function useCheckout() {
       }
     }
     return items;
-  }, [groups, selectedIds]);
+  }, [groups, itemsParam, selectedIds]);
 
   const sellerIds = useMemo(
     () => Array.from(new Set(availableItems.map((i) => i.seller_id))),
@@ -103,7 +116,7 @@ export function useCheckout() {
   }
 
   useEffect(() => {
-    if (!cart.data) return;
+    if (!source.data) return;
     setDraft((previous) => {
       let next = previous;
       for (const sellerId of sellerIds) {
@@ -121,7 +134,7 @@ export function useCheckout() {
       }
       return next;
     });
-  }, [sellerIds, viewer, selectedProducts, cart.data]);
+  }, [sellerIds, viewer, selectedProducts, source.data]);
 
   function updateDelivery(sellerId: string, patch: CheckoutDeliveryPatch) {
     setDraft((prev) => ({
@@ -131,6 +144,11 @@ export function useCheckout() {
   }
 
   const subtotal = useMemo(() => addVnd(...availableItems.map((i) => i.expected_price)), [availableItems]);
+  const shippingTotal = addVnd(...sellerIds.map((sellerId) => {
+    const delivery = draft[sellerId];
+    return delivery ? shippingFor(sellerId, delivery.method) : "0";
+  }));
+  const orderTotal = addVnd(subtotal, shippingTotal);
 
   const checkout = useMutation({
     mutationFn: ({ payload, key }: { payload: CheckoutPayload; key: string }) => api.checkout.create(payload, key),
@@ -151,7 +169,7 @@ export function useCheckout() {
   });
 
   async function handleSubmit() {
-    if (checkout.isPending || !online || !cart.data) return;
+    if (checkout.isPending || !online || sourcePending || !source.data) return;
     setSubmissionError(null);
 
     const deliveries: CheckoutDeliveryInput[] = [];
@@ -193,14 +211,17 @@ export function useCheckout() {
 
   function handlePriceChangedRefresh() {
     setPriceChangedAlert(null);
-    void invalidateCart(queryClient);
+    if (isDirectPurchase) void source.refetch();
+    else void invalidateCart(queryClient);
   }
   return {
     online,
     submissionError,
     draft,
     priceChangedAlert,
-    cart,
+    source,
+    sourcePending,
+    productId,
     provinces,
     groups,
     availableItems,
@@ -209,6 +230,8 @@ export function useCheckout() {
     methodsFor,
     updateDelivery,
     subtotal,
+    shippingTotal,
+    orderTotal,
     checkout,
     handleSubmit,
     handlePriceChangedRefresh,

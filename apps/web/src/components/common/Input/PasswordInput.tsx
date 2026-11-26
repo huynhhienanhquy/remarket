@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { ComponentProps } from "react";
 import { Input } from "./Input";
+import { FormField } from "../FormField/FormField";
+import type { FormFieldProps } from "../FormField/FormField";
 
 export function PasswordInput({ className, ...props }: Omit<ComponentProps<typeof Input>, "type">) {
   const [visible, setVisible] = useState(false);
@@ -12,4 +14,13 @@ export function PasswordInput({ className, ...props }: Omit<ComponentProps<typeo
       {visible ? "Ẩn" : "Hiện"}
     </button>
   </div>;
+}
+
+/** Password control and its label, helper and error share one accessibility link. */
+export function PasswordField({ id, label, helper, error, required = true, ...props }:
+  Omit<ComponentProps<typeof PasswordInput>, "id" | "error"> &
+  Pick<FormFieldProps, "label" | "helper"> & { id: string; error?: string | null; required?: boolean }) {
+  return <FormField label={label} htmlFor={id} helper={helper} error={error} required={required}>
+    <PasswordInput {...props} id={id} error={!!error} />
+  </FormField>;
 }

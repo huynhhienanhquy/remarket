@@ -6,9 +6,8 @@ import { randomUUID } from "expo-crypto";
 import { useQuery } from "@tanstack/react-query";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { ApiError } from "@remarket/api-client";
-import { formatVnd, orderShippingFee, addVnd } from "@remarket/shared";
+import { formatVnd, orderShippingFee, addVnd, productAsCart } from "@remarket/shared";
 import type {
-  CartView,
   CheckoutDeliveryInput,
   CheckoutResult,
 } from "@remarket/shared";
@@ -16,6 +15,7 @@ import { api } from "../services/runtime";
 import { useSession, queryClient } from "../services/session-context";
 import { CheckoutIntent } from "../services/checkout-intent";
 import { buildCheckoutPayload } from "../services/checkout-payload";
+import { productDetailKey } from "../services/marketplace";
 import {
   checkoutSelection,
   selectedCart,
@@ -44,49 +44,29 @@ export default function CheckoutScreen({
   const action = useAction();
   const network = useNetInfo();
   const offline = network.isConnected === false;
-  const result = useQuery({
-    queryKey:
-      buyNow && product_id
-        ? ["checkout", user?.id, product_id]
-        : ["cart", user?.id],
-    queryFn: async (): Promise<CartView> => {
-      if (!buyNow || !product_id) return api.cart.get();
-      const product = await api.products.detail(product_id);
-      return {
-        total_items: 1,
-        groups: [
-          {
-            seller: product.seller,
-            items: [
-              {
-                product_id: product.id,
-                title: product.title,
-                price: product.price,
-                image_url: product.image_url,
-                condition: product.condition,
-                status: product.status,
-                province_label: product.province_label,
-                delivery_method: product.delivery_method,
-                shipping_fee: product.shipping_fee,
-                available: product.capabilities.can_buy,
-                unavailable_reason: product.capabilities.unavailable_reason,
-              },
-            ],
-          },
-        ],
-      };
-    },
-    enabled: !!user,
+  const directProductId = buyNow ? product_id || null : null;
+  const cartQuery = useQuery({
+    queryKey: ["cart", user?.id],
+    queryFn: () => api.cart.get(),
+    enabled: !!user && directProductId === null,
   });
+  const directPurchase = useQuery({
+    queryKey: productDetailKey(directProductId ?? undefined, user?.id),
+    queryFn: () => directProductId ? api.products.detail(directProductId) : null,
+    select: productAsCart,
+    enabled: !!user && directProductId !== null,
+  });
+  const result = directProductId === null ? cartQuery : directPurchase;
+  const productRefreshing = directProductId !== null && result.isStale && result.isFetching;
   const [deliveries, setDeliveries] = useState<
     Record<string, Partial<CheckoutDeliveryInput>>
   >({});
   const intent = useRef(new CheckoutIntent(randomUUID));
   const [uncertain, setUncertain] = useState(false);
   const [orders, setOrders] = useState<CheckoutResult | null>(null);
-  const cart =
-    result.data &&
-    selectedCart(result.data, product_id ? null : checkoutSelection(items));
+  const cart = !productRefreshing && result.data
+    ? selectedCart(result.data, product_id ? null : checkoutSelection(items))
+    : undefined;
   const selectedGroups = (cart?.groups ?? [])
     .map((group) => ({
       ...group,
@@ -222,7 +202,7 @@ export default function CheckoutScreen({
       ) : (
         <>
           <Feedback
-            loading={result.isPending}
+            loading={result.isPending || productRefreshing}
             error={result.error}
             retry={() => {
               void result.refetch();

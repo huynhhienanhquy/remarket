@@ -10,6 +10,7 @@ export function communicationEndpoints(http: HttpTransport) {
     unreadCount: () => http.get("/conversations/unread-count"),
     conversations: (page) => http.get("/conversations", { page }),
     detail: (id) => http.get(`/conversations/${id}`),
+    deleteConversation: (id) => http.delete(`/conversations/${id}`),
     open: (productId) => http.post("/conversations", { product_id: productId }),
     messages: (conversationId, cursor) =>
       http.get(`/conversations/${conversationId}/messages`, {

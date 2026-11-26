@@ -14,6 +14,7 @@ import {
   useAction,
 } from "../../components/ui";
 import {
+  AdminFilter,
   AdminList,
   AdminSearch,
   AdvancedFilters,
@@ -68,30 +69,23 @@ export default function AdminCategories() {
         <>
           <Button title="Thêm danh mục" onPress={() => edit("new")} />
           <AdminSearch
-            onSearch={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
+            onSearch={setQ}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Trạng thái"
             value={status}
             items={[
-              { value: "", label: "Tất cả" },
               { value: "ACTIVE", label: "Hoạt động" },
               { value: "INACTIVE", label: "Ngừng hoạt động" },
             ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
+            onChange={setStatus}
+            onPage={setPage}
           />
           <AdvancedFilters
             fields={moderationFields}
-            onApply={(value) => {
-              setAdvanced(value);
-              setPage(1);
-            }}
+            onApply={setAdvanced}
+            onPage={setPage}
           />
         </>
       }

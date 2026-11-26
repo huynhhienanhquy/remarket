@@ -1,20 +1,18 @@
-import { readFilters, countFilters, buildChips } from "@/pages/SearchPage/filters";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { readFilters, countFilters, buildChips, emptyFilters, type FilterValues } from "../filters";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ProductListItem } from "@remarket/shared";
+import type { ProductListItem, ProductQuery, SortOption } from "@remarket/shared";
 import { api, apiForQuery } from "@/services/api";
 import { queryKeys } from "@/config/queryClient";
 import { useSession } from "@/contexts/SessionContext";
 import { loginPathFor } from "@/config/route/guards";
-import { type FilterValues } from "@/pages/SearchPage/sections/FilterPanel";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const PAGE_SIZE = 12;
 
 /**
- * Owns URL filters, draft-sheet state and catalogue queries with the existing cache keys.
- * Called once by the route component; hook order and handlers match the original page.
+ * Owns URL filters, draft-sheet state and catalogue queries.
  */
 export function useProductSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,38 +22,30 @@ export function useProductSearch() {
   const { viewer, status } = useSession();
 
   const q = searchParams.get("q") ?? "";
-  const sort = (searchParams.get("sort") ?? "newest") as "newest" | "price_asc" | "price_desc";
+  const sort = (searchParams.get("sort") ?? "newest") as SortOption;
   const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
   const filters = useMemo(() => readFilters(searchParams), [searchParams]);
 
-  const [keyword, setKeyword] = useState(q);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [draft, setDraft] = useState<FilterValues>(filters);
   const desktopFilters = useMediaQuery("(min-width: 1024px)");
 
-  useEffect(() => setKeyword(q), [q]);
-  // Discard unapplied sheet edits whenever it is reopened (ui-spec 8).
-  useEffect(() => {
-    if (sheetOpen) setDraft(filters);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetOpen]);
-
   // Start the page content before auxiliary filters compete for the small DB pool.
+  const productQuery: ProductQuery = {
+    q: q || undefined,
+    category_id: filters.category_id || undefined,
+    min_price: filters.min_price || undefined,
+    max_price: filters.max_price || undefined,
+    condition: filters.condition || undefined,
+    province_code: filters.province_code || undefined,
+    delivery_method: filters.delivery_method || undefined,
+    sort,
+    page,
+    page_size: PAGE_SIZE,
+  };
   const listQuery = useQuery({
-    queryKey: queryKeys.products({ ...Object.fromEntries(searchParams), page_size: PAGE_SIZE }),
-    queryFn: ({ signal }) =>
-      apiForQuery(signal).products.list({
-        q: q || undefined,
-        category_id: filters.category_id || undefined,
-        min_price: filters.min_price || undefined,
-        max_price: filters.max_price || undefined,
-        condition: filters.condition || undefined,
-        province_code: filters.province_code || undefined,
-        delivery_method: filters.delivery_method || undefined,
-        sort,
-        page,
-        page_size: PAGE_SIZE,
-      }),
+    queryKey: queryKeys.products(productQuery),
+    queryFn: ({ signal }) => apiForQuery(signal).products.list(productQuery),
     placeholderData: keepPreviousData,
     enabled: status === "ready",
     staleTime: 10_000,
@@ -114,17 +104,8 @@ export function useProductSearch() {
     favorites.mutate({ id: product.id, on: !product.is_favorited });
   }
 
-  function submitKeyword() {
-    applyParams({ q: keyword.trim() || null });
-  }
-
   function clearFilters() {
-    const next = new URLSearchParams(searchParams);
-    for (const key of ["category_id", "min_price", "max_price", "condition", "province_code", "delivery_method"]) {
-      next.delete(key);
-    }
-    next.delete("page");
-    setSearchParams(next);
+    applyParams({ ...emptyFilters() });
   }
 
   function removeChip(key: keyof FilterValues) {
@@ -144,8 +125,6 @@ export function useProductSearch() {
     q,
     sort,
     filters,
-    keyword,
-    setKeyword,
     sheetOpen,
     setSheetOpen,
     draft,
@@ -155,7 +134,6 @@ export function useProductSearch() {
     applyParams,
     listQuery,
     toggleFavorite,
-    submitKeyword,
     clearFilters,
     removeChip,
     chips,

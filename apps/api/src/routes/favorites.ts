@@ -9,7 +9,8 @@ import { ok, okList } from "../shared/api-response.js";
 import { notFound, unauthorized, validationError } from "../shared/errors.js";
 import { offsetOf, pageMeta, parsePagingOnly } from "../shared/pagination.js";
 import { toSavedProductListItem } from "../shared/dto-mappers.js";
-import { buildProductContext, loadCategoryChain } from "../shared/viewer.js";
+import { readProducts } from "../shared/product-reads.js";
+import { loadCategoryChain, viewerFrom } from "../shared/viewer.js";
 
 /**
  * Favourite routes (detail-project 9.4): list, idempotent add and remove.
@@ -41,29 +42,12 @@ favoritesRouter.get(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const viewerId = viewerIdOf(req);
     const paging = parsePagingOnly(req.query);
-    const where = { userId: viewerId };
-
-    const [total, rows] = await Promise.all([
-      prisma.favorite.count({ where }),
-      prisma.favorite.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: offsetOf(paging),
-        take: paging.page_size,
-        include: {
-          product: {
-            include: { images: { orderBy: { sortOrder: "asc" } }, seller: true },
-          },
-        },
-      }),
-    ]);
-
-    const products = rows.map((row) => row.product);
-    const ctx = await buildProductContext(products, req);
+    const result = await readProducts({ kind: "favorites", userId: viewerId,
+      offset: offsetOf(paging), limit: paging.page_size }, viewerFrom(req));
     return okList(
       res,
-      products.map((product) => toSavedProductListItem(product, ctx)),
-      pageMeta(paging, total),
+      result.items.map(({ product, context }) => toSavedProductListItem(product, context)),
+      pageMeta(paging, result.total),
     );
   }),
 );

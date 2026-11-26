@@ -120,6 +120,58 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("product navigation snapshots on
     await get(`/products/${ids[7]}`, seller).expect(404);
   }, 120_000);
 
+  it("reads saved listings in one snapshot with save-time ordering, exact totals and redacted unavailable rows", async () => {
+    await prisma.favorite.update({ where: { userId_productId: { userId: buyer, productId: ids[0]! } },
+      data: { createdAt: new Date("2026-10-03") } });
+    await prisma.favorite.createMany({ data: [ids[1]!, ids[6]!, ids[7]!].map((productId) => ({
+      userId: buyer, productId, createdAt: new Date("2026-10-02"),
+    })) });
+    const query = vi.spyOn(prisma, "$queryRaw");
+    let first;
+    try {
+      first = await get("/favorites?page_size=1", buyer).expect(200);
+      expect(query).toHaveBeenCalledTimes(1);
+    } finally { query.mockRestore(); }
+    expect(first.body.data.meta).toMatchObject({ total: 4, total_pages: 4 });
+    expect(first.body.data.items[0]).toMatchObject({ id: ids[0], price: "999999999", is_favorited: true,
+      seller: { rating: 5, review_count: 1, completed_sales_count: 1 } });
+    // A saved item never mints a public image capability without checking
+    // eligibility, even though the snapshot also contains its category path.
+    expect(first.body.data.items[0].image_url).toBe("/api/v1/uploads/fixture.png");
+    const all = await get("/favorites", buyer).expect(200);
+    expect(all.body.data.items.map((entry: { id: string }) => entry.id))
+      .toEqual([ids[0], ...[ids[1]!, ids[6]!, ids[7]!].sort().reverse()]);
+    for (const id of [ids[6], ids[7]]) {
+      expect(all.body.data.items.find((entry: { id: string }) => entry.id === id))
+        .toMatchObject({ title: "", price: "0", image_url: null, is_hidden: true, is_favorited: true });
+    }
+    for (const privateValue of ["private-test-hash", "private-phone", "private-address", "Private block reason", `${seller}@example.test`]) {
+      expect(JSON.stringify(all.body.data)).not.toContain(privateValue);
+    }
+    expect((await get("/favorites?page=8&page_size=1", buyer).expect(200)).body.data)
+      .toMatchObject({ items: [], meta: { total: 4 } });
+    expect((await get("/favorites", seller).expect(200)).body.data)
+      .toMatchObject({ items: [], meta: { total: 0 } });
+    await get("/favorites").expect(401);
+    await get("/favorites?page_size=bad", buyer).expect(422);
+  }, 120_000);
+
+  it("refreshes saved-item reputation and redaction immediately after moderation", async () => {
+    try {
+      await prisma.review.updateMany({ where: { reviewedUserId: seller }, data: { hiddenAt: new Date() } });
+      await prisma.product.update({ where: { id: ids[0]! }, data: { isBlocked: true } });
+      const response = await get("/favorites?page_size=1", buyer).expect(200);
+      expect(response.body.data.items[0]).toMatchObject({ id: ids[0], title: "", price: "0", image_url: null,
+        is_hidden: true, seller: { rating: null, review_count: 0, completed_sales_count: 1 } });
+      await prisma.user.update({ where: { id: buyer }, data: { status: "LOCKED" } });
+      await get("/favorites", buyer).expect(403);
+    } finally {
+      await prisma.user.update({ where: { id: buyer }, data: { status: "ACTIVE" } });
+      await prisma.product.update({ where: { id: ids[0]! }, data: { isBlocked: false } });
+      await prisma.review.updateMany({ where: { reviewedUserId: seller }, data: { hiddenAt: null } });
+    }
+  }, 120_000);
+
   it("rechecks favorites, reputation, ancestor/category policy and seller state without caching", async () => {
     await prisma.favorite.deleteMany({ where: { userId: buyer } });
     await prisma.review.updateMany({ where: { reviewedUserId: seller }, data: { hiddenAt: new Date() } });

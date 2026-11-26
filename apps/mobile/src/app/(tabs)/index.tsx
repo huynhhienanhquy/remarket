@@ -1,5 +1,7 @@
 import type { ComponentProps } from "react";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { HoverPressable as Pressable } from "../../components/HoverPressable";
+import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -10,11 +12,10 @@ import {
   colors,
   EmptyState,
   Feedback,
-  ProductGrid,
-  ProductGridSkeleton,
   Screen,
   styles,
 } from "../../components/ui";
+import { ProductGrid, ProductGridSkeleton } from "../../components/ProductCards";
 import {
   MarketplaceFooter,
   MarketplaceHeader,
@@ -28,17 +29,24 @@ const categoryIcons: Record<string, ComponentProps<typeof Ionicons>["name"]> = {
   "xe-co": "car-outline",
   "gia-dung": "cafe-outline",
 };
-const steps = [
+// Metro requires a static require for bundled image files.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const heroImage = require("../../../../../packages/shared/assets/marketplace-hero.jpg");
+
+const steps: Array<{ title: string; body: string; icon: ComponentProps<typeof Ionicons>["name"] }> = [
   {
     title: "Đăng tin",
+    icon: "camera-outline",
     body: "Chụp ảnh, mô tả tình trạng món đồ và mức giá bạn muốn bán.",
   },
   {
     title: "Trao đổi",
+    icon: "chatbubble-outline",
     body: "Nhắn tin trực tiếp để thống nhất tình trạng, giá và cách giao nhận.",
   },
   {
     title: "Giao nhận",
+    icon: "cart-outline",
     body: "Gặp trực tiếp hoặc giao hàng, trả tiền mặt khi nhận được món đồ.",
   },
 ];
@@ -72,91 +80,46 @@ export default function Home() {
       }}
       refreshing={latest.isRefetching || categories.isRefetching}
     >
-      <View
-        style={{
-          backgroundColor: colors.soft,
-          borderRadius: 16,
-          paddingHorizontal: 20,
-          paddingVertical: 24,
-          gap: 10,
-          borderWidth: 1,
-          borderColor: `${colors.green}1A`,
-          overflow: "hidden",
-        }}
-      >
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: -96,
-            right: -80,
-            width: 240,
-            height: 240,
-            borderRadius: 120,
-            borderWidth: 1,
-            borderColor: `${colors.green}26`,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <View style={{ width: 192, height: 192, borderRadius: 96, borderWidth: 1, borderColor: `${colors.green}26` }} />
+      <View style={[homeStyles.hero, wide && homeStyles.heroWide]}>
+        <View style={[homeStyles.heroCopy, wide && homeStyles.heroCopyWide]}>
+          <Text accessibilityRole="header" style={[homeStyles.heroTitle, wide && homeStyles.heroTitleWide]}>
+            Món đồ cũ.{"\n"}
+            <Text style={homeStyles.heroAccent}>Giá trị mới.</Text>
+          </Text>
+          <Text style={homeStyles.heroDescription}>
+            Tìm mua món đồ đã qua sử dụng hoặc đăng bán những gì bạn không còn cần.
+          </Text>
+          <View style={homeStyles.heroActions}>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push("/products")}
+              style={({ pressed }) => [homeStyles.heroButton, homeStyles.browseButton, pressed && homeStyles.pressed]}
+            >
+              <Text style={homeStyles.browseLabel}>Khám phá</Text>
+              <Ionicons name="chevron-forward" size={16} color="#143d2d" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push("/sell")}
+              style={({ pressed }) => [homeStyles.heroButton, homeStyles.sellButton, pressed && homeStyles.pressed]}
+            >
+              <Ionicons name="add" size={18} color={colors.card} />
+              <Text style={homeStyles.sellLabel}>Đăng bán</Text>
+            </Pressable>
+          </View>
         </View>
-        <Text
-          style={{
-            alignSelf: "flex-start",
-            backgroundColor: colors.card,
-            borderRadius: 999,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            fontSize: 11,
-            lineHeight: 16,
-            fontWeight: "600",
-            color: colors.green,
-            textTransform: "uppercase",
-            letterSpacing: 0.55,
-          }}
-        >
-          Mua bán đồ đã qua sử dụng
-        </Text>
-        <Text
-          accessibilityRole="header"
-          style={{
-            fontSize: wide ? 40 : 28,
-            lineHeight: wide ? 48 : 36,
-            letterSpacing: -0.3,
-            fontWeight: "700",
-            color: colors.text,
-          }}
-        >
-          Món đồ cũ.{wide ? " " : "\n"}
-          <Text style={{ color: colors.green }}>Giá trị mới.</Text>
-        </Text>
-        <Text style={[styles.text, { color: colors.muted }]}>
-          Tìm món bạn cần, nhường món bạn không còn dùng.
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 8,
-            marginTop: 6,
-          }}
-        >
-          <Button
-            title="Khám phá sản phẩm"
-            compact={!wide}
-            onPress={() => router.push("/products")}
-          />
-          <Button
-            title="Đăng bán ngay"
-            secondary
-            compact={!wide}
-            onPress={() => router.push("/sell")}
+        <View style={[homeStyles.heroPhoto, wide && homeStyles.heroPhotoWide]}>
+          <Image
+            source={heroImage}
+            accessible={false}
+            contentFit="cover"
+            contentPosition={{ top: "65%", left: "50%" }}
+            style={StyleSheet.absoluteFill}
           />
         </View>
       </View>
       <View style={{ gap: 16, paddingTop: 16, paddingBottom: 12 }}>
-        <Text style={styles.heading}>Khám phá theo danh mục</Text>
+        <Text style={styles.heading}>Danh mục sản phẩm</Text>
         {categories.isPending ? (
           <View
             accessibilityLabel="Đang tải danh mục"
@@ -170,7 +133,7 @@ export default function Home() {
                   flexBasis: categoryWidth,
                   flexGrow: 1,
                   height: 96,
-                  borderRadius: 12,
+                  borderRadius: 16,
                   backgroundColor: colors.subtle,
                 }}
               />
@@ -210,6 +173,7 @@ export default function Home() {
                     gap: 8,
                     paddingHorizontal: 8,
                     minHeight: 96,
+                    borderRadius: 16,
                     paddingVertical: 12,
                     backgroundColor: pressed ? colors.soft : colors.card,
                   },
@@ -217,9 +181,9 @@ export default function Home() {
               >
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
                     backgroundColor: colors.soft,
                     alignItems: "center",
                     justifyContent: "center",
@@ -234,7 +198,7 @@ export default function Home() {
                 <Text
                   style={[
                     styles.meta,
-                    { color: colors.text, textAlign: "center", fontWeight: "500" },
+                    { color: colors.text, textAlign: "center", fontWeight: "600" },
                   ]}
                 >
                   {item.name}
@@ -249,7 +213,7 @@ export default function Home() {
       </View>
       <View style={{ gap: 12 }}>
         <View style={[styles.row, { justifyContent: "space-between", gap: 8 }]}>
-          <Text style={styles.heading}>Mới đăng gần đây</Text>
+          <Text style={[styles.heading, { flexShrink: 1 }]}>Mới đăng gần đây</Text>
           <Pressable
             accessibilityRole="link"
             onPress={() => router.push("/products")}
@@ -296,24 +260,22 @@ export default function Home() {
         }}
       >
         <Text style={styles.heading}>Ba bước để trao đổi món đồ</Text>
-        {steps.map((step, i) => (
+        {steps.map((step) => (
           <View
             key={step.title}
-            style={[styles.card, { padding: 20, backgroundColor: colors.bg }]}
+            style={[styles.card, { padding: 20, borderRadius: 16 }]}
           >
             <View
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
+                width: 40,
+                height: 40,
+                borderRadius: 12,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: colors.soft,
               }}
             >
-              <Text style={[styles.label, { color: colors.green }]}>
-                {i + 1}
-              </Text>
+              <Ionicons name={step.icon} size={20} color={colors.green} />
             </View>
             <Text
               style={{
@@ -335,3 +297,35 @@ export default function Home() {
     </Screen>
   );
 }
+
+const homeStyles = StyleSheet.create({
+  hero: {
+    backgroundColor: "#143d2d",
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  heroWide: { flexDirection: "row" },
+  heroCopy: { gap: 12, paddingHorizontal: 20, paddingVertical: 28 },
+  heroCopyWide: { flex: 1.1, padding: 40, justifyContent: "center" },
+  heroTitle: { color: "#ffffff", fontSize: 34, lineHeight: 39, fontWeight: "700", letterSpacing: -1 },
+  heroTitleWide: { fontSize: 54, lineHeight: 60, letterSpacing: -2 },
+  heroAccent: { color: "#cce6a7" },
+  heroDescription: { color: "#e2eee4", fontSize: 14, lineHeight: 22, maxWidth: 360 },
+  heroActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  heroButton: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  browseButton: { backgroundColor: "#cce6a7" },
+  browseLabel: { color: "#143d2d", fontSize: 14, fontWeight: "700" },
+  sellButton: { borderWidth: 1, borderColor: "#8b9e91" },
+  sellLabel: { color: "#ffffff", fontSize: 14, fontWeight: "700" },
+  pressed: { opacity: 0.8 },
+  heroPhoto: { height: 124, backgroundColor: "#7e8051" },
+  heroPhotoWide: { flex: 0.9, height: "auto" },
+});

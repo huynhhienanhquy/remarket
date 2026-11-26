@@ -6,7 +6,7 @@ import { GuestOnly, RequireAdmin, RequireAuth, RequireVerified } from "./guards"
 import { RouteError, ForbiddenBody, NotFoundBody } from "../../components/common/RouteError/RouteError";
 import { AccountShell } from "../../layouts/AccountShell/AccountShell";
 import { AuthShell } from "../../layouts/AuthShell/AuthShell";
-import { ChatShell, CheckoutShell } from "../../layouts/ChatShell/ChatShell";
+import { CheckoutShell } from "../../layouts/ChatShell/ChatShell";
 import { MarketplaceShell } from "../../layouts/MarketplaceShell/MarketplaceShell";
 
 // The admin workspace and its CSS are only needed on admin routes.
@@ -76,12 +76,6 @@ const router = createBrowserRouter([
         children: [{ index: true, element: privateRoute(<CheckoutPage />) }],
       },
       {
-        element: privateRoute(<ChatShell />),
-        children: [
-          { path: "messages/:id?", element: <MessagesPage /> },
-        ],
-      },
-      {
         element: <AuthShell />,
         children: [
           {
@@ -113,11 +107,7 @@ const router = createBrowserRouter([
         ],
       },
       {
-        element: (
-          <RequireAuth>
-            <AccountShell />
-          </RequireAuth>
-        ),
+        element: privateRoute(<AccountShell />),
         children: [
           { path: "account", element: <AccountPage /> },
           {
@@ -134,6 +124,7 @@ const router = createBrowserRouter([
           },
           { path: "favorites", element: <FavoritesPage /> },
           { path: "cart", element: <CartPage /> },
+          { path: "messages/:id?", element: <MessagesPage /> },
           { path: "notifications", element: <NotificationsPage /> },
           { path: "orders", element: <OrdersPage role="buyer" /> },
           { path: "orders/:id", element: <OrderDetailPage role="buyer" /> },

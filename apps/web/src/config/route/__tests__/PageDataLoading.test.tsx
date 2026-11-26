@@ -2,7 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createQueryClient } from "../../queryClient";
+import { createQueryClient, queryKeys } from "../../queryClient";
 import { SessionProvider } from "../../../contexts/SessionContext";
 import { ToastProvider } from "../../../components/common/Toast/Toast";
 import { MarketplaceShell } from "../../../layouts/MarketplaceShell/MarketplaceShell";
@@ -15,6 +15,8 @@ import { NotificationsPage } from "../../../pages/NotificationsPage/Notification
 import { AdminUsersPage } from "../../../pages/AdminUsersPage/AdminUsersPage";
 import { AdminEmailVerificationsPage } from "../../../pages/AdminEmailVerificationsPage/AdminEmailVerificationsPage";
 import { SearchPage } from "../../../pages/SearchPage/SearchPage";
+import { ProductDetailPage } from "../../../pages/ProductDetailPage/ProductDetailPage";
+import { CheckoutPage } from "../../../pages/CheckoutPage/CheckoutPage";
 import { VerifyEmailPage } from "../../../pages/VerifyEmailPage/VerifyEmailPage";
 import { RequireAdmin, RequireAuth } from "../guards";
 import { httpContext, page } from "../../../tests/http-context";
@@ -25,6 +27,8 @@ let client: ReturnType<typeof createQueryClient>;
 beforeEach(() => {
   context = httpContext(member);
   context.reply("GET", "/products", page([product]));
+  context.reply("GET", `/products/${product.id}`, product);
+  context.reply("GET", "/ai/config", { enabled: false });
   context.reply("GET", "/cart", { groups: [], total_items: 0 });
   context.reply("GET", "/conversations", page([]));
   context.reply("GET", "/notifications", { ...page([]), meta: { ...page([]).meta, unread: 0 } });
@@ -46,11 +50,14 @@ afterEach(() => {
 function show(path: string) {
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><SessionProvider><ToastProvider>
     <Link to="/cart">Test cart</Link><Link to="/messages">Test messages</Link><Link to="/admin/users">Test admin users</Link>
+    <Link to="/products">Test search</Link>
     <Routes>
       <Route element={<MarketplaceShell />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/products" element={<SearchPage />} />
+        <Route path="/products/:id" element={<ProductDetailPage />} />
       </Route>
+      <Route path="/checkout" element={<RequireAuth><CheckoutPage /></RequireAuth>} />
       <Route element={<RequireAuth><AccountShell /></RequireAuth>}>
         <Route path="/cart" element={<CartPage />} />
         <Route path="/messages/:id?" element={<MessagesPage />} />
@@ -144,6 +151,56 @@ describe("only the current page loads its data", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Bộ lọc/ }));
     await settled("/provinces");
     expect(context.requests("GET", "/products")).toHaveLength(1);
+  });
+
+  it("defers product footer categories until it is visible and shares the result with search", async () => {
+    let enterViewport = () => {};
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: IntersectionObserverCallback) {
+        enterViewport = () => callback([{ isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+      observe() {}
+      disconnect() {}
+    });
+    show(`/products/${product.id}`);
+    await screen.findByRole("heading", { name: product.title });
+    expect(context.requests("GET", "/categories")).toHaveLength(0);
+    act(enterViewport);
+    await settled("/categories");
+    fireEvent.click(screen.getByText("Test search"));
+    await settled("/products");
+    expect(context.requests("GET", "/categories")).toHaveLength(1);
+  });
+
+  it("reuses fresh product details in checkout and lets the form render while provinces load", async () => {
+    let resolveProvinces: (provinces: Array<{ code: string; name: string }>) => void = () => {};
+    context.on("GET", "/provinces", () => new Promise((resolve) => { resolveProvinces = resolve; }));
+    show(`/products/${product.id}`);
+    const [buy] = await screen.findAllByRole("button", { name: "Mua ngay" });
+    fireEvent.click(buy!);
+    expect(await screen.findByRole("textbox", { name: /Tên người nhận/ })).toHaveValue(member.full_name);
+    expect(screen.getByLabelText("Khu vực")).toBeDisabled();
+    expect(context.requests("GET", `/products/${product.id}`)).toHaveLength(1);
+    expect(context.requests("GET", "/cart")).toHaveLength(0);
+    resolveProvinces([{ code: member.province_code!, name: "Hà Nội" }]);
+    await waitFor(() => expect(screen.getByLabelText("Khu vực")).toBeEnabled());
+    expect(screen.getByLabelText("Khu vực")).toHaveValue(member.province_code);
+  });
+
+  it("waits for revalidation before using stale product details to check out", async () => {
+    const endpoint = `/products/${product.id}`;
+    show(endpoint);
+    const [buy] = await screen.findAllByRole("button", { name: "Mua ngay" });
+    act(() => {
+      client.setQueryData(queryKeys.product(product.id), product, { updatedAt: Date.now() - 60_000 });
+    });
+    let resolveProduct: (value: typeof product) => void = () => {};
+    context.on("GET", endpoint, () => new Promise((resolve) => { resolveProduct = resolve; }));
+    fireEvent.click(buy!);
+    await waitFor(() => expect(context.requests("GET", endpoint)).toHaveLength(2));
+    expect(screen.queryByRole("textbox", { name: /Tên người nhận/ })).not.toBeInTheDocument();
+    resolveProduct({ ...product, shipping_fee: "40000" });
+    expect(await screen.findByLabelText("Phí giao hàng")).toHaveValue("40000");
   });
 
   it("refreshes approval capabilities on the verification page", async () => {

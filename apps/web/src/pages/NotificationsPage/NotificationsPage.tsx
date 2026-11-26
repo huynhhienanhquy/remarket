@@ -8,7 +8,6 @@ import { api, apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { Button } from "../../components/common/Button/Button";
 import { Dialog } from "../../components/common/Dialog/Dialog";
-import { Icon } from "../../components/common/Icon/Icon";
 import { Pagination } from "../../components/common/Pagination/Pagination";
 import { useToast } from "../../components/common/Toast/Toast";
 import { ListLoading, OfflineNotice, QueryFailure } from "../../components/common/PageFeedback/PageFeedback";
@@ -49,9 +48,10 @@ export function NotificationsPage() {
     <AccountFilters label="Lọc thông báo" options={[{ value: "all", label: "Tất cả" }, { value: "unread", label: "Chưa đọc" }]} value={unread ? "unread" : "all"} onChange={(value) => setParams(value === "unread" ? { unread: "true" } : {})} />
     {read.isError && <QueryFailure error={read.error} />}
     {notifications.isPending ? <ListLoading /> : notifications.isError ? <QueryFailure error={notifications.error} retry={() => void notifications.refetch()} /> : notifications.data.items.length === 0 ? <AccountEmptyState icon={unread ? "check" : "bell"} title={unread ? "Bạn đã đọc hết thông báo" : "Bạn chưa có thông báo"} description={unread ? "Bạn đã cập nhật tất cả thông tin mới. Chọn Tất cả để xem lại thông báo trước đó." : "Thông tin về đơn hàng, tin đăng và tài khoản sẽ xuất hiện tại đây."} /> : <>
-      <ul className="space-y-3">{notifications.data.items.map((entry) => <li key={entry.id}><button disabled={read.isPending || !online} className={`rm-account-card flex w-full items-start gap-3 p-4 text-left transition-colors hover:border-brand disabled:opacity-60 sm:gap-4 sm:p-5 ${entry.read_at ? "" : "border-brand/20"}`} onClick={() => read.mutate(entry)}>
-        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${entry.read_at ? "bg-surface-subtle text-muted" : "bg-brand-soft text-brand"}`}><Icon name="bell" /></span>
-        <div className="min-w-0 flex-1"><div className="flex items-start gap-2"><h2 className={`flex-1 break-words text-sm leading-6 ${entry.read_at ? "font-medium" : "font-semibold"}`}>{entry.title}</h2>{!entry.read_at && <span aria-label="Chưa đọc" className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand" />}</div><p className="my-2 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted">{entry.content}</p><time className="t-meta text-muted" dateTime={entry.created_at} title={formatDateTime(entry.created_at)}>{formatRelative(entry.created_at)}</time></div>
+      <ul className="space-y-3">{notifications.data.items.map((entry) => <li key={entry.id}><button disabled={read.isPending || !online} className={`rm-account-card rm-card-action block w-full p-4 text-left disabled:opacity-60 enabled:hover:bg-page/60 sm:p-5 ${entry.read_at ? "" : "border-brand/20"}`} onClick={() => read.mutate(entry)}>
+        <div className="flex items-start gap-2"><h2 className={`min-w-0 flex-1 break-words text-sm leading-6 ${entry.read_at ? "font-medium" : "font-semibold"}`}>{entry.title}</h2>{!entry.read_at && <span aria-label="Chưa đọc" className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand" />}</div>
+        <p className="my-2 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted">{entry.content}</p>
+        <time className="t-meta text-muted" dateTime={entry.created_at} title={formatDateTime(entry.created_at)}>{formatRelative(entry.created_at)}</time>
       </button></li>)}</ul>
       <Pagination page={page} total={notifications.data.meta.total} totalPages={Math.max(1, Math.ceil(notifications.data.meta.total / 20))} onPageChange={(next) => setParams({ ...(unread ? { unread: "true" } : {}), page: String(next) })} />
     </>}

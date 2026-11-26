@@ -2,7 +2,7 @@ import { formatDateTime } from "@remarket/shared";
 import type { Tone } from "@remarket/shared";
 import { CheckIcon } from "../Icon/Icon";
 
-export interface OrderTimelineStep {
+interface OrderTimelineStep {
   label: string;
   /** Matches the order status the caller is rendering; no step is invented. */
   status: string;

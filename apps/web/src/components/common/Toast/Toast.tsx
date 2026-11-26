@@ -6,7 +6,7 @@ import type { IconName } from "../Icon/Icon";
 
 export type ToastTone = "success" | "error" | "info" | "warning";
 
-export interface ToastAction {
+interface ToastAction {
   label: string;
   to: string;
 }

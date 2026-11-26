@@ -33,5 +33,3 @@ export async function warmHttpDatabasePool(): Promise<void> {
   const connections = Math.min(2, Number.isFinite(configured) && configured > 0 ? configured : env.databaseConnectionLimit);
   await Promise.all(Array.from({ length: connections }, () => prisma.$queryRaw`SELECT 1`));
 }
-
-export default prisma;

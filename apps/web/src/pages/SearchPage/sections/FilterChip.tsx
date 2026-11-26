@@ -1,4 +1,5 @@
-/** Chip describing one active filter, with a direct remove control. */
+import { XIcon } from "../../../components/common/Icon/Icon";
+
 export function FilterChip({
   label,
   onRemove,
@@ -7,16 +8,14 @@ export function FilterChip({
   onRemove: () => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-3 py-1 t-meta text-brand">
-      {label}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Xóa bộ lọc ${label}`}
-        className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-brand hover:text-white"
-      >
-        ×
-      </button>
-    </span>
+    <button
+      type="button"
+      onClick={onRemove}
+      aria-label={`Xóa bộ lọc ${label}`}
+      className="inline-flex min-h-touch max-w-full items-center gap-2 rounded-full border border-brand/15 bg-brand-soft px-3 text-left text-sm text-brand hover:border-brand/50"
+    >
+      <span className="min-w-0 break-words">{label}</span>
+      <XIcon size={14} className="shrink-0" />
+    </button>
   );
 }

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { Message } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { CHAT_LIMITS, validateChatMessage } from "@remarket/shared";
 import type { AuthUser } from "../middleware/auth.js";
 import { enqueueOutbox, enqueueOutboxBatch } from "../outbox/outbox.js";
@@ -33,6 +34,48 @@ export async function assertConversationParticipant(
     throw notFound("Không tìm thấy cuộc hội thoại này.");
   }
   return conversation;
+}
+
+export function visibleMessages(viewerId: string): Prisma.MessageWhereInput {
+  return {
+    OR: [
+      { hiddenForBuyer: false, conversation: { buyerId: viewerId } },
+      { hiddenForSeller: false, conversation: { sellerId: viewerId } },
+    ],
+  };
+}
+
+export async function deleteConversationForViewer(conversationId: string, viewerId: string): Promise<void> {
+  const conversation = await assertConversationParticipant(conversationId, viewerId);
+  const buyer = conversation.buyerId === viewerId;
+  const hidden = buyer ? { hiddenForBuyer: true } : { hiddenForSeller: true };
+  const visibilityColumn = buyer ? Prisma.sql`"hiddenForBuyer"` : Prisma.sql`"hiddenForSeller"`;
+  const event = {
+    eventType: "conversation.cleared",
+    aggregateId: conversationId,
+    payload: { conversation_id: conversationId, recipients: [viewerId] },
+  };
+
+  await prisma.$transaction(async (tx) => {
+    // Sending locks the same row before inserting, so a concurrent message
+    // belongs either entirely before or entirely after the clear.
+    const cleared = await tx.$executeRaw`
+      UPDATE "Conversation" SET ${visibilityColumn} = true
+      WHERE "id" = ${conversationId} AND ("buyerId" = ${viewerId} OR "sellerId" = ${viewerId})
+    `;
+    if (cleared === 0) throw notFound("Không tìm thấy cuộc hội thoại này.");
+    await tx.message.updateMany({ where: { conversationId, ...visibleMessages(viewerId) }, data: hidden });
+    await tx.notification.updateMany({
+      where: { userId: viewerId, type: "NEW_MESSAGE", referenceType: "conversation", referenceId: conversationId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    await enqueueOutbox(tx, event.eventType, event.aggregateId, `conversation-cleared:${randomUUID()}`, event.payload);
+  });
+  try {
+    publishRealtimeEvent(event);
+  } catch (error) {
+    console.error("Immediate conversation clear delivery failed; durable relay will retry:", error instanceof Error ? error.message : error);
+  }
 }
 
 function uniqueViolation(error: unknown): boolean {
@@ -96,14 +139,14 @@ export async function sendChatMessage(input: {
           SELECT "isBlocked", "deletedAt" FROM "Product" WHERE "id" = ${conversation.productId} FOR SHARE`;
         if (!product || product.isBlocked || product.deletedAt !== null) throw productNotAvailable("Tin đăng không còn khả dụng nên không thể nhắn tin mới.");
       }
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date(), hiddenForBuyer: false, hiddenForSeller: false },
+      });
       const created = await tx.message.create({
         data: { conversationId, senderId: viewer.id, clientMessageId, content },
       });
       if (isSystem) await auditSystemMessage(tx, viewer, conversationId, created.id, recipientId);
-      await tx.conversation.update({
-        where: { id: conversationId },
-        data: { updatedAt: new Date() },
-      });
       const notification = await tx.notification.create({
         data: {
           userId: recipientId,
@@ -159,8 +202,9 @@ export async function markConversationRead(input: {
   lastMessageId: string;
 }): Promise<{ unread: number; updated: number; read_at: string }> {
   await assertConversationParticipant(input.conversationId, input.viewerId);
+  const visibility = visibleMessages(input.viewerId);
   const target = await prisma.message.findFirst({
-    where: { id: input.lastMessageId, conversationId: input.conversationId },
+    where: { ...visibility, id: input.lastMessageId, conversationId: input.conversationId },
     select: { createdAt: true },
   });
   if (!target) throw notFound("Không tìm thấy tin nhắn này.");
@@ -172,6 +216,7 @@ export async function markConversationRead(input: {
         conversationId: input.conversationId,
         senderId: { not: input.viewerId },
         readAt: null,
+        AND: [visibility],
         OR: [
           { createdAt: { lt: target.createdAt } },
           { createdAt: target.createdAt, id: { lte: input.lastMessageId } },
@@ -180,7 +225,7 @@ export async function markConversationRead(input: {
       data: { readAt: now },
     });
     const unread = await tx.message.count({ where: {
-      conversationId: input.conversationId, senderId: { not: input.viewerId }, readAt: null,
+      ...visibility, conversationId: input.conversationId, senderId: { not: input.viewerId }, readAt: null,
     } });
     if (updated.count > 0) await enqueueOutbox(
       tx,

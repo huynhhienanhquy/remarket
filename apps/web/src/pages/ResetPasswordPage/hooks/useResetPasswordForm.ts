@@ -1,13 +1,12 @@
-import { fieldMessages } from "@/helpers/fieldMessages";
-import { useRef, useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { validatePassword, validatePasswordConfirm } from "@remarket/shared";
 import { safeReturnTo } from "@/config/route/guards";
-import { errorTitle, isApiError } from "@/helpers/errors";
+import { apiFieldErrors, errorTitle, isApiError } from "@/helpers/errors";
 import { api } from "@/services/api";
+import { useValidatedField } from "@/hooks/useValidatedField";
 
 /**
  * Keeps the reset token in memory while removing it from the URL; unsuccessful resets retain the draft.
@@ -24,42 +23,16 @@ export function useResetPasswordForm() {
   }, [params, setParams]);
   const returnTo = safeReturnTo(params.get("returnTo") ?? "/", "");
 
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-
-  const [passwordTouched, setPasswordTouched] = useState(false);
-  const [confirmTouched, setConfirmTouched] = useState(false);
-
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-
-  const passwordRef = useRef<HTMLInputElement>(null);
-  const confirmRef = useRef<HTMLInputElement>(null);
-
-  function changePassword(value: string) {
-    setPassword(value);
-    if (passwordTouched) setPasswordError(validatePassword(value));
-    if (formError !== null) setFormError(null);
-  }
-
-  function changeConfirm(value: string) {
-    setConfirm(value);
-    if (confirmTouched) setConfirmError(validatePasswordConfirm(password, value));
-    if (formError !== null) setFormError(null);
-  }
-
-  function blurPassword() {
-    setPasswordTouched(true);
-    setPasswordError(validatePassword(password));
-  }
-
-  function blurConfirm() {
-    setConfirmTouched(true);
-    setConfirmError(validatePasswordConfirm(password, confirm));
-  }
+  const clearFormError = () => setFormError(null);
+  const { value: password, setValue: setPassword, error: passwordError, setError: setPasswordError, ref: passwordRef,
+    change: changePassword, blur: blurPassword, validate: checkPassword } = useValidatedField(validatePassword, clearFormError);
+  const { value: confirm, setValue: setConfirm, error: confirmError, setError: setConfirmError, ref: confirmRef,
+    change: changeConfirm, blur: blurConfirm, validate: checkConfirm } = useValidatedField(
+      (value) => validatePasswordConfirm(password, value), clearFormError,
+    );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -69,12 +42,8 @@ export function useResetPasswordForm() {
       return;
     }
 
-    const nextPasswordError = validatePassword(password);
-    const nextConfirmError = validatePasswordConfirm(password, confirm);
-    setPasswordTouched(true);
-    setConfirmTouched(true);
-    setPasswordError(nextPasswordError);
-    setConfirmError(nextConfirmError);
+    const nextPasswordError = checkPassword();
+    const nextConfirmError = checkConfirm();
     setFormError(null);
 
     if (nextPasswordError !== null) {
@@ -96,8 +65,8 @@ export function useResetPasswordForm() {
       if (isApiError(caught) && (caught.code === "TOKEN_EXPIRED" || caught.code === "INVALID_TOKEN")) {
         setFormError("Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
       } else if (isApiError(caught)) {
-        const fields = fieldMessages(caught);
-        if (fields !== null) {
+        const fields = apiFieldErrors(caught);
+        if (fields !== undefined) {
           if (fields.password !== undefined) {
             setPasswordError(fields.password);
             passwordRef.current?.focus();

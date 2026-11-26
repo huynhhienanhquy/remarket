@@ -44,7 +44,7 @@ export function SupportNewPage() {
   return <div className="max-w-[760px] space-y-6 py-6">
     <Link to="/support" className="text-brand">Quay lại trung tâm hỗ trợ</Link><h1 className="t-h1">Tạo yêu cầu hỗ trợ</h1><OfflineNotice online={online} />
     {create.isError && <QueryFailure error={create.error} />}
-    <form className="space-y-4 rounded-card border border-line bg-surface p-4 sm:p-6" onSubmit={(event) => {
+    <form className="rm-card-panel space-y-4 rounded-card border border-line bg-surface p-4 sm:p-6" onSubmit={(event) => {
       event.preventDefault(); if (create.isPending || !online) return;
       const errors: Record<string, string> = {};
       const titleError = validateSupportSubject(subject); if (titleError) errors.subject = titleError;

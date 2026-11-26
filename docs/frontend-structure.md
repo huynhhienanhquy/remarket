@@ -5,16 +5,18 @@ chỉ định. Giữ nguyên logic, JSX, điều hướng, API, state, side effe
 đổi có sẵn trong workspace. Quy ước lâu dài tại
 [FRONTEND_CONVENTIONS.md](../FRONTEND_CONVENTIONS.md).
 
+Cây module bên dưới được cập nhật sau lượt dọn ngày 17/11/2026. Các số đo
+đối chiếu AST và kiểm chứng cuối tài liệu ghi nhận lượt refactor 09/10.
+
 ## Cấu trúc thực tế
 
 ```text
 apps/web/src/
 ├── App.tsx
 ├── main.tsx
-├── assets/images/illustrations/HeroArt.tsx
+├── assets/fonts/
 ├── components/
 │   ├── common/<ComponentName>/<ComponentName>.tsx và tests hiện có
-│   │   └── index.ts
 │   ├── AccountPageHeader/, ConversationList/, ReportDialog/
 │   ├── MarketplaceHeader/MarketplaceHeader.tsx, components/
 │   ├── SessionExpiryWatcher/, Logo/, Footer/, MobileBottomNav/
@@ -25,8 +27,8 @@ apps/web/src/
 ├── constants/queryKeys.ts
 ├── contexts/SessionContext.tsx, RealtimeContext.tsx, __tests__/
 ├── data/authBenefits.ts
-├── helpers/errors.ts, adminErrors.ts, fieldMessages.ts
-├── hooks/useConnectivity.ts, useUnreadCounts.ts, useNavigationCounts.ts, useAdminParams.ts
+├── helpers/errors.ts, adminErrors.ts
+├── hooks/useConnectivity.ts, useUnreadCounts.ts, useNavigationCounts.ts, useAdminParams.ts, useValidatedField.ts
 ├── layouts/
 │   ├── RootLayout/RootLayout.tsx
 │   ├── AccountShell/AccountShell.tsx, AccountNavigation.test.tsx
@@ -55,7 +57,7 @@ nguyên thân khai báo. Không còn tầng route-area, `app/`, `lib/`,
 
 | Trách nhiệm | Nơi chứa mã hiện tại |
 |---|---|
-| Tài nguyên hình ảnh | `assets/images/illustrations/HeroArt.tsx`: SVG inline hiện có |
+| Tài nguyên hình ảnh | `packages/shared/assets/marketplace-hero.jpg`: ảnh hero dùng chung web/mobile |
 | UI primitive dùng chung | `components/common/<ComponentName>/` |
 | Component nghiệp vụ dùng lại | `components/<FeatureName>/`, `components/admin/` |
 | Environment, query client, route/navigation config | `config/`, `config/route/` |
@@ -75,7 +77,8 @@ nguyên thân khai báo. Không còn tầng route-area, `app/`, `lib/`,
 
 Các tên UserCard, ThemeContext, cartStore, font/avatar, form configs và stories
 trong mẫu minh họa trách nhiệm. Không thêm chức năng, tài nguyên giả, thư mục
-rỗng hoặc dependency. Artwork giữ nguyên React SVG để không đổi markup/ARIA.
+rỗng hoặc dependency. Lượt refactor 09/10 giữ nguyên React SVG; component
+illustration cũ đã được gỡ sau khi trang chủ chuyển sang ảnh hero dùng chung.
 Design tokens vẫn dùng Tailwind; shared DTO/enum/validation vẫn dùng
 `packages/shared`. Store dùng cơ chế session hiện có, không đổi sang Zustand.
 

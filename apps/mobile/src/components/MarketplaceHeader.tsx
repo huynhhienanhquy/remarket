@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Text, TextInput, View, useWindowDimensions } from "react-native";
+import { HoverPressable as Pressable } from "./HoverPressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../services/runtime";
@@ -7,6 +8,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigationCounts } from "../services/use-navigation-counts";
 import { useSession } from "../services/session-context";
+import { useAssistantAvailability } from "../services/assistant";
 import { colors, IconButton, layout, styles } from "./ui";
 
 export function Logo() {
@@ -21,6 +23,7 @@ export function Logo() {
         alignItems: "center",
         gap: 8,
         minHeight: layout.touchTarget,
+        flexShrink: 1,
       }}
     >
       <View
@@ -36,12 +39,14 @@ export function Logo() {
         <Ionicons name="sync-outline" size={20} color={colors.card} />
       </View>
       <Text
+        numberOfLines={1}
         style={{
           fontSize: 18,
           lineHeight: 28,
           fontWeight: "700",
           letterSpacing: -0.45,
           color: colors.text,
+          flexShrink: 1,
         }}
       >
         Re<Text style={{ color: colors.green }}>Market</Text>
@@ -97,7 +102,7 @@ export function MarketplaceHeader({
           }}
         >
           <Logo />
-          <MobileHeaderActions />
+          <MobileHeaderActions showAssistant />
         </View>
         {showSearch && (
           <View
@@ -271,7 +276,7 @@ export function CompactHeader({
 }
 
 /** One set of utilities and count queries for discovery and account headers. */
-export function MobileHeaderActions() {
+function MobileHeaderActions({ showAssistant = false }: { showAssistant?: boolean }) {
   const router = useRouter();
   const counts = useNavigationCounts();
   const { user } = useSession();
@@ -281,6 +286,7 @@ export function MobileHeaderActions() {
   };
   return (
     <View style={{ flexDirection: "row", flexShrink: 0 }}>
+      {showAssistant && user?.status === "ACTIVE" && <AssistantButton />}
       <IconButton
         icon="chatbubble-outline"
         label="Tin nhắn"
@@ -301,5 +307,18 @@ export function MobileHeaderActions() {
         onPress={() => open("/cart")}
       />
     </View>
+  );
+}
+
+function AssistantButton() {
+  const router = useRouter();
+  const config = useAssistantAvailability();
+  if (!config.data?.enabled) return null;
+  return (
+    <IconButton
+      icon="sparkles-outline"
+      label="Trợ lý ReMarket"
+      onPress={() => router.push("/assistant")}
+    />
   );
 }

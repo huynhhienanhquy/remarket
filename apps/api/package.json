@@ -31,7 +31,6 @@
     "@copilotkit/runtime": "1.85.0",
     "@prisma/adapter-pg": "5.22.0",
     "@prisma/client": "^5.22.0",
-    "@prisma/engines": "5.22.0",
     "@remarket/shared": "workspace:*",
     "ai": "6.0.332",
     "bcryptjs": "^2.4.3",

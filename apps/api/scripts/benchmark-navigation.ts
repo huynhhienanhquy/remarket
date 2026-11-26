@@ -86,6 +86,34 @@ try {
           ms: Math.round(performance.now() - started) });
       }
     }
+  } else if (process.argv.includes("--cart-notifications")) {
+    for (const [name, path, activity] of [
+      ["cart", "/api/v1/cart", { cartItems: { some: {} } }],
+      ["notifications", "/api/v1/notifications", { notifications: { some: {} } }],
+    ] as const) {
+      const session = await client.session.findFirst({
+        where: { revokedAt: null, expiresAt: { gt: new Date() }, user: { deletedAt: null, status: "ACTIVE", ...activity } },
+        select: { id: true, userId: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      });
+      if (!session) { detail({ skipped: name, reason: "no active session with matching data" }); continue; }
+      const token = signAccessToken(session.userId, session.id);
+      for (let run = 0; run < 6; run += 1) {
+        const response = await sample(`${name}-${run}`, path, token);
+        detail({ operation: `${name}-${run}`, body_bytes: Buffer.byteLength(response.text),
+          total: name === "cart" ? response.body.data.total_items : response.body.data.meta.total });
+      }
+    }
+  } else if (process.argv.includes("--favorites")) {
+    const session = await client.session.findFirst({
+      where: { revokedAt: null, expiresAt: { gt: new Date() }, user: { deletedAt: null, status: "ACTIVE", role: "USER" } },
+      select: { id: true, userId: true },
+    });
+    assert.ok(session, "Favorites probe requires an existing active member session");
+    const token = signAccessToken(session.userId, session.id);
+    for (let run = 0; run < 4; run += 1) {
+      await sample(`member-favorites-${run}`, "/api/v1/favorites?page_size=12", token);
+    }
   } else if (process.argv.includes("--product-reads")) {
     const catalogue = await sample("probe-products", "/api/v1/products?page_size=1");
     const product = catalogue.body.data.items[0] as { id: string; seller: { id: string } } | undefined;

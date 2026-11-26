@@ -1,0 +1,305 @@
+.rm-fab {
+  isolation: isolate;
+}
+
+.rm-fab::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: theme(colors.brand.DEFAULT);
+  box-shadow: 0 4px 16px rgb(23 37 29 / 14%);
+  content: "";
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :where([data-user-interactions]) :where(button, summary, [role="button"], [role="tab"], [role="menuitem"], .rm-control, .rm-button, .rm-button-primary, .admin-primary, nav a[href]) {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* Solid hit area under a magnetic label, liquid light and a single reflection. */
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary) {
+    isolation: isolate;
+    --rm-cta-liquid-center: rgb(190 255 212 / 9.5%);
+    --rm-cta-liquid-edge: rgb(106 237 187 / 7%);
+    --rm-cta-shine-color: rgb(231 255 220 / 7%);
+    --rm-cta-ambient: rgb(92 219 156 / 7%);
+  }
+
+  /* Leave the saturated rim outside the label's contrast budget. */
+  :where([data-user-interactions]) .rm-admin-page :is(.rm-button-primary.bg-brand, .admin-primary) {
+    background-color: color-mix(in srgb, var(--admin-green-dark) 86%, var(--admin-green));
+    --rm-cta-liquid-center: rgb(190 255 212 / 6%);
+    --rm-cta-liquid-edge: rgb(106 237 187 / 5%);
+    --rm-cta-shine-color: rgb(231 255 220 / 4.5%);
+    --rm-cta-ambient: rgb(92 219 156 / 4%);
+  }
+
+  :where([data-user-interactions]) .rm-button-primary-light {
+    --rm-cta-liquid-center: rgb(255 255 241 / 88%);
+    --rm-cta-liquid-edge: rgb(164 241 170 / 64%);
+    --rm-cta-shine-color: rgb(255 255 255 / 74%);
+    --rm-cta-ambient: rgb(92 219 156 / 17%);
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary)::before,
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary)::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    content: "";
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary)::before {
+    z-index: -1;
+    background:
+      radial-gradient(ellipse 68% 125% at calc(50% + var(--rm-light-x, 0px)) calc(50% + var(--rm-light-y, 0px)),
+        var(--rm-cta-liquid-center), var(--rm-cta-liquid-edge) 34%, transparent 83%),
+      radial-gradient(ellipse at 50% 130%, var(--rm-cta-ambient), transparent 72%);
+    background-size: 100% 100%, 145% 145%;
+    box-shadow: inset 0 0 0 1px rgb(185 255 181 / 37%), 0 4px 14px -2px rgb(101 220 155 / 37%);
+    transform-origin: calc(50% + var(--rm-light-x, 0px)) calc(50% + var(--rm-light-y, 0px));
+    scale: .94 .82;
+    transition: opacity 190ms ease-out, scale 320ms var(--rm-motion-spring);
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary)::after {
+    z-index: -1;
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-primary, .admin-primary)::after {
+    background: linear-gradient(111deg, transparent 35%, var(--rm-cta-shine-color, rgb(231 255 220 / 15%)) 50%, transparent 64%);
+    background-size: 280% 100%;
+    background-repeat: no-repeat;
+  }
+
+  :where([data-user-interactions])
+    :is(.rm-button-primary, .admin-primary)[data-pointer-active]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))::before {
+    opacity: 1;
+    scale: 1.015 1.04;
+    animation: rm-cta-refraction 3.7s ease-in-out infinite alternate;
+  }
+
+  :where([data-user-interactions])
+    :is(.rm-button-primary, .admin-primary):hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    animation: rm-cta-shine 530ms var(--rm-motion-settle) both;
+  }
+
+  :where([data-user-interactions])
+    :is(.rm-button-primary, .admin-primary)[data-pointer-active]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))
+    > :is(.rm-button-content, svg[aria-hidden="true"]) {
+    translate: calc(var(--rm-pointer-x, 0) * 8px) calc(var(--rm-pointer-y, 0) * 5px - 1px);
+    scale: 1.055;
+    transition-duration: 0s, 320ms;
+  }
+
+  /* Secondary controls have a quiet, inward fill and a traveling outline. */
+  .rm-button-secondary::before,
+  .rm-button-secondary::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    content: "";
+    opacity: 0;
+  }
+
+  .rm-button-secondary::before {
+    z-index: -1;
+    background: radial-gradient(ellipse 80% 120% at calc(50% + var(--rm-light-x, 0px)) calc(50% + var(--rm-light-y, 0px)),
+      theme(colors.brand.DEFAULT / 21%), theme(colors.brand.DEFAULT / 7%) 56%, transparent);
+    transform-origin: calc(50% + var(--rm-light-x, 0px)) calc(50% + var(--rm-light-y, 0px));
+    scale: .86 .68;
+    transition: scale 330ms var(--rm-motion-spring), opacity 160ms ease-out;
+  }
+
+  .rm-button-secondary::after {
+    padding: 1px;
+    background: linear-gradient(105deg, transparent 25%, var(--rm-motion-lime) 42%, #3fa778 55%, transparent 69%) 100% / 250% 100%;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    transition: background-position 420ms var(--rm-motion-settle), opacity 170ms ease-out;
+  }
+
+  .rm-button-secondary[data-pointer-active]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))::before {
+    scale: 1;
+    opacity: 1;
+  }
+
+  .rm-button-secondary:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    background-position: 37%;
+    opacity: 1;
+  }
+
+  :where([data-user-interactions])
+    .rm-button-secondary:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-button-content {
+    translate: 0 -2px;
+    scale: 1.025;
+  }
+
+  :where([data-user-interactions])
+    :is(.rm-button-ghost, .rm-button-danger):hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-button-content {
+    translate: 0 -1px;
+  }
+
+  /* Native JSX controls, popup controls and compact admin actions share a
+     stationary surface. The role determines its accent and motion. */
+  :where([data-user-interactions]) :is(button, summary, [role="button"], [role="tab"], [role="menuitem"], .rm-control, nav a[href])
+    > svg[aria-hidden="true"]:not(.rm-icon-favorite, .rm-icon-forward),
+  .rm-button-content svg[aria-hidden="true"]:not(.rm-icon-forward) {
+    transition: translate 240ms var(--rm-motion-spring), scale 240ms var(--rm-motion-spring);
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+
+  :where([data-user-interactions]) :is(button, summary, [role="button"], [role="tab"], [role="menuitem"], .rm-control, nav a[href]):not(:where(.rm-button-primary, .admin-primary, .rm-button-secondary, .rm-fab, .rm-card-nav, .rm-card-tile, .rm-card-action))::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    content: "";
+    background: var(--rm-control-fill, radial-gradient(ellipse at 45% 24%, theme(colors.brand.DEFAULT / 17%), transparent 83%));
+    opacity: 0;
+    scale: var(--rm-control-start, .76 .82);
+    transform-origin: var(--rm-control-origin, center);
+    transition: opacity 155ms ease-out, scale 270ms var(--rm-motion-spring);
+  }
+
+  :where([data-user-interactions]) :is(button, summary, [role="button"], [role="tab"], [role="menuitem"], .rm-control, nav a[href]):hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"], .rm-button-primary, .admin-primary, .rm-button-secondary, .rm-fab, .rm-card-nav, .rm-card-tile, .rm-card-action))::before {
+    opacity: 1;
+    scale: 1;
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-danger, button.bg-danger, button.text-danger, button[class~="!text-danger"], button[data-tone="danger"], .rm-icon-heart) {
+    --rm-control-fill: radial-gradient(ellipse at 62% 0, theme(colors.danger.DEFAULT / 21%), transparent 83%);
+  }
+
+  :where([data-user-interactions]) :is(.rm-button-danger, button.bg-danger) {
+    --rm-control-fill: linear-gradient(130deg, rgb(255 201 184 / 12%), transparent 62%, rgb(70 13 8 / 22%));
+  }
+
+  :where([data-user-interactions]) [data-pointer-active]:has(> .rm-perimeter[data-perimeter-variant="icon"]) {
+    --rm-control-fill: radial-gradient(ellipse at calc(50% + var(--rm-light-x, 0px)) calc(50% + var(--rm-light-y, 0px)),
+      theme(colors.brand.DEFAULT / 24%), transparent 74%);
+  }
+
+  :where([data-user-interactions]) :is(button, .rm-control, .admin-utility, [role="menuitem"]):hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"], .rm-button-primary, .admin-primary, .rm-icon-heart, .rm-button-danger, .bg-danger, .text-danger, [data-tone="danger"]))
+    > svg[aria-hidden="true"]:first-child:not(.rm-icon-favorite, .rm-icon-forward, :has(~ :not(.rm-perimeter))) {
+    scale: 1.12;
+  }
+
+  .rm-control[aria-label]:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"], .rm-nav-link, .rm-button-primary))
+    > svg[aria-hidden="true"] {
+    scale: 1.10;
+  }
+
+  :where([data-user-interactions]) :is(.admin-utility, .admin-row-action, .rm-button-secondary, [aria-haspopup], summary):hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"], .admin-primary, .rm-button-primary, .text-danger, [data-tone="danger"]))
+    > svg:not(.rm-icon-forward) {
+    translate: 2px 0;
+  }
+
+  .rm-button-secondary:hover:not(:where(:active, :disabled, [aria-disabled="true"], [aria-busy="true"]))
+    > .rm-button-content svg:not(.rm-icon-forward) {
+    translate: 2px 0;
+  }
+
+  :where([data-user-interactions]) :is(button, summary, [role="button"], .rm-control):active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"], .rm-button, .rm-button-primary, .admin-primary))
+    > svg[aria-hidden="true"] {
+    scale: .92;
+  }
+
+  /* Navigation keeps a persistent current marker and a separate hover fill. */
+  :is(nav a[href], nav button, [role="menuitem"], [role="tab"], .rm-nav-link, .category-tree-item):not(:where(.rm-button-primary, .admin-primary, .rm-card-tile, .rm-card-nav, .text-danger)) {
+    --rm-control-start: .36 1;
+    --rm-control-origin: left;
+    --rm-control-fill: linear-gradient(90deg, theme(colors.brand.DEFAULT / 17%), theme(colors.brand.DEFAULT / 2%));
+  }
+
+  :is(nav a[href], nav button, [role="menuitem"], [role="tab"], .rm-nav-link, .category-tree-item):not(:where(.rm-button-primary, .admin-primary, .rm-card-tile, .rm-card-nav))::after {
+    position: absolute;
+    inset: auto 23% 2px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    content: "";
+    pointer-events: none;
+    opacity: 0;
+    scale: .25 1;
+    transform-origin: left;
+    transition: scale 280ms var(--rm-motion-spring), opacity 155ms ease-out;
+  }
+
+  :is(nav a[href], nav button, [role="menuitem"], [role="tab"], .rm-nav-link, .category-tree-item)
+    :where(svg[aria-hidden="true"]) {
+    transition: translate 240ms var(--rm-motion-spring);
+  }
+
+  :is(nav a[href], nav button, [role="menuitem"], [role="tab"], .rm-nav-link, .category-tree-item):hover:not(:where(.rm-button-primary, .admin-primary, .rm-card-tile, .rm-card-nav, :disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    opacity: .72;
+    scale: 1;
+  }
+
+  :is(nav a[href], nav button, [role="tab"], .rm-nav-link, .category-tree-item):is([aria-current], [aria-selected="true"], [aria-expanded="true"]):not(:where(.rm-button-primary, .admin-primary, [aria-disabled="true"], :disabled))::after {
+    opacity: .92;
+    scale: 1;
+  }
+
+  :is(nav a[href], nav button, [role="menuitem"], [role="tab"], .rm-nav-link, .category-tree-item):hover:not(:where(.rm-button-primary, .admin-primary, :disabled, [aria-disabled="true"], [aria-busy="true"]))
+    > svg[aria-hidden="true"],
+  :is(nav a[href], nav button, .rm-nav-link):hover:not(:where(.rm-button-primary, .admin-primary, :disabled, [aria-disabled="true"], [aria-busy="true"]))
+    > span:first-child > svg[aria-hidden="true"] {
+    translate: 2px 0;
+  }
+
+  :where([data-user-interactions]) a[href]:not(:where(nav *, [role="menuitem"], .rm-button, .rm-button-primary, .rm-control, .rm-nav-link, .rm-card-link, .rm-card-tile, .rm-card-action, .rm-card-nav, :has(img, svg))) {
+    text-decoration-color: currentColor;
+    text-underline-offset: .19em;
+    transition: text-decoration-color 180ms ease-out, text-underline-offset 180ms ease-out;
+  }
+
+  :where([data-user-interactions]) a[href]:hover:not(:where(nav *, [role="menuitem"], .rm-button, .rm-button-primary, .rm-control, .rm-nav-link, .rm-card-link, .rm-card-tile, .rm-card-action, .rm-card-nav, [aria-disabled="true"], [aria-busy="true"], :has(img, svg))) {
+    text-decoration-line: underline;
+    text-decoration-color: theme(colors.brand.DEFAULT / 70%);
+    text-underline-offset: .3em;
+  }
+
+  .rm-fab::before,
+  .rm-fab > .rm-button-content {
+    transition: translate 330ms var(--rm-motion-spring), scale 330ms var(--rm-motion-spring), box-shadow 210ms ease-out;
+  }
+
+  .rm-fab:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"]))::before {
+    translate: 0 -5px;
+    scale: 1.035;
+    background: linear-gradient(150deg, #207f53, theme(colors.brand.DEFAULT) 59%, #104c30);
+    box-shadow: 0 12px 24px -8px rgb(14 82 49 / 67%), 0 0 15px rgb(82 225 147 / 36%);
+  }
+
+  .rm-fab:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-button-content {
+    translate: 0 -5px;
+  }
+
+  .rm-fab:active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"]))::before,
+  .rm-fab:active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) > .rm-button-content {
+    translate: 0 1px;
+    scale: .96;
+    transition-duration: 110ms;
+  }
+}
+
+@keyframes rm-cta-shine {
+  0% { opacity: 0; background-position: 100% 0; }
+  26% { opacity: 1; }
+  77% { opacity: .9; }
+  100% { opacity: 0; background-position: 0 0; }
+}
+
+@keyframes rm-cta-refraction {
+  from { background-position: 0 0, 15% 100%; }
+  to { background-position: 0 0, 86% 65%; }
+}

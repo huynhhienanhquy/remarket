@@ -1,4 +1,4 @@
-import { HeroArt } from "../../assets/images/illustrations/HeroArt";
+import heroImage from "../../../../../packages/shared/assets/marketplace-hero.jpg";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CategoryNode, ProductListItem } from "@remarket/shared";
@@ -7,28 +7,31 @@ import { queryKeys } from "../../config/queryClient";
 import { useSession } from "../../contexts/SessionContext";
 import { loginPathFor } from "../../config/route/guards";
 import { Button, buttonClasses } from "../../components/common/Button/Button";
-import { CategoryIcon } from "../../components/common/Icon/Icon";
+import { CameraIcon, CartIcon, CategoryIcon, ChatIcon, ChevronRightIcon, PlusIcon } from "../../components/common/Icon/Icon";
 import { EmptyState } from "../../components/common/EmptyState/EmptyState";
 import { InlineAlert } from "../../components/common/InlineAlert/InlineAlert";
 import { ProductCard } from "../../components/common/ProductCard/ProductCard";
 import { ProductCardSkeleton } from "../../components/common/Skeleton/Skeleton";
 
+const LATEST_GRID = "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5";
+
 const STEPS = [
   {
+    icon: CameraIcon,
     title: "Đăng tin",
     body: "Chụp ảnh, mô tả tình trạng món đồ và mức giá bạn muốn bán.",
   },
   {
+    icon: ChatIcon,
     title: "Trao đổi",
     body: "Nhắn tin trực tiếp để thống nhất tình trạng, giá và cách giao nhận.",
   },
   {
+    icon: CartIcon,
     title: "Giao nhận",
     body: "Gặp trực tiếp hoặc giao hàng, trả tiền mặt khi nhận được món đồ.",
   },
 ];
-
-/* ------------------------------------------------------------------ */
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -68,53 +71,50 @@ export function HomePage() {
     .sort((left, right) => Number(right.show_on_home === true) - Number(left.show_on_home === true) || (left.sort_index ?? 0) - (right.sort_index ?? 0))
     .slice(0, 6);
   const items = latest.data?.items ?? [];
+  const sellPath = viewer ? "/account/products/new" : loginPathFor("/account/products/new", "");
 
   return (
     <>
       {/* Hero */}
-      <section className="rm-container pt-4 lg:pt-8">
-        <div className="relative isolate flex flex-col gap-6 overflow-hidden rounded-modal border border-brand/10 bg-brand-soft px-5 py-6 lg:flex-row lg:items-center lg:gap-8 lg:px-10 lg:py-8">
-          <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 -z-10 grid h-60 w-60 place-items-center rounded-full border border-brand/15 lg:hidden">
-            <div className="h-48 w-48 rounded-full border border-brand/15" />
-          </div>
-          <div className="lg:w-[60%]">
-            <p className="inline-flex rounded-full bg-surface px-3 py-1.5 text-[11px] font-semibold uppercase leading-4 tracking-wide text-brand">
-              Mua bán đồ đã qua sử dụng
-            </p>
-            <h1 className="mt-3 t-hero text-ink">
-              Món đồ cũ. <span className="block text-brand lg:inline">Giá trị mới.</span>
+      <section className="rm-container pt-4 lg:pt-7">
+        <div className="grid overflow-hidden rounded-[24px] bg-[#143d2d] text-white sm:grid-cols-[1.1fr_0.9fr]">
+          <div className="flex min-w-0 flex-col items-start justify-center px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
+            <h1 className="text-[clamp(1.9rem,4.6vw,3.75rem)] font-bold leading-[1.09] tracking-[-0.045em]">
+              Món đồ cũ.<br /><span className="text-[#cce6a7]">Giá trị mới.</span>
             </h1>
-            <p className="mt-2 max-w-lg t-body text-muted">
-              Tìm món bạn cần, nhường món bạn không còn dùng.
+            <p className="mt-4 max-w-sm text-sm leading-6 text-[#e2eee4] sm:text-base">
+              Tìm mua món đồ đã qua sử dụng hoặc đăng bán những gì bạn không còn cần.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2 lg:mt-6">
-              <Link to="/products" className={`${buttonClasses()} !px-3 lg:!px-4`}>
-                Khám phá sản phẩm
+            <div className="mt-6 flex flex-wrap gap-2 sm:gap-3">
+              <Link to="/products" className={`${buttonClasses()} rm-button-primary-light !rounded-xl !bg-[#cce6a7] !text-[#143d2d] hover:!bg-[#e1f2c9]`}>
+                <span className="rm-button-content inline-flex items-center gap-2">
+                  Khám phá <ChevronRightIcon size={16} className="rm-icon-forward" />
+                </span>
               </Link>
               <Link
-                to={viewer ? "/account/products/new" : loginPathFor("/", "")}
-                className={`${buttonClasses("secondary")} !px-3 lg:!px-4`}
+                to={sellPath}
+                className={`${buttonClasses("secondary")} !rounded-xl !border-white/35 !bg-transparent !text-white hover:!bg-white/10`}
               >
-                Đăng bán ngay
+                <span className="rm-button-content inline-flex items-center gap-2">
+                  <PlusIcon size={16} className="rm-icon-forward" /> Đăng bán
+                </span>
               </Link>
             </div>
           </div>
-          <div className="hidden justify-center lg:flex lg:w-[40%]">
-            <HeroArt />
+          <div className="relative h-32 min-w-0 bg-[#7e8051] sm:h-auto">
+            <img src={heroImage} alt="" width={1050} height={700} fetchPriority="high" className="absolute inset-0 h-full w-full object-cover object-[center_65%]" />
           </div>
         </div>
       </section>
 
       {/* Categories */}
-      <section className="rm-section" aria-labelledby="home-categories">
+      <section className="py-7 lg:py-9" aria-labelledby="home-categories">
         <div className="rm-container">
-          <h2 id="home-categories" className="t-h2 text-ink">
-            Khám phá theo danh mục
-          </h2>
+          <h2 id="home-categories" className="t-h2 text-ink">Danh mục sản phẩm</h2>
           {categories.isPending ? (
             <div className="mt-4 grid grid-cols-3 gap-3 lg:grid-cols-6">
               {Array.from({ length: 6 }, (_, index) => (
-                <div key={index} className="rm-skeleton min-h-24 rounded-card" />
+                <div key={index} className="rm-skeleton min-h-24 rounded-2xl" />
               ))}
             </div>
           ) : categories.isError ? (
@@ -137,12 +137,15 @@ export function HomePage() {
                 <Link
                   key={root.id}
                   to={`/products?category_id=${root.id}`}
-                  className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-line bg-surface px-2 py-3 text-center transition-colors hover:border-brand hover:bg-brand-soft"
+                  className="rm-card-tile grid min-w-0 rounded-2xl"
                 >
-                  <span className="grid h-9 w-9 place-items-center rounded-control bg-brand-soft text-brand transition-colors group-hover:bg-surface">
-                    <CategoryIcon slug={root.slug} symbol={root.icon} size={20} />
+                  <span className="rm-card-face flex min-h-24 min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-2 py-3 text-center">
+                    <span className="rm-card-light" aria-hidden="true" />
+                    <span className="rm-card-icon grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+                      <CategoryIcon slug={root.slug} symbol={root.icon} size={20} />
+                    </span>
+                    <span className="rm-card-layer max-w-full break-words text-xs font-semibold leading-[18px] text-ink sm:text-sm">{root.name}</span>
                   </span>
-                  <span className="text-xs font-medium leading-[18px] text-ink">{root.name}</span>
                 </Link>
               ))}
             </div>
@@ -151,19 +154,19 @@ export function HomePage() {
       </section>
 
       {/* Latest listings */}
-      <section className="rm-section pt-0" aria-labelledby="home-latest">
+      <section className="pb-8 lg:pb-12" aria-labelledby="home-latest">
         <div className="rm-container">
           <div className="flex items-center justify-between gap-4">
             <h2 id="home-latest" className="t-h2 text-ink">
               Mới đăng gần đây
             </h2>
-            <Link to="/products" className="inline-flex min-h-touch shrink-0 items-center text-sm font-semibold text-brand hover:underline">
-              Xem tất cả
+            <Link to="/products" className="rm-control inline-flex min-h-touch shrink-0 items-center gap-1 rounded-xl px-2 text-sm font-semibold text-brand hover:bg-brand-soft">
+              Xem tất cả <ChevronRightIcon size={16} className="rm-icon-forward" />
             </Link>
           </div>
 
           {latest.isPending ? (
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+            <div className={LATEST_GRID}>
               {Array.from({ length: 10 }, (_, index) => (
                 <ProductCardSkeleton key={index} />
               ))}
@@ -185,15 +188,11 @@ export function HomePage() {
               <EmptyState
                 title="Chưa có tin đăng nào"
                 description="Hãy là người đầu tiên đăng món đồ của bạn."
-                action={
-                  viewer
-                    ? { label: "Đăng món đồ đầu tiên", to: "/account/products/new" }
-                    : { label: "Đăng món đồ đầu tiên", to: loginPathFor("/", "") }
-                }
+                action={{ label: "Đăng món đồ đầu tiên", to: sellPath }}
               />
             </div>
           ) : (
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+            <div className={LATEST_GRID}>
               {items.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -207,19 +206,22 @@ export function HomePage() {
       </section>
 
       {/* Three steps */}
-      <section className="rm-section border-t border-line bg-surface" aria-labelledby="home-steps">
+      <section className="rm-section border-t border-line bg-brand-soft/50" aria-labelledby="home-steps">
         <div className="rm-container">
           <h2 id="home-steps" className="t-h2 text-ink">
             Ba bước để trao đổi món đồ
           </h2>
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {STEPS.map((step, index) => (
-              <div key={step.title} className="rounded-card border border-line bg-page p-5">
-                <span className="grid h-8 w-8 place-items-center rounded-control bg-brand-soft text-sm font-semibold text-brand">
-                  {index + 1}
-                </span>
-                <h3 className="mt-3 t-h3 text-ink">{step.title}</h3>
-                <p className="mt-2 t-body text-muted">{step.body}</p>
+            {STEPS.map(({ title, body, icon: StepIcon }) => (
+              <div key={title} className="rm-card-feature min-w-0">
+                <div className="rm-card-face h-full rounded-2xl border border-line bg-surface p-5">
+                  <span className="rm-card-light" aria-hidden="true" />
+                  <span className="rm-card-icon grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
+                    <StepIcon />
+                  </span>
+                  <h3 className="rm-card-layer mt-3 t-h3 text-ink">{title}</h3>
+                  <p className="rm-card-copy mt-2 text-sm leading-6 text-muted">{body}</p>
+                </div>
               </div>
             ))}
           </div>

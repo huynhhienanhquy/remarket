@@ -1,5 +1,13 @@
 import { Prisma } from "@prisma/client";
 
+export const categoryPathsSql = Prisma.sql`
+  SELECT id, ARRAY[name]::text[] AS path, status = 'ACTIVE' AS active
+  FROM "Category" WHERE "parentId" IS NULL
+  UNION ALL
+  SELECT c.id, a.path || c.name::text, a.active AND c.status = 'ACTIVE'
+  FROM "Category" c JOIN category_paths a ON c."parentId" = a.id
+`;
+
 export interface CategoryPolicyNode { id: string; parentId: string | null; status: string; isLeaf: boolean }
 
 export function eligibleCategoryIds(rows: readonly CategoryPolicyNode[]): Set<string> {

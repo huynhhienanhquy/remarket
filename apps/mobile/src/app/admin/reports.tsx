@@ -13,6 +13,7 @@ import { SelectField } from "../../components/SelectField";
 import { Sheet } from "../../components/Sheet";
 import { Button, styles } from "../../components/ui";
 import {
+  AdminFilter,
   AdminList,
   AdvancedFilters,
   DecisionSheet,
@@ -53,55 +54,44 @@ export default function AdminReports() {
       onPage={setPage}
       filters={
         <>
-          <SelectField
+          <AdminFilter
             label="Trạng thái"
             value={status}
             items={[
-              { value: "", label: "Tất cả" },
               ...REPORT_STATUSES.map((value) => ({
                 value,
                 label: REPORT_STATUS_LABELS[value].label,
               })),
             ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
+            onChange={setStatus}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Lý do"
             value={reason}
             items={[
-              { value: "", label: "Tất cả" },
               ...REPORT_REASONS.map((value) => ({
                 value,
                 label: REPORT_REASON_LABELS[value],
               })),
             ]}
-            onChange={(value) => {
-              setReason(value);
-              setPage(1);
-            }}
+            onChange={setReason}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Đối tượng"
             value={type}
             items={[
-              { value: "", label: "Tất cả" },
               { value: "product", label: "Tin đăng" },
               { value: "user", label: "Người dùng" },
             ]}
-            onChange={(value) => {
-              setType(value);
-              setPage(1);
-            }}
+            onChange={setType}
+            onPage={setPage}
           />
           <AdvancedFilters
             fields={moderationFields}
-            onApply={(value) => {
-              setAdvanced(value);
-              setPage(1);
-            }}
+            onApply={setAdvanced}
+            onPage={setPage}
           />
         </>
       }

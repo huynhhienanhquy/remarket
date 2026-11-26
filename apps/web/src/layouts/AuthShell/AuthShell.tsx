@@ -39,7 +39,7 @@ export function AuthShell() {
           <div className="mx-auto mb-5 w-full max-w-[420px] lg:hidden">
             <Logo />
           </div>
-          <main className="mx-auto w-full max-w-[420px] rounded-modal border border-line bg-surface p-5 shadow-subtle sm:p-6 lg:p-8">
+          <main className="rm-card-panel mx-auto w-full max-w-[420px] rounded-modal border border-line bg-surface p-5 shadow-subtle sm:p-6 lg:p-8">
             <Outlet />
           </main>
           <div className="mx-auto mt-4 w-full max-w-[420px]">

@@ -65,7 +65,7 @@ export function SearchInput({
           <button
             type="submit"
             aria-label="Tìm kiếm"
-            className={[ICON_BUTTON, "bg-brand text-white hover:bg-brand-hover"].join(" ")}
+            className={[ICON_BUTTON, "rm-button-primary bg-brand text-white"].join(" ")}
           >
             <SearchIcon />
           </button>

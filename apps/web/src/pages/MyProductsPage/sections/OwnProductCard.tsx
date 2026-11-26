@@ -16,10 +16,10 @@ export function ProductCard({ product, busy, onAction, onEdit, onView }: Product
   const showActions = product.allowed_actions.some((action) => action !== "view" && action !== "edit");
 
   return (
-    <div className="rm-account-card flex h-full flex-col overflow-hidden transition-shadow hover:shadow-card-hover">
+    <div className="rm-account-card rm-card-managed flex h-full flex-col overflow-hidden rounded-none">
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-subtle">
         {product.image_url ? (
-          <ApiImage src={product.image_url} alt={product.title} className="h-full w-full object-cover" />
+          <ApiImage src={product.image_url} alt={product.title} className="rm-managed-image h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">Không có ảnh</div>
         )}

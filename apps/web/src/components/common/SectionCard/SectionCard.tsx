@@ -21,7 +21,7 @@ export function SectionCard({
 }: SectionCardProps) {
   return (
     <section
-      className={['rounded-card border border-line bg-surface', className ?? ""].join(" ")}
+      className={["rm-card-panel rounded-card border border-line bg-surface", className ?? ""].join(" ")}
     >
       {(title !== undefined || actions !== undefined) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-card border-b border-line bg-page/60 px-4 py-3 lg:px-6">

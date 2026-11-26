@@ -1,6 +1,7 @@
 import { destinationAfterLogin } from "../services/linking";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "../components/HoverPressable";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { session } from "../services/runtime";
 import {

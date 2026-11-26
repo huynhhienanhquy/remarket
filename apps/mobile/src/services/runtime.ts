@@ -6,14 +6,27 @@ import {
   commerceEndpoints,
   communicationEndpoints,
   adminEndpoints,
+  aiEndpoints,
 } from "@remarket/api-client";
 
 export const API_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:3000/api/v1";
+const apiAddress = new URL(API_URL);
 export const SOCKET_URL =
-  process.env.EXPO_PUBLIC_SOCKET_URL ?? new URL(API_URL).origin;
+  process.env.EXPO_PUBLIC_SOCKET_URL ?? apiAddress.origin;
 export const http = createTransport({
   baseUrl: API_URL,
+  // Render Free can take about a minute to wake before serving requests.
+  timeoutMs(method, path) {
+    if (
+      apiAddress.hostname.endsWith(".onrender.com") &&
+      (method === "GET" ||
+        path === "/auth/mobile/bootstrap" ||
+        path === "/auth/mobile/refresh")
+    ) {
+      return 75_000;
+    }
+  },
   getToken: () => nativeSession?.getToken() ?? null,
   getGeneration: () => nativeSession?.getGeneration() ?? 0,
   refresh: () => nativeSession.refresh(),
@@ -31,4 +44,5 @@ export const api = {
   ...commerceEndpoints(http),
   ...communicationEndpoints(http),
   admin: adminEndpoints(http),
+  ai: aiEndpoints(http),
 };

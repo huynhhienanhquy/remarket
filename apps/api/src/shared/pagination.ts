@@ -3,7 +3,7 @@ import { z } from "zod";
 
 /** Page size defaults to 20 and is capped at 100 (detail-project 9.2). */
 export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 100;
 
 export interface PageParams {
   page: number;

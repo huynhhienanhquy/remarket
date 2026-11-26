@@ -77,7 +77,7 @@ export function SellerProfilePage() {
   return (
     <div className="rm-container py-6 lg:py-8">
       {/* Profile header card — no cover image (ui-spec 10) */}
-      <section className="relative rounded-card border border-line bg-surface p-5 lg:p-6">
+      <section className="rm-card-panel relative rounded-card border border-line bg-surface p-5 lg:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           {seller.avatar_url ? (
             <ApiImage
@@ -240,7 +240,7 @@ export function SellerProfilePage() {
                 {reviews.data.items.map((review) => (
                   <li
                     key={review.id}
-                    className="rounded-card border border-line bg-surface p-4"
+                    className="rm-card-panel rounded-card border border-line bg-surface p-4"
                   >
                     <div className="flex items-start gap-3">
                       {review.reviewer.avatar_url ? (

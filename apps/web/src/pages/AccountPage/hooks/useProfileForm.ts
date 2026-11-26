@@ -9,15 +9,12 @@ import { apiFieldErrors } from "@/helpers/errors";
 import { useToast } from "../../../components/common/Toast/Toast";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
-/**
- * Owns profile drafts and mutations; the parent keeps the existing key that resets edited profile state.
- * Called once by the route component; hook order and handlers match the original page.
- */
 export function useProfileForm(viewer: SessionUser) {
   const { refresh, expire } = useSession();
   const navigate = useNavigate();
   const toast = useToast();
   const online = useConnectivity();
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(viewer.full_name);
   const [phone, setPhone] = useState(viewer.phone ?? "");
   const [province, setProvince] = useState(viewer.province_code ?? "");
@@ -25,16 +22,31 @@ export function useProfileForm(viewer: SessionUser) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: ({ signal }) => apiForQuery(signal).categories.provinces() });
+  const provinces = useQuery({ queryKey: queryKeys.provinces, queryFn: ({ signal }) => apiForQuery(signal).categories.provinces(), enabled: editing });
   const save = useMutation({ mutationFn: () => api.auth.updateProfile({ full_name: name.trim(), phone: phone.trim() || null, province_code: province || null, default_address: address.trim() || null }),
-    onSuccess: async () => { await refresh(); toast.success("Đã lưu hồ sơ"); }, onError: (error) => setFields(apiFieldErrors(error) ?? {}) });
+    onSuccess: async () => { await refresh(); setEditing(false); toast.success("Đã lưu hồ sơ"); }, onError: (error) => setFields(apiFieldErrors(error) ?? {}) });
   const avatar = useMutation({ mutationFn: async (file: File) => { const uploaded = await api.uploads.upload(file, "avatar"); return api.auth.uploadAvatar(uploaded.storage_path); }, onSuccess: async () => { await refresh(); toast.success("Đã đổi ảnh đại diện"); } });
   const logoutAll = useMutation({ mutationFn: () => api.auth.logoutAll(), onSuccess: () => { expire(); navigate("/login", { replace: true }); } });
   const busy = save.isPending || avatar.isPending || logoutAll.isPending;
   const dirty = name !== viewer.full_name || phone !== (viewer.phone ?? "") || province !== (viewer.province_code ?? "") || address !== (viewer.default_address ?? "");
+
+  function openEditor() {
+    setName(viewer.full_name);
+    setPhone(viewer.phone ?? "");
+    setProvince(viewer.province_code ?? "");
+    setAddress(viewer.default_address ?? "");
+    setFields({});
+    save.reset();
+    avatar.reset();
+    setEditing(true);
+  }
+
   return {
     toast,
     online,
+    editing,
+    openEditor,
+    closeEditor: () => setEditing(false),
     name,
     setName,
     phone,

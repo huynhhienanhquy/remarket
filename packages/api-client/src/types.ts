@@ -42,7 +42,6 @@ import type {
   ProductStatus,
   ReportReason,
   ReportStatus,
-  SortOption,
   TicketStatus,
   TicketType,
   UserRole,
@@ -138,7 +137,7 @@ export interface ProductsApi {
   remove(id: string): Promise<{ id: string }>;
 }
 
-export interface ProductImageInput {
+interface ProductImageInput {
   storage_path?: string;
   url: string;
   sort_order: number;
@@ -184,7 +183,7 @@ export interface CheckoutApi {
   ): Promise<CheckoutResult>;
 }
 
-export interface OrderQuery {
+interface OrderQuery {
   role: "buyer" | "seller";
   status?: string;
   page?: number;
@@ -213,6 +212,7 @@ export interface ChatApi {
     page?: number,
   ): Promise<{ items: ConversationListItem[]; meta: { total: number } }>;
   detail(conversationId: string): Promise<ConversationListItem>;
+  deleteConversation(conversationId: string): Promise<{ deleted: boolean }>;
   /** Opens the single conversation for (product, buyer, seller). */
   open(productId: string): Promise<{ id: string }>;
   messages(
@@ -471,5 +471,3 @@ export interface AdminApi {
     };
   }>;
 }
-
-export type { SortOption };

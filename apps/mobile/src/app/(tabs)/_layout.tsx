@@ -27,6 +27,7 @@ export default function TabLayout() {
         headerTintColor: colors.text,
         headerTitleAlign: "left",
         headerTitleStyle: { fontSize: 18, fontWeight: "600" },
+        // Hide the built-in bar without disabling routes used by the custom menu.
         tabBarStyle: { display: "none" },
         tabBarHideOnKeyboard: true,
         headerShadowVisible: false,
@@ -38,20 +39,14 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="products"
-        options={{ href: null, headerShown: false }}
+        options={{ headerShown: false }}
       />
       <Tabs.Screen name="favorites" options={{ title: "Yêu thích" }} />
       <Tabs.Screen
         name="sell"
         options={{ title: "Đăng bán", tabBarStyle: { display: "none" } }}
       />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: "Tin nhắn",
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="messages" options={{ title: "Tin nhắn" }} />
       <Tabs.Screen name="account" options={{ title: "Tài khoản" }} />
     </Tabs>
   );

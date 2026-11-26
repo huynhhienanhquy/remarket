@@ -137,7 +137,7 @@ try {
     // The actual socket frame proves realtime delivery, not merely a REST refresh.
     assert(user.frames.some(frame => frame.includes("email.verified")), "Email approval must arrive over WebSocket");
     checks.push("email-approval-live-websocket-session");
-    await visit(user, "/account/products/new", "Đăng tin mới", "email-verified-selling-unlocked", true);
+    await visit(user, "/account/products/new", "Đăng sản phẩm", "email-verified-selling-unlocked", true);
     await visit(user, "/notifications", "Email đã được xác minh", "email-approved-notification-mobile", true);
     await visit(admin, "/admin/email-verifications?status=APPROVED", before.email, "email-approved-history-desktop");
     await call(admin, `return api.admin.approveEmailVerification(${JSON.stringify(before.id)});`);
@@ -210,11 +210,13 @@ try {
   const sellerId = await call(seller, "return (await api.auth.me()).id;");
   const sellerProfileBefore = await call(buyer, `return api.profiles.publicProfile(${JSON.stringify(sellerId)});`);
   if (process.env.SMOKE_LIFECYCLE_ONLY !== "true") {
-  for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Lưu thay đổi", "profile"], ["/favorites", "Yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
+  for (const [route, text, label] of [["/", "Món đồ cũ", "home"], ["/products", "sản phẩm", "search"], ["/account", "Thông tin cá nhân", "profile"], ["/favorites", "Yêu thích", "favorites"], ["/cart", "Giỏ hàng", "cart"], ["/orders", "Đơn mua", "orders"], ["/notifications", "Thông báo", "notifications"], ["/support", "hỗ trợ", "support"], ["/messages", "Tin nhắn", "inbox"]]) {
     await visit(buyer, route, text, `${label}-desktop`);
     await visit(buyer, route, text, `${label}-mobile`, true);
   }
-  await visit(buyer, "/account", "Lưu thay đổi", "profile-save", true);
+  await visit(buyer, "/account", "Thông tin cá nhân", "profile-save", true);
+  await click(buyer, "Chỉnh sửa");
+  await wait(buyer, "Boolean(document.querySelector('#profile-name'))", "profile editor opened");
   await fill(buyer, "#profile-name", "Người mua kiểm thử live"); await click(buyer, "Lưu thay đổi");
   await wait(buyer, "document.body.innerText.includes('Đã lưu hồ sơ')", "profile persisted");
   await visit(buyer, "/support/new", "Gửi yêu cầu", "support-new", true);
@@ -243,7 +245,7 @@ try {
   await wait(buyer, "document.body.innerText.includes('Đã xem')", "read receipt");
   await screenshot(seller, "chat-live-received"); console.log("PASS: two-session live chat and read receipt");
   }
-  await visit(seller, "/account/products/new", "Đăng tin mới", "product-form-mobile", true);
+  await visit(seller, "/account/products/new", "Đăng sản phẩm", "product-form-mobile", true);
   await visit(seller, "/account/products", "Tin đăng của tôi", "my-products-mobile", true);
   const requireApi = createRequire(path.resolve("apps/api/package.json"));
   const png = await requireApi("sharp")({ create: { width: 64, height: 64, channels: 3, background: "#227766" } }).png().toBuffer();
@@ -267,7 +269,8 @@ try {
   await visit(seller, `/sales/${order.id}`, "Xác nhận đơn hàng", "seller-order-desktop");
   await click(seller, "Xác nhận đơn hàng");
   await wait(seller, "Boolean([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Giao hàng' && !b.disabled))", "order confirmed UI");
-  order = await call(seller, `const order = await api.orders.detail(${JSON.stringify(order.id)}); return api.orders.act(order.id,'ship',{expected_version:order.version,carrier:'Kiểm thử',tracking_code:'TEST123'});`);
+  order = await call(seller, `const order = await api.orders.detail(${JSON.stringify(order.id)}); return api.orders.act(order.id,'ship',{expected_version:order.version,carrier:'Kiểm thử'});`);
+  assert.ok(order.delivery.tracking_code, "Shipping must generate a tracking code");
   order = await call(seller, `return api.orders.act(${JSON.stringify(order.id)},'deliver',{expected_version:${order.version}});`);
   await visit(buyer, `/orders/${order.id}`, "Hành động", "buyer-order-mobile", true);
   await click(buyer, "Hoàn tất đơn hàng");
@@ -316,9 +319,11 @@ try {
   await call(admin, `const current = await api.products.detail(${JSON.stringify(product.id)}); return api.admin.blockProduct(current.id,current.version,'Kiểm tra ảnh snapshot sau khi tin bị ẩn');`);
   await visit(buyer, `/orders/${order.id}`, "Hành động", "order-hidden-listing-snapshot", true);
   assert(await evaluate(buyer, "Boolean([...document.querySelectorAll('img')].find(img => img.src.includes('/api/v1/uploads/') && img.src.includes('signature=') && img.naturalWidth > 0))"), "Order participant must see the signed snapshot image after the listing is hidden");
-  for (const [route, text] of [["/admin", "Tổng người dùng"], ["/admin/users", "Người dùng"], ["/admin/products", "Tin đăng"], ["/admin/categories", "Danh mục"], ["/admin/reports", "Báo cáo"], ["/admin/reviews", "Đánh giá"], ["/admin/support", "Hỗ trợ"], ["/admin/audit", "Nhật ký"]]) await visit(admin, route, text, route === "/admin" ? "admin-dashboard" : route.replaceAll("/", "-").slice(1));
+  for (const [route, text] of [["/admin", "Tổng người dùng"], ["/admin/users", "Người dùng"], ["/admin/products", "Sản phẩm"], ["/admin/categories", "Danh mục"], ["/admin/reports", "Báo cáo"], ["/admin/reviews", "Đánh giá"], ["/admin/support", "Hỗ trợ"], ["/admin/audit", "Nhật ký"]]) await visit(admin, route, text, route === "/admin" ? "admin-dashboard" : route.replaceAll("/", "-").slice(1));
   await visit(admin, "/admin/reviews", "Đánh giá", "admin-reviews-ready");
-  await click(admin, "Xem");
+  const reviewAction = 'button[aria-label="Xem đánh giá"]';
+  await wait(admin, `Boolean(document.querySelector(${JSON.stringify(reviewAction)}))`, "admin review action");
+  await evaluate(admin, `document.querySelector(${JSON.stringify(reviewAction)}).click()`);
   await wait(admin, "document.body.innerText.includes('Chi tiết đánh giá')", "admin review drawer");
   await screenshot(admin, "admin-review-drawer"); checks.push("admin-review-drawer");
   const locked = await tabFor("locked@example.test");

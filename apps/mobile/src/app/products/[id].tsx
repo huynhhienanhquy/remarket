@@ -24,7 +24,7 @@ import {
 import { ProductGallery } from "../../components/ProductGallery";
 import { ReportSheet } from "../../components/ReportSheet";
 import { MarketplaceFooter } from "../../components/MarketplaceHeader";
-import { deliveryLabel } from "../../services/marketplace";
+import { deliveryLabel, productDetailKey } from "../../services/marketplace";
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,7 +33,7 @@ export default function ProductDetail() {
   const action = useAction();
   const [report, setReport] = useState(false);
   const result = useQuery({
-    queryKey: ["products", id, user?.id],
+    queryKey: productDetailKey(id, user?.id),
     queryFn: () => api.products.detail(id),
     enabled: !!id,
   });

@@ -16,6 +16,8 @@ const disposers = new WeakMap<PrismaClient, () => Promise<void>>();
 
 export function pgPoolOptions(options: DatabaseOptions): pg.PoolConfig {
   const url = new URL(options.url);
+  const usesSupabasePooler = url.hostname.endsWith(".pooler.supabase.com");
+  const usesTransactionPooler = usesSupabasePooler && url.port === "6543";
   const schema = url.searchParams.get("schema") ?? "public";
   const max = Number(url.searchParams.get("connection_limit") ?? options.connectionLimit);
   const timeout = Number(url.searchParams.get("connect_timeout") ?? 10);
@@ -23,11 +25,11 @@ export function pgPoolOptions(options: DatabaseOptions): pg.PoolConfig {
   if (!Number.isFinite(timeout) || timeout < 0) throw new Error("Invalid database connection timeout");
   // Raw SQL uses this schema too. A non-public namespace requires a persistent
   // session: transaction poolers cannot retain a per-client search_path.
-  if (schema !== "public" && url.hostname.endsWith(".pooler.supabase.com") && url.port === "6543") {
+  if (schema !== "public" && usesTransactionPooler) {
     throw new Error("Non-public database schemas require the session/direct URL");
   }
   let ssl: pg.PoolConfig["ssl"];
-  if ((url.hostname.endsWith(".pooler.supabase.com") || url.hostname.endsWith(".supabase.co")) && url.searchParams.get("sslmode") !== "disable"
+  if ((usesSupabasePooler || url.hostname.endsWith(".supabase.co")) && url.searchParams.get("sslmode") !== "disable"
     && !url.searchParams.has("sslrootcert") && !url.searchParams.has("sslcert")) {
     const caPath = new URL(import.meta.url.includes("/dist/apps/api/src/")
       ? "../../../../../certs/supabase-ca-2021.crt" : "../../certs/supabase-ca-2021.crt", import.meta.url);
@@ -39,13 +41,13 @@ export function pgPoolOptions(options: DatabaseOptions): pg.PoolConfig {
     && !url.searchParams.has("sslmode") && !url.searchParams.has("ssl")) ssl = { rejectUnauthorized: true };
   return {
     connectionString: url.toString(), max,
-    // Keep the connections opened at HTTP startup. Otherwise a quiet minute
-    // discards both and the next navigation pays TLS/authentication again.
-    min: options.applicationName === "remarket-http" ? Math.min(2, max) : 0,
+    // Let warmed connections expire when idle behind the remote transaction pooler.
+    min: !usesTransactionPooler && options.applicationName === "remarket-http" ? Math.min(2, max) : 0,
     connectionTimeoutMillis: timeout * 1000,
-    idleTimeoutMillis: 60_000,
+    idleTimeoutMillis: usesTransactionPooler ? 15_000 : 60_000,
     allowExitOnIdle: true,
     keepAlive: true,
+    ...(usesTransactionPooler ? { keepAliveInitialDelayMillis: 10_000 } : {}),
     application_name: options.applicationName ?? "remarket",
     ...(ssl ? { ssl } : {}),
     ...(schema === "public" ? {} : {
@@ -68,7 +70,10 @@ export function createDatabaseClient(options: DatabaseOptions): PrismaClient<Pri
     log: options.log ?? ["error", "warn"],
   });
   const pool = new pg.Pool(pgPoolOptions(options));
-  pool.on("error", () => console.error(`${options.applicationName ?? "remarket"}: idle database connection failed`));
+  pool.on("error", (error: NodeJS.ErrnoException) => {
+    // pg has already evicted the failed idle connection.
+    console.warn(`${options.applicationName ?? "remarket"}: idle database connection discarded`, error.code ?? error.name);
+  });
   const schema = new URL(options.url).searchParams.get("schema") ?? "public";
   const client = new PrismaClient<Prisma.PrismaClientOptions, Prisma.LogLevel>({ adapter: new PrismaPg(pool, { schema }),
     transactionOptions: options.transactionOptions, log: options.log ?? ["error", "warn"] });

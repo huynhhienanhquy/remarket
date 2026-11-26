@@ -2,12 +2,12 @@ import { useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Modal,
-  Pressable,
   ScrollView,
   Text,
   View,
   useWindowDimensions,
 } from "react-native";
+import { HoverPressable as Pressable } from "./HoverPressable";
 import type { ProductImage } from "@remarket/shared";
 import { MarketplaceImage } from "./MarketplaceImage";
 import { colors, IconButton, styles } from "./ui";
@@ -28,6 +28,7 @@ export function ProductGallery({
   return (
     <View style={{ gap: 8 }}>
       <Pressable
+        hover="product"
         accessibilityRole="button"
         accessibilityLabel="Mở ảnh toàn màn hình"
         disabled={!images.length}
@@ -78,11 +79,13 @@ export function ProductGallery({
       </Pressable>
       <ScrollView
         horizontal
-        contentContainerStyle={{ gap: 8 }}
+        showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
       >
         {images.map((item, index) => (
           <Pressable
+            hover="icon"
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`Ảnh ${index + 1}`}
@@ -132,6 +135,8 @@ export function ProductGallery({
             />
           </View>
           <ScrollView
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
             maximumZoomScale={4}
             minimumZoomScale={1}
             centerContent

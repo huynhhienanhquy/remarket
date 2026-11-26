@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reorderImages, validateSearchFilters } from "./marketplace";
+import { productSearchFromParams, reorderImages, validateSearchFilters } from "./marketplace";
 
 describe("marketplace filters", () => {
   it("accepts an open range and exact VND limits", () => {
@@ -20,6 +20,40 @@ describe("marketplace filters", () => {
       { min_price: "1e9" },
     ])
       expect(validateSearchFilters(input)).toBeTruthy();
+  });
+  it("opens a catalog link with all filters from an assistant search", () => {
+    const category = "c075fffb-8450-4c83-a88f-23e6601197aa";
+    expect(productSearchFromParams({
+      q: "iPhone 13",
+      category_id: category,
+      province_code: "VN-52",
+      condition: "GOOD",
+      delivery_method: "MEETUP",
+      min_price: "0",
+      max_price: "7999999",
+      sort: "price_asc",
+    })).toEqual({
+      q: "iPhone 13",
+      category,
+      filters: {
+        province_code: "VN-52",
+        condition: "GOOD",
+        delivery_method: "MEETUP",
+        min_price: "0",
+        max_price: "7999999",
+      },
+      sort: "price_asc",
+    });
+  });
+  it("ignores invalid links without discarding valid filters", () => {
+    expect(productSearchFromParams({
+      q: ["one", "two"],
+      province_code: "VN-52",
+      sort: "unknown",
+      condition: "unknown",
+      min_price: "20000",
+      max_price: "10000",
+    })).toEqual({ q: "", category: undefined, sort: "newest", filters: { province_code: "VN-52" } });
   });
 });
 

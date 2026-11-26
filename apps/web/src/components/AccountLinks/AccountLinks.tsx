@@ -9,7 +9,7 @@ export function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
       <ul className="mt-2 space-y-1">
         {group.items.map((item) => <li key={item.to}>
           <NavLink to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => [
-            "group flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm leading-5 transition-colors",
+            "rm-control rm-nav-link group flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm leading-5",
             isActive ? "bg-brand font-semibold text-white" : "font-medium text-muted hover:bg-surface-subtle hover:text-ink",
           ].join(" ")}>
             <Icon name={item.icon} className="shrink-0" />

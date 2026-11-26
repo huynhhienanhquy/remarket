@@ -21,7 +21,7 @@ export function ProductCardSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="h-full overflow-hidden rounded-card border border-line bg-surface"
+      className="h-full overflow-hidden border border-line bg-surface shadow-subtle"
     >
       <div className="rm-skeleton aspect-[4/3] w-full rounded-none" />
       <div className="p-3">
@@ -31,7 +31,7 @@ export function ProductCardSkeleton() {
         </div>
         <div className="mt-1 rm-skeleton h-6 w-2/3" />
         <div className="mt-1 rm-skeleton h-[22px] w-12 rounded-full" />
-        <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2">
+        <div className="mt-1 flex items-center gap-2 pt-2">
           <div className="rm-skeleton h-[18px] w-2/5" />
           <div className="rm-skeleton h-[18px] w-1/3" />
         </div>

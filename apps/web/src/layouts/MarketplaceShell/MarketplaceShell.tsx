@@ -1,16 +1,16 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiForQuery } from "../../services/api";
 import { queryKeys } from "../../config/queryClient";
 import { MarketplaceHeader } from "../../components/MarketplaceHeader/MarketplaceHeader";
 import { MobileBottomNav } from "../../components/MobileBottomNav/MobileBottomNav";
+import { MarketplaceAiLauncher } from "../../components/MarketplaceAi/MarketplaceAiLauncher";
 import { Footer } from "../../components/Footer/Footer";
 import { useSession } from "../../contexts/SessionContext";
 import { aiEndpoints } from "@remarket/api-client";
 import { http } from "../../services/http";
 
-const MarketplaceAi = lazy(() => import("../../components/MarketplaceAi/MarketplaceAi"));
 const readAiConfig = aiEndpoints(http).config;
 
 /** Discovery pages keep footer + search row; deep task pages drop both. */
@@ -32,6 +32,7 @@ export function MarketplaceShell() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const discovery = isDiscovery(location.pathname);
 
   // Keep the header field in sync when the URL query changes elsewhere.
   useEffect(() => {
@@ -42,7 +43,7 @@ export function MarketplaceShell() {
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,
     queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
-    enabled: status === "ready",
+    enabled: discovery && status === "ready",
     staleTime: 5 * 60_000,
   });
   const { data: aiConfig } = useQuery({
@@ -62,7 +63,6 @@ export function MarketplaceShell() {
     navigate(query ? `/products?${query}` : "/products");
   }, [navigate, search, searchParams]);
 
-  const discovery = isDiscovery(location.pathname);
   const footerVisible =
     discovery || /^\/products\/[^/]+$/.test(location.pathname);
 
@@ -74,14 +74,15 @@ export function MarketplaceShell() {
         onSearchSubmit={submitSearch}
         categories={categories ?? []}
         showSearchRow={discovery}
+        showCategories={discovery}
       />
       <main className="flex-1">
         <Outlet />
       </main>
-      {footerVisible && <Footer />}
+      {footerVisible && <Footer deferCategories={!discovery} />}
       <MobileBottomNav />
       {viewer?.status === "ACTIVE" && aiConfig?.enabled && (
-        <Suspense fallback={null}><MarketplaceAi key={viewer.id} userId={viewer.id} /></Suspense>
+        <MarketplaceAiLauncher key={viewer.id} userId={viewer.id} />
       )}
     </div>
   );

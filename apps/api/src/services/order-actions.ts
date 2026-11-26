@@ -6,13 +6,13 @@ import type { AuthUser } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { enqueueOutbox } from "../outbox/outbox.js";
 import { loadCategoryEligibility } from "../services/category-policy.js";
+import { completionBlockReason } from "../services/entity-policy.js";
 import { createNotification } from "../services/notifications.js";
 import { cancelOrder } from "../services/order-cancellation.js";
-import { completionBlockReason } from "../shared/dto-mappers.js";
 import { accountLocked, conflict, invalidTransition, notFound, orderExpired, validationError, versionConflict } from "../shared/errors.js";
 import { prisma } from "../utils/prisma.js";
 
-export type OrderStateAction = "confirm" | "cancel" | "ship" | "deliver" | "complete";
+type OrderStateAction = "confirm" | "cancel" | "ship" | "deliver" | "complete";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,7 +40,7 @@ export function hasOpenOrderTicket(
 }
 
 /** Diagnose a missed id/version/status update without exposing other orders. */
-export async function conditionalTransition(
+async function conditionalTransition(
   tx: Prisma.TransactionClient,
   order: { id: string; status: OrderStatus; version: number },
   fromStatuses: OrderStatus[],
@@ -64,7 +64,7 @@ export async function conditionalTransition(
   }
 }
 
-export async function recordTransition(
+async function recordTransition(
   tx: Prisma.TransactionClient,
   order: { id: string; code: string; buyerId: string; sellerId: string; status: OrderStatus },
   actor: AuthUser,

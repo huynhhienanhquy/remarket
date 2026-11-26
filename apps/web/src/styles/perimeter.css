@@ -1,0 +1,329 @@
+.rm-perimeter {
+  display: none;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  :where([data-perimeter-host]) {
+    position: relative;
+  }
+
+  .rm-perimeter {
+    position: absolute;
+    display: block;
+    z-index: 3;
+    margin: 0 !important;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease-out;
+    --rm-perimeter-time: 2.65s;
+    --rm-perimeter-tail: 14px;
+    --rm-perimeter-trail-color: #21865f;
+    --rm-perimeter-body-color: #67e6ac;
+    --rm-perimeter-head-color: #f2ffd2;
+    --rm-perimeter-bloom: .24;
+    --rm-perimeter-play: paused;
+  }
+
+  .rm-perimeter[data-perimeter-running] {
+    opacity: var(--rm-perimeter-opacity, 1);
+    --rm-perimeter-play: running;
+  }
+
+  @starting-style {
+    .rm-perimeter[data-perimeter-running] { opacity: 0; }
+  }
+
+  .rm-perimeter > svg {
+    position: absolute;
+    display: block;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .rm-perimeter path {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: var(--rm-perimeter-segment) calc(100px - var(--rm-perimeter-segment));
+    --rm-perimeter-offset: calc(
+      var(--rm-perimeter-entry, 0px) + var(--rm-perimeter-phase, 0px) +
+      (var(--rm-perimeter-segment) - var(--rm-perimeter-tail)) * var(--rm-perimeter-leading, 1)
+    );
+    animation: rm-perimeter-traverse var(--rm-perimeter-time) linear infinite;
+    animation-direction: var(--rm-perimeter-direction, normal);
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter-bloom {
+    --rm-perimeter-segment: calc(var(--rm-perimeter-tail) * .72);
+    stroke: var(--rm-perimeter-body-color);
+    stroke-width: 4px;
+    opacity: var(--rm-perimeter-bloom);
+  }
+
+  .rm-perimeter-tail {
+    --rm-perimeter-segment: var(--rm-perimeter-tail);
+    stroke: var(--rm-perimeter-trail-color);
+    stroke-width: var(--rm-perimeter-width, 1.6px);
+    opacity: .67;
+  }
+
+  .rm-perimeter-body {
+    --rm-perimeter-segment: calc(var(--rm-perimeter-tail) * .58);
+    stroke: var(--rm-perimeter-body-color);
+    stroke-width: var(--rm-perimeter-width, 1.8px);
+  }
+
+  .rm-perimeter-head {
+    --rm-perimeter-segment: var(--rm-perimeter-tip, calc(var(--rm-perimeter-tail) * .19));
+    stroke: var(--rm-perimeter-head-color);
+    stroke-width: var(--rm-perimeter-width, 2px);
+  }
+
+  .rm-perimeter[data-perimeter-variant="feature"] {
+    --rm-perimeter-time: 2.65s;
+    --rm-perimeter-tail: 23px;
+    --rm-perimeter-bloom: .45;
+    --rm-perimeter-body-color: #77edc0;
+    --rm-perimeter-head-color: #f6ffc1;
+  }
+
+  .rm-perimeter[data-perimeter-variant="feature"] .rm-perimeter-forward > .rm-perimeter-tail {
+    stroke-width: 2.2px;
+  }
+
+  .rm-perimeter .rm-perimeter-burst {
+    stroke: var(--rm-perimeter-body-color);
+    stroke-width: 2.6px;
+    stroke-dasharray: 23px 77px;
+    animation-name: rm-perimeter-ignite;
+    animation-duration: 620ms;
+    animation-iteration-count: 1;
+    animation-fill-mode: both;
+    animation-direction: normal;
+  }
+
+  .rm-perimeter .rm-perimeter-spark {
+    stroke: var(--rm-perimeter-head-color);
+    stroke-width: 2.5px;
+    stroke-dasharray: .22px 1.25px .08px 98.45px;
+    --rm-perimeter-offset: -68px;
+    --rm-perimeter-time: 1.62s;
+  }
+
+  .rm-perimeter[data-perimeter-variant="dual"] {
+    --rm-perimeter-tail: 15px;
+    --rm-perimeter-time: 2.85s;
+    --rm-perimeter-bloom: .39;
+  }
+
+  .rm-perimeter-reverse {
+    --rm-perimeter-direction: reverse;
+    --rm-perimeter-leading: 0;
+    --rm-perimeter-phase: -48px;
+    --rm-perimeter-time: 3.25s;
+    --rm-perimeter-tail: 9px;
+    --rm-perimeter-trail-color: #08788a;
+    --rm-perimeter-body-color: #6edfed;
+    --rm-perimeter-head-color: #e0ffff;
+  }
+
+  .rm-perimeter-echo {
+    --rm-perimeter-time: 3.8s;
+    --rm-perimeter-tail: 6px;
+    --rm-perimeter-phase: -27px;
+    --rm-perimeter-width: 1.2px;
+    --rm-perimeter-trail-color: #8769d1;
+    --rm-perimeter-head-color: #f3e8ff;
+  }
+
+  .rm-perimeter:is([data-perimeter-variant="primary"], [data-perimeter-variant="floating"]) {
+    --rm-perimeter-time: 1.95s;
+    --rm-perimeter-tail: 12px;
+    --rm-perimeter-tip: 1.35px;
+    --rm-perimeter-trail-color: #5bd296;
+    --rm-perimeter-body-color: #b6ff92;
+    --rm-perimeter-head-color: #fffbd9;
+    --rm-perimeter-bloom: .48;
+  }
+
+  .rm-button-primary-light > .rm-perimeter {
+    --rm-perimeter-trail-color: #186951;
+    --rm-perimeter-body-color: #2aae73;
+    --rm-perimeter-head-color: #fff;
+  }
+
+  .rm-perimeter[data-perimeter-variant="primary"] .rm-perimeter-reverse {
+    --rm-perimeter-time: 2.55s;
+    --rm-perimeter-tail: 7px;
+  }
+
+  .rm-perimeter[data-perimeter-variant="floating"] {
+    translate: 0 -5px;
+    scale: 1.035;
+    transition: opacity 180ms ease-out, translate 330ms var(--rm-motion-spring), scale 330ms var(--rm-motion-spring);
+  }
+
+  .rm-fab:active > .rm-perimeter {
+    translate: 0 1px;
+    scale: .96;
+  }
+
+  .rm-perimeter[data-perimeter-variant="secondary"] {
+    --rm-perimeter-time: 2.4s;
+    --rm-perimeter-tail: 19px;
+    --rm-perimeter-bloom: .29;
+  }
+
+  .rm-perimeter:is([data-perimeter-variant="dashboard"], [data-perimeter-variant="icon"]) {
+    --rm-perimeter-time: 3.85s;
+    --rm-perimeter-tail: 9px;
+    --rm-perimeter-opacity: .87;
+  }
+
+  .rm-perimeter[data-perimeter-variant="icon"] {
+    --rm-perimeter-time: 1.85s;
+    --rm-perimeter-tail: 17px;
+    --rm-perimeter-bloom: .32;
+  }
+
+  .rm-perimeter-spectrum {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    padding: var(--rm-perimeter-spectrum-width, 2px);
+    border-radius: inherit;
+    overflow: hidden;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: var(--rm-perimeter-spectrum-opacity, .9);
+    pointer-events: none;
+  }
+
+  .rm-perimeter-spectrum::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--rm-perimeter-spectrum-size);
+    height: var(--rm-perimeter-spectrum-size);
+    translate: -50% -50%;
+    background: conic-gradient(from -34deg,
+      transparent, #096c56 5%, #49e2b1 8%, #e5ffce 10%, transparent 13%,
+      transparent 48%, #276b91 59%, #9d8be7 68%, #b5eff7 71%, transparent 76%);
+    content: "";
+    pointer-events: none;
+    animation: rm-perimeter-spectrum var(--rm-perimeter-spectrum-time, 4s) linear infinite;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter:is([data-perimeter-variant="feature"], [data-perimeter-variant="primary"]) {
+    --rm-perimeter-spectrum-width: 2.5px;
+    --rm-perimeter-spectrum-time: 4.45s;
+  }
+
+  .rm-perimeter:is([data-perimeter-variant="feature"], [data-perimeter-variant="primary"], [data-perimeter-variant="statistics"])::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 1px rgb(var(--rm-metric-glow, 72 217 162) / 39%),
+      0 0 15px rgb(var(--rm-metric-glow, 72 217 162) / 45%);
+    content: "";
+    pointer-events: none;
+    animation: rm-perimeter-pulse 2.8s ease-in-out infinite;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter[data-perimeter-variant="statistics"] {
+    --rm-perimeter-time: 3.4s;
+    --rm-perimeter-tail: 25px;
+    --rm-perimeter-width: 1.3px;
+    --rm-perimeter-trail-color: rgb(var(--rm-metric-glow, 67 169 113) / 75%);
+    --rm-perimeter-body-color: rgb(var(--rm-metric-glow, 67 169 113));
+    --rm-perimeter-head-color: #fff6d6;
+  }
+
+  .rm-perimeter[data-perimeter-variant="statistics"] > svg {
+    animation: rm-perimeter-pulse 1.7s ease-in-out infinite;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter[data-perimeter-variant="danger"] {
+    --rm-perimeter-time: 2.6s;
+    --rm-perimeter-tail: 12px;
+    --rm-perimeter-trail-color: #ab2634;
+    --rm-perimeter-body-color: #e65a5b;
+    --rm-perimeter-head-color: #ffe0ce;
+    --rm-perimeter-bloom: .22;
+  }
+
+  .rm-perimeter[data-perimeter-variant="danger"] > svg {
+    animation: rm-perimeter-pulse 3.1s ease-in-out infinite;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter:is([data-perimeter-variant="list"], [data-perimeter-variant="navigation"], [data-perimeter-variant="action"]) {
+    --rm-perimeter-time: 2.05s;
+    --rm-perimeter-tail: 9px;
+    --rm-perimeter-width: 1.25px;
+    --rm-perimeter-opacity: .83;
+  }
+
+  .rm-perimeter[data-perimeter-variant="navigation"] {
+    --rm-perimeter-time: 2.8s;
+    --rm-perimeter-tail: 12px;
+    --rm-perimeter-opacity: .75;
+  }
+
+  .rm-perimeter[data-perimeter-variant="action"] > svg {
+    animation: rm-perimeter-pulse 2.05s ease-in-out infinite;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter[data-perimeter-variant="product"] {
+    --rm-perimeter-spectrum-time: 3.35s;
+    --rm-perimeter-spectrum-opacity: .84;
+  }
+
+  .rm-perimeter[data-perimeter-variant="product"] .rm-perimeter-spectrum {
+    animation: rm-perimeter-wake 540ms var(--rm-motion-settle) both;
+    animation-play-state: var(--rm-perimeter-play);
+  }
+
+  .rm-perimeter[data-perimeter-variant="panel"] {
+    --rm-perimeter-time: 4.1s;
+    --rm-perimeter-tail: 9px;
+    --rm-perimeter-width: 1.25px;
+    --rm-perimeter-opacity: .64;
+  }
+}
+
+@keyframes rm-perimeter-traverse {
+  from { stroke-dashoffset: var(--rm-perimeter-offset); }
+  to { stroke-dashoffset: calc(var(--rm-perimeter-offset) - 100px); }
+}
+
+@keyframes rm-perimeter-spectrum {
+  from { transform: rotate(var(--rm-perimeter-rotation, 0deg)); }
+  to { transform: rotate(calc(var(--rm-perimeter-rotation, 0deg) + 1turn)); }
+}
+
+@keyframes rm-perimeter-ignite {
+  0% { opacity: 0; stroke-dashoffset: var(--rm-perimeter-burst-offset, 0px); }
+  18% { opacity: .82; }
+  100% { opacity: 0; stroke-dashoffset: calc(var(--rm-perimeter-burst-offset, 0px) - 100px); }
+}
+
+@keyframes rm-perimeter-wake {
+  from { opacity: .2; }
+  32% { opacity: 1; }
+  to { opacity: var(--rm-perimeter-spectrum-opacity, .9); }
+}
+
+@keyframes rm-perimeter-pulse {
+  0%, 100% { opacity: .65; }
+  50% { opacity: 1; }
+}

@@ -30,10 +30,8 @@ export default function AdminAudit() {
             { key: "actor_id", label: "Mã người thực hiện" },
             ...periodFields,
           ]}
-          onApply={(value) => {
-            setFilters(value);
-            setPage(1);
-          }}
+          onApply={setFilters}
+          onPage={setPage}
         />
       }
     >

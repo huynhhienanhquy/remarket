@@ -134,7 +134,7 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
-export function TrashIcon(props: IconProps) {
+function TrashIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M3 6h18" />
@@ -146,7 +146,7 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
-export function EditIcon(props: IconProps) {
+function EditIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M12 20h9" />
@@ -155,7 +155,7 @@ export function EditIcon(props: IconProps) {
   );
 }
 
-export function MoreVerticalIcon(props: IconProps) {
+function MoreVerticalIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" />
@@ -228,7 +228,7 @@ export function FilterIcon(props: IconProps) {
   );
 }
 
-export function ArrowLeftIcon(props: IconProps) {
+function ArrowLeftIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M19 12H5" />
@@ -237,7 +237,7 @@ export function ArrowLeftIcon(props: IconProps) {
   );
 }
 
-export function CopyIcon(props: IconProps) {
+function CopyIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -246,7 +246,7 @@ export function CopyIcon(props: IconProps) {
   );
 }
 
-export function ExternalLinkIcon(props: IconProps) {
+function ExternalLinkIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -313,6 +313,9 @@ const ICONS = {
   shapes: strokeIcon("m12 2 5 8H7zM3 14h7v7H3zM21 17.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z"),
   users: strokeIcon("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2zM16 4a4 4 0 0 1 0 8M22 21v-2a4 4 0 0 0-3-4M13 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"),
   "mail-check": strokeIcon("M11 19H3V5h18v6M3 6l9 7 9-7M14 17l3 3 5-6"),
+  mail: strokeIcon("M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM2 7l10 7L22 7"),
+  phone: strokeIcon("M21 16.5v3a2 2 0 0 1-2.2 2 18 18 0 0 1-8-2.8 17 17 0 0 1-5.5-5.5 18 18 0 0 1-2.8-8A2 2 0 0 1 4.5 3h3a2 2 0 0 1 2 1.7l.5 2.8a2 2 0 0 1-.5 2l-1.3 1.3a14 14 0 0 0 5 5l1.3-1.3a2 2 0 0 1 2-.5l2.8.5a2 2 0 0 1 1.7 2z"),
+  "map-pin": strokeIcon("M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0zM15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"),
   flag: strokeIcon("M4 22V3h10l1 3h6v11h-7l-1-3H4"),
   headset: strokeIcon("M4 13v-2a8 8 0 0 1 16 0v2M4 12h3v6H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 1-2ZM20 12h-3v6h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-1-2ZM18 18v1a2 2 0 0 1-2 2h-4"),
   history: strokeIcon("M3 12a9 9 0 1 1 2.6 6.4M3 3v6h6M12 7v5l4 2"),

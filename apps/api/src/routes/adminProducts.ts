@@ -1,3 +1,4 @@
+import { moderationListFields } from "../shared/admin-query.js";
 import { loadCategoryEligibility } from "../services/category-policy.js";
 import { createNotifications } from "../services/notifications.js";
 import type { Prisma } from "@prisma/client";
@@ -38,11 +39,7 @@ const listQuery = z
     q: z.string().trim().max(100).optional(),
     category_id: z.string().trim().min(1).max(64).optional(),
     seller_id: z.string().trim().min(1).max(64).optional(),
-    handled_by: z.string().trim().min(1).max(64).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    page: z.string().optional(),
-    page_size: z.string().optional(),
+    ...moderationListFields,
   })
   .strict();
 

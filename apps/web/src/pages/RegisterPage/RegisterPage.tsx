@@ -1,4 +1,4 @@
-import { PasswordInput } from "@/components/common/Input/PasswordInput";
+import { PasswordField } from "@/components/common/Input/PasswordInput";
 import { useRegisterForm } from "./hooks/useRegisterForm";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/common/Button/Button";
@@ -98,48 +98,32 @@ export function RegisterPage() {
           />
         </FormField>
 
-        <FormField
+        <PasswordField
           label="Mật khẩu"
-          htmlFor="reg-password"
+          id="reg-password"
           required
           helper="Tối thiểu 12 ký tự"
           error={passwordError ?? undefined}
-        >
-          <PasswordInput
-              ref={passwordRef}
-              id="reg-password"
+          ref={passwordRef}
+          autoComplete="new-password"
+          placeholder="Tối thiểu 12 ký tự"
+          value={password}
+          onChange={(event) => changePassword(event.target.value)}
+          onBlur={blurPassword}
+        />
 
-              autoComplete="new-password"
-              placeholder="Tối thiểu 12 ký tự"
-              value={password}
-              error={passwordError !== null}
-              aria-describedby={passwordError !== null ? "reg-password-error" : undefined}
-              className="pr-20"
-              onChange={(event) => changePassword(event.target.value)}
-              onBlur={blurPassword}
-            />
-        </FormField>
-
-        <FormField
+        <PasswordField
           label="Nhập lại mật khẩu"
-          htmlFor="reg-confirm"
+          id="reg-confirm"
           required
           error={confirmError ?? undefined}
-        >
-          <PasswordInput
-              ref={confirmRef}
-              id="reg-confirm"
-
-              autoComplete="new-password"
-              placeholder="Nhập lại mật khẩu"
-              value={confirm}
-              error={confirmError !== null}
-              aria-describedby={confirmError !== null ? "reg-confirm-error" : undefined}
-              className="pr-20"
-              onChange={(event) => changeConfirm(event.target.value)}
-              onBlur={blurConfirm}
-            />
-        </FormField>
+          ref={confirmRef}
+          autoComplete="new-password"
+          placeholder="Nhập lại mật khẩu"
+          value={confirm}
+          onChange={(event) => changeConfirm(event.target.value)}
+          onBlur={blurConfirm}
+        />
 
         <Button type="submit" size="lg" fullWidth loading={pending}>
           Tạo tài khoản

@@ -1,8 +1,8 @@
 import { useDismiss } from "@/hooks/useDismiss";
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { CategoryNode } from "@remarket/shared";
-import { ChevronRightIcon } from "../../common/Icon/Icon";
+import { ChevronRightIcon, MenuIcon } from "../../common/Icon/Icon";
 
 /* ------------------------------------------------------------------ */
 /* Category navigation                                                 */
@@ -10,6 +10,8 @@ import { ChevronRightIcon } from "../../common/Icon/Icon";
 export function CategoryBar({ categories }: { categories: CategoryNode[] }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const currentCategory = params.get("category_id");
   const containerRef = useRef<HTMLDivElement>(null);
   const roots = categories.filter((entry) => entry.status === "ACTIVE");
 
@@ -29,8 +31,9 @@ export function CategoryBar({ categories }: { categories: CategoryNode[] }) {
             aria-haspopup="menu"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="flex h-11 items-center gap-1.5 rounded-control px-3 t-label text-ink transition-colors hover:bg-surface-subtle"
+            className="flex h-11 items-center gap-2 whitespace-nowrap rounded-control px-3 text-sm font-semibold text-brand transition-colors hover:bg-brand-soft"
           >
+            <MenuIcon size={17} />
             Tất cả danh mục
             <ChevronRightIcon className="rotate-90 text-muted" />
           </button>
@@ -82,7 +85,8 @@ export function CategoryBar({ categories }: { categories: CategoryNode[] }) {
             <li key={root.id}>
               <Link
                 to={`/products?category_id=${root.id}`}
-                className="flex h-11 items-center rounded-control px-3 t-label text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                aria-current={currentCategory === root.id ? "page" : undefined}
+                className="rm-control flex h-11 items-center whitespace-nowrap rounded-control px-3 t-label text-muted hover:bg-surface-subtle hover:text-ink aria-[current=page]:bg-brand-soft aria-[current=page]:text-brand"
               >
                 {root.name}
               </Link>

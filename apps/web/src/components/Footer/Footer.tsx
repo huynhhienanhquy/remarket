@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../../contexts/SessionContext";
 import type { CategoryNode } from "@remarket/shared";
@@ -10,12 +11,24 @@ import { Logo } from "../Logo/Logo";
  * Marketing footer: discovery and public profiles only (ui-spec 3). No policy
  * links are rendered until real content and routes exist.
  */
-export function Footer() {
+export function Footer({ deferCategories = false }: { deferCategories?: boolean }) {
   const { status } = useSession();
+  const footer = useRef<HTMLElement>(null);
+  const [categoriesVisible, setCategoriesVisible] = useState(false);
+  useEffect(() => {
+    const element = footer.current;
+    if (!deferCategories || !element || categoriesVisible || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setCategoriesVisible(true);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [categoriesVisible, deferCategories]);
+
   const { data: categories } = useQuery({
     queryKey: queryKeys.categories,
     queryFn: ({ signal }) => apiForQuery(signal).categories.tree(),
-    enabled: status === "ready",
+    enabled: status === "ready" && (!deferCategories || categoriesVisible || typeof IntersectionObserver === "undefined"),
     staleTime: 5 * 60_000,
   });
   const roots: CategoryNode[] = (categories ?? []).filter(
@@ -23,7 +36,7 @@ export function Footer() {
   );
 
   return (
-    <footer className="border-t border-line bg-surface pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0">
+    <footer ref={footer} className="border-t border-line bg-surface pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="rm-container grid gap-8 py-10 lg:grid-cols-[1fr_2fr] lg:py-12">
         <div className="space-y-3">
           <Logo />

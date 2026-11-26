@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, StyleSheet, Text, View } from "react-native";
+import { HoverPressable as Pressable } from "./HoverPressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname, useRouter } from "expo-router";
 import type { Href } from "expo-router";
@@ -140,6 +141,7 @@ export function MobileBottomNav() {
             );
           })}
           <Pressable
+            hover="navigation"
             accessibilityRole="button"
             accessibilityLabel="Menu"
             accessibilityState={{ expanded: open }}

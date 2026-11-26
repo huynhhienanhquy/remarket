@@ -2,10 +2,6 @@
  * Typographic scale (ui-spec 2.1). Mobile-first: default value is the mobile
  * size, the 1024px breakpoint switches to the desktop size.
  */
-:root {
-  --rm-space: 4px;
-}
-
 .t-hero {
   font-size: 28px;
   line-height: 36px;

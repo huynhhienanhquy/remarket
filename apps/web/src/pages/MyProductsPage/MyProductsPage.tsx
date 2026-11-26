@@ -36,7 +36,11 @@ export function MyProductsPage() {
 
   return (
     <div className="space-y-6">
-      <AccountPageHeader title="Tin đăng của tôi" description="Quản lý tin đăng và theo dõi trạng thái món đồ bạn đang bán." action={<Link to="/account/products/new" className={buttonClasses("primary", "md")}>Đăng tin mới</Link>} />
+      <AccountPageHeader title="Tin đăng của tôi" description="Quản lý tin đăng và theo dõi trạng thái món đồ bạn đang bán." action={
+        <Link to="/account/products/new" className={buttonClasses("primary", "md")}>
+          <span className="rm-button-content inline-block">Đăng tin mới</span>
+        </Link>
+      } />
       <OfflineNotice online={online} />
       <AccountFilters options={FILTERS.map((entry) => ({ value: entry, label: entry === "ALL" ? "Tất cả" : PRODUCT_STATUS_LABELS[entry].label }))} value={status} onChange={(value) => setParams(value === "ALL" ? {} : { status: value })} />
 

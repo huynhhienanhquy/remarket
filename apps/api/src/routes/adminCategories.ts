@@ -1,3 +1,4 @@
+import { moderationListFields } from "../shared/admin-query.js";
 import { Router } from "express";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -22,11 +23,7 @@ const router = Router();
 const categoryListQuery = z.object({
   q: z.string().trim().max(100).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
-  handled_by: z.string().trim().min(1).max(64).optional(),
-  from: z.string().optional(),
-  to: z.string().optional(),
-  page: z.string().optional(),
-  page_size: z.string().optional(),
+  ...moderationListFields,
 }).strict();
 
 // Includes inactive categories; the public category endpoint intentionally does not.
@@ -122,8 +119,7 @@ async function assertSlugAvailable(
   }
 }
 
-/** A new child needs an existing root parent (root + children only). */
-async function assertParentUsable(tx: Prisma.TransactionClient, parentId: string): Promise<void> {
+async function loadParentForUpdate(tx: Prisma.TransactionClient, parentId: string) {
   await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${parentId} FOR UPDATE`;
   const parent = await tx.category.findUnique({
     where: { id: parentId },
@@ -134,6 +130,10 @@ async function assertParentUsable(tx: Prisma.TransactionClient, parentId: string
       parent_id: "Danh mục cha không tồn tại.",
     });
   }
+  return parent;
+}
+
+function assertParentAcceptsChildren(parent: Awaited<ReturnType<typeof loadParentForUpdate>>): void {
   if (parent.parentId !== null) {
     throw validationError("Thông tin danh mục chưa hợp lệ.", {
       parent_id: "Chỉ hỗ trợ tối đa hai cấp danh mục.",
@@ -144,6 +144,11 @@ async function assertParentUsable(tx: Prisma.TransactionClient, parentId: string
       parent_id: "Danh mục đang chứa tin đăng nên phải tiếp tục là danh mục cấp cuối.",
     });
   }
+}
+
+/** A new child needs an existing root parent (root + children only). */
+async function assertParentUsable(tx: Prisma.TransactionClient, parentId: string): Promise<void> {
+  assertParentAcceptsChildren(await loadParentForUpdate(tx, parentId));
 }
 
 /**
@@ -161,16 +166,7 @@ async function assertNewParent(
     });
   }
 
-  await tx.$queryRaw`SELECT "id" FROM "Category" WHERE "id" = ${parentId} FOR UPDATE`;
-  const parent = await tx.category.findUnique({
-    where: { id: parentId },
-    select: { id: true, parentId: true, _count: { select: { products: true } } },
-  });
-  if (parent === null) {
-    throw validationError("Thông tin danh mục chưa hợp lệ.", {
-      parent_id: "Danh mục cha không tồn tại.",
-    });
-  }
+  const parent = await loadParentForUpdate(tx, parentId);
 
   // Walking up from the proposed parent: meeting `categoryId` means the move
   // would turn that ancestor chain into a cycle.
@@ -192,16 +188,7 @@ async function assertNewParent(
     cursor = node.parentId;
   }
 
-  if (parent.parentId !== null) {
-    throw validationError("Thông tin danh mục chưa hợp lệ.", {
-      parent_id: "Chỉ hỗ trợ tối đa hai cấp danh mục.",
-    });
-  }
-  if (parent._count.products > 0) {
-    throw validationError("Thông tin danh mục chưa hợp lệ.", {
-      parent_id: "Danh mục đang chứa tin đăng nên phải tiếp tục là danh mục cấp cuối.",
-    });
-  }
+  assertParentAcceptsChildren(parent);
 }
 
 const categoryPresentation = {

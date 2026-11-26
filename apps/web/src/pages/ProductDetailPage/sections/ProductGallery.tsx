@@ -17,7 +17,7 @@ export function ProductGallery({ product, hidden, images, mainImage, activeImage
         <button
           type="button"
           onClick={openViewer}
-          className="block w-full"
+          className="rm-photo-control block w-full rounded-card"
           aria-label="Xem ảnh lớn"
         >
           <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-card bg-surface-subtle">
@@ -34,7 +34,7 @@ export function ProductGallery({ product, hidden, images, mainImage, activeImage
           </div>
         </button>
         {images.length > 1 && (
-          <div className="scrollbar-thin mt-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {images.map((image, index) => (
               <button
                 key={image.id}
@@ -43,8 +43,8 @@ export function ProductGallery({ product, hidden, images, mainImage, activeImage
                 aria-label={`Ảnh ${index + 1}`}
                 aria-current={index === activeImage}
                 className={[
-                  "h-16 w-16 shrink-0 overflow-hidden rounded-control border-2 bg-surface-subtle",
-                  index === activeImage ? "border-brand" : "border-transparent",
+                  "rm-photo-control h-16 w-16 shrink-0 overflow-hidden rounded-control border-2 bg-surface-subtle focus-visible:-outline-offset-2",
+                  index === activeImage ? "border-brand" : "border-transparent hover:border-brand/50",
                 ].join(" ")}
               >
                 <MarketplaceImage

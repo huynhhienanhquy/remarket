@@ -98,6 +98,10 @@ pnpm --filter @remarket/mobile ios
 
 ## Chức năng
 
+- Trợ lý ReMarket trong đầu trang Khám phá cho tài khoản đang hoạt động. Trợ lý
+  tìm tin nhiều lượt, trả lời FAQ có nguồn, xem số liệu tài khoản và lưu lịch sử.
+  API cần migration AI, `AI_USER_CHAT_ENABLED=true` và `OPENAI_API_KEY` ở backend.
+  App lấy URL runtime từ `EXPO_PUBLIC_API_BASE_URL`.
 - Khám phá, tìm kiếm, danh mục, tỉnh thành, tình trạng, khoảng giá và sắp xếp.
 - Chi tiết/gallery, hồ sơ người bán, yêu thích và giỏ hàng.
 - Đăng ký/login, SecureStore session, khôi phục khi mở lại/resume, logout/all devices,
@@ -192,3 +196,5 @@ dùng nút hiện mật khẩu trên màn đăng nhập để kiểm tra ký t�
 pnpm dev:mobile:go
 
 pnpm run go
+
+pnpm --filter @remarket/mobile run go:tunnel

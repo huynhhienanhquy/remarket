@@ -46,18 +46,22 @@ export function loginPathFor(pathname: string, search: string): string {
   return returnTo === "/" ? "/login" : `/login?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
+/** Shared session loading/login gate; each route keeps its own access policy. */
+function useAuthenticatedRoute() {
+  const { viewer, status } = useSession();
+  const location = useLocation();
+  const pending = status === "loading" ? <PageSkeleton />
+    : !viewer ? <Navigate to={loginPathFor(location.pathname, location.search)} replace /> : null;
+  return { viewer, location, pending };
+}
+
 /**
  * Private routes render nothing until the session check finishes, then either
  * the content or an internal login redirect with `returnTo` (ui-spec 24).
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { viewer, status } = useSession();
-  const location = useLocation();
-
-  if (status === "loading") return <PageSkeleton />;
-  if (!viewer) {
-    return <Navigate to={loginPathFor(location.pathname, location.search)} replace />;
-  }
+  const { viewer, location, pending } = useAuthenticatedRoute();
+  if (pending || !viewer) return pending;
   // LOCKED accounts keep orders, support and notifications only (3.10).
   if (viewer.status === "LOCKED" && !isRouteAllowedWhenLocked(location.pathname)) {
     return <Navigate to="/orders" replace />;
@@ -66,13 +70,8 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { viewer, status } = useSession();
-  const location = useLocation();
-
-  if (status === "loading") return <PageSkeleton />;
-  if (!viewer) {
-    return <Navigate to={loginPathFor(location.pathname, location.search)} replace />;
-  }
+  const { viewer, pending } = useAuthenticatedRoute();
+  if (pending || !viewer) return pending;
   if (viewer.role !== "ADMIN") return <Navigate to="/403" replace />;
   if (viewer.status !== "ACTIVE") return <Navigate to="/orders" replace />;
   return <>{children}</>;
@@ -80,13 +79,8 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
 
 /** Selling requires a verified email (detail-project 3.1 and 4.1). */
 export function RequireVerified({ children }: { children: ReactNode }) {
-  const { viewer, status } = useSession();
-  const location = useLocation();
-
-  if (status === "loading") return <PageSkeleton />;
-  if (!viewer) {
-    return <Navigate to={loginPathFor(location.pathname, location.search)} replace />;
-  }
+  const { viewer, location, pending } = useAuthenticatedRoute();
+  if (pending || !viewer) return pending;
   if (viewer.email_verified_at === null) {
     const params = new URLSearchParams({
       email: viewer.email,

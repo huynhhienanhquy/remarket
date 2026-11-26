@@ -24,6 +24,7 @@ import {
   useAction,
 } from "../../components/ui";
 import {
+  AdminFilter,
   AdminList,
   AdvancedFilters,
   DecisionSheet,
@@ -86,35 +87,29 @@ export default function AdminSupport() {
       onPage={setPage}
       filters={
         <>
-          <SelectField
+          <AdminFilter
             label="Trạng thái"
             value={status}
             items={[
-              { value: "", label: "Tất cả" },
               ...TICKET_STATUSES.map((value) => ({
                 value,
                 label: TICKET_STATUS_LABELS[value].label,
               })),
             ]}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
+            onChange={setStatus}
+            onPage={setPage}
           />
-          <SelectField
+          <AdminFilter
             label="Loại yêu cầu"
             value={type}
             items={[
-              { value: "", label: "Tất cả" },
               ...TICKET_TYPES.map((value) => ({
                 value,
                 label: TICKET_TYPE_LABELS[value],
               })),
             ]}
-            onChange={(value) => {
-              setType(value);
-              setPage(1);
-            }}
+            onChange={setType}
+            onPage={setPage}
           />
           <AdvancedFilters
             fields={[
@@ -124,10 +119,8 @@ export default function AdminSupport() {
               },
               ...periodFields,
             ]}
-            onApply={(value) => {
-              setAdvanced(value);
-              setPage(1);
-            }}
+            onApply={setAdvanced}
+            onPage={setPage}
           />
         </>
       }

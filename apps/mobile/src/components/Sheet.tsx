@@ -76,6 +76,8 @@ export function Sheet({
             <IconButton label="Đóng" icon="close" onPress={onClose} />
           </View>
           <ScrollView
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentContainerStyle={{

@@ -2,16 +2,16 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { validationError } from "../shared/errors.js";
 
-export const MAX_CHECKOUT_ITEMS = 50;
+const MAX_CHECKOUT_ITEMS = 50;
 
-export const checkoutItemSchema = z
+const checkoutItemSchema = z
   .object({
     product_id: z.string().uuid("Mã sản phẩm không hợp lệ."),
     expected_price: z.string().regex(/^\d+$/, "Giá phải là số nguyên VND."),
   })
   .strict();
 
-export const checkoutDeliverySchema = z
+const checkoutDeliverySchema = z
   .object({
     seller_id: z.string().uuid("Mã người bán không hợp lệ."),
     method: z.enum(["COD", "MEETUP"]),
@@ -45,7 +45,7 @@ export const checkoutPayloadSchema = z
 
 export type CheckoutItemInput = z.infer<typeof checkoutItemSchema>;
 
-export type CheckoutDeliveryInput = z.infer<typeof checkoutDeliverySchema>;
+type CheckoutDeliveryInput = z.infer<typeof checkoutDeliverySchema>;
 
 export type CheckoutPayloadInput = z.infer<typeof checkoutPayloadSchema>;
 

@@ -37,19 +37,22 @@ router.get("/summary/:section", asyncHandler(async (req, res) => {
   ok(res, await adminSummaryLoaders[section](start, end));
 }));
 
-// Counts only: shared navigation must not load the individual queue pages.
+// Load the four badge counts in one statement without fetching queue rows.
 router.get("/navigation-counts", asyncHandler(async (_req, res) => {
-  const [pendingEmails, pendingReports, openTickets, pendingProducts] = await Promise.all([
-    prisma.user.count({ where: { emailVerificationRequestedAt: { not: null }, emailVerifiedAt: null } }),
-    prisma.report.count({ where: { status: "PENDING" } }),
-    prisma.supportTicket.count({ where: { status: "OPEN" } }),
-    prisma.product.count({ where: { status: "PENDING", deletedAt: null } }),
-  ]);
+  const [row] = await prisma.$queryRaw<Array<{ [K in keyof AdminNavigationCounts]: bigint }>>`
+    SELECT
+      (SELECT COUNT(*) FROM "User" WHERE "emailVerificationRequestedAt" IS NOT NULL AND "emailVerifiedAt" IS NULL)
+        AS pending_email_verifications,
+      (SELECT COUNT(*) FROM "Report" WHERE status = 'PENDING') AS pending_reports,
+      (SELECT COUNT(*) FROM "SupportTicket" WHERE status = 'OPEN') AS open_tickets,
+      (SELECT COUNT(*) FROM "Product" WHERE status = 'PENDING' AND "deletedAt" IS NULL) AS pending_products
+  `;
+  if (!row) throw new Error("Admin navigation counts query returned no row");
   const counts: AdminNavigationCounts = {
-    pending_email_verifications: pendingEmails,
-    pending_reports: pendingReports,
-    open_tickets: openTickets,
-    pending_products: pendingProducts,
+    pending_email_verifications: Number(row.pending_email_verifications),
+    pending_reports: Number(row.pending_reports),
+    open_tickets: Number(row.open_tickets),
+    pending_products: Number(row.pending_products),
   };
   ok(res, counts);
 }));

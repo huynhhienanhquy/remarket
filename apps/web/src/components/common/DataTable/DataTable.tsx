@@ -106,7 +106,7 @@ export function DataTable<T>({
                 }
                 className={[
                   "border-b border-line transition-colors",
-                  onRowClick ? "cursor-pointer hover:bg-surface-subtle" : "",
+                  onRowClick ? "rm-table-action cursor-pointer hover:bg-surface-subtle" : "",
                 ].join(" ")}
               >
                 {columns.map((column) => (

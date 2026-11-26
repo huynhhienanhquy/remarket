@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { HoverPressable as Pressable } from "./HoverPressable";
 import { useRouter } from "expo-router";
 import { Logo } from "./MarketplaceHeader";
 import { colors, Screen, styles } from "./ui";

@@ -3,14 +3,14 @@ import { env } from "../config/env.js";
 import { forbidden, validationError } from "../shared/errors.js";
 import { authTransport, readNativeRefresh, nativeAuthOnly } from "./auth-transport.js";
 
-export const DAY_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const REFRESH_MS = env.refreshTtlDays * DAY_MS;
 
-export const REFRESH_COOKIE_PATH = "/api/v1/auth";
+const REFRESH_COOKIE_PATH = "/api/v1/auth";
 
 /** The scope selects a cookie, never grants access; the opaque token is still required. */
-export function refreshCookieName(req: Request): string {
+function refreshCookieName(req: Request): string {
   const scope = req.headers["x-session-scope"];
   if (scope === undefined) return env.refreshCookie;
   if (typeof scope !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(scope)) {

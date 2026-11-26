@@ -17,7 +17,13 @@ import {
   validationError,
 } from "../shared/errors.js";
 import { toConversationListItem, toMessage } from "../shared/dto-mappers.js";
-import { assertConversationParticipant, markConversationRead, sendChatMessage } from "../services/chat-service.js";
+import {
+  assertConversationParticipant,
+  deleteConversationForViewer,
+  markConversationRead,
+  sendChatMessage,
+  visibleMessages,
+} from "../services/chat-service.js";
 import { chatRateLimit } from "../middleware/rate-limit.js";
 
 /**
@@ -36,9 +42,9 @@ router.get("/unread-count", asyncHandler(async (req: AuthRequest, res) => {
   const viewer = viewerOf(req);
   const unread = await prisma.message.count({
     where: {
+      ...visibleMessages(viewer.id),
       readAt: null,
       senderId: { not: viewer.id },
-      conversation: { OR: [{ buyerId: viewer.id }, { sellerId: viewer.id }] },
     },
   });
   ok(res, unread);
@@ -151,13 +157,15 @@ async function conversationItem(
   conversationId: string,
   viewerId: string,
 ): Promise<ConversationListItem> {
+  const visibility = visibleMessages(viewerId);
   const row = await prisma.conversation.findUnique({
     relationLoadStrategy: "join",
     where: { id: conversationId },
     include: {
       ...conversationInclude,
+      messages: { ...conversationInclude.messages, where: visibility },
       _count: {
-        select: { messages: { where: { readAt: null, senderId: { not: viewerId } } } },
+        select: { messages: { where: { ...visibility, readAt: null, senderId: { not: viewerId } } } },
       },
     },
   });
@@ -216,8 +224,9 @@ router.get(
     };
 
     const where: Prisma.ConversationWhereInput = {
-      OR: [{ buyerId: viewer.id }, { sellerId: viewer.id }],
+      OR: [{ buyerId: viewer.id, hiddenForBuyer: false }, { sellerId: viewer.id, hiddenForSeller: false }],
     };
+    const visibility = visibleMessages(viewer.id);
 
     const [conversations, total] = await Promise.all([
       prisma.conversation.findMany({
@@ -225,8 +234,9 @@ router.get(
         where,
         include: {
           ...conversationInclude,
+          messages: { ...conversationInclude.messages, where: visibility },
           _count: {
-            select: { messages: { where: { readAt: null, senderId: { not: viewer.id } } } },
+            select: { messages: { where: { ...visibility, readAt: null, senderId: { not: viewer.id } } } },
           },
         },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -373,15 +383,18 @@ router.post(
   }),
 );
 
-/* ------------------------------------------------------------------ *
- * GET /api/v1/conversations/:conversationId/messages
- * ------------------------------------------------------------------ */
-
+// Detail and deletion share the same participant check.
 router.get("/:conversationId", asyncHandler(async (req: AuthRequest, res) => {
   const viewer = viewerOf(req);
   const id = parseId(req.params.conversationId);
   await assertConversationParticipant(id, viewer.id);
   ok(res, await conversationItem(id, viewer.id));
+}));
+
+router.delete("/:conversationId", asyncHandler(async (req: AuthRequest, res) => {
+  const viewer = viewerOf(req);
+  await deleteConversationForViewer(parseId(req.params.conversationId), viewer.id);
+  ok(res, { deleted: true });
 }));
 
 router.get(
@@ -398,13 +411,16 @@ router.get(
     /* Strictly older than the cursor, stable on (createdAt, id), newest first. */
     const rows = await prisma.message.findMany({
       where: {
+        ...visibleMessages(viewer.id),
         conversationId,
         ...(cursor
           ? {
-              OR: [
-                { createdAt: { lt: cursor.createdAt } },
-                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-              ],
+              AND: [{
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              }],
             }
           : {}),
       },

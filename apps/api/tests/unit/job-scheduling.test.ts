@@ -37,3 +37,38 @@ describe("independent push scheduling", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+it("backs off outbox claims after connection timeouts and resumes polling on recovery", async () => {
+  vi.useFakeTimers();
+  const logError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const logRecovery = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  const connectionTimeout = new Error("timeout exceeded when trying to connect");
+  jobs.heartbeat.mockResolvedValue(undefined);
+  jobs.orders.mockResolvedValue([]);
+  jobs.reminders.mockResolvedValue([]);
+  jobs.uploads.mockResolvedValue([]);
+  jobs.retention.mockResolvedValue(undefined);
+  jobs.outbox.mockResolvedValueOnce(0)
+    .mockRejectedValueOnce(connectionTimeout)
+    .mockRejectedValueOnce(connectionTimeout)
+    .mockResolvedValue(0);
+
+  const stop = startJobRunner(60_000, 250);
+  try {
+    await vi.advanceTimersByTimeAsync(1_249);
+    expect(jobs.outbox).toHaveBeenCalledTimes(2);
+    expect(logError).toHaveBeenCalledWith("Outbox pump failed:", connectionTimeout.message);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(jobs.outbox).toHaveBeenCalledTimes(3);
+    expect(logRecovery).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(251);
+    expect(jobs.outbox).toHaveBeenCalledTimes(5);
+    expect(logRecovery).toHaveBeenCalledExactlyOnceWith("Outbox pump recovered.");
+  } finally {
+    stop();
+    logError.mockRestore();
+    logRecovery.mockRestore();
+  }
+});

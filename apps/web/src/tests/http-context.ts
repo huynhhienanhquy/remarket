@@ -3,7 +3,7 @@ import type { SessionUser } from "@remarket/shared";
 import { apiSuccessStatus, apiResponseIssue } from "@remarket/shared";
 import { http } from "../services/http";
 
-export interface RecordedRequest {
+interface RecordedRequest {
   method: string;
   path: string;
   url: URL;
@@ -13,7 +13,7 @@ export interface RecordedRequest {
 }
 type Handler = (request: RecordedRequest) => unknown | Promise<unknown>;
 
-export function envelope(data: unknown, status = 200): Response {
+function envelope(data: unknown, status = 200): Response {
   return new Response(JSON.stringify({ success: true, data, meta: { request_id: "test-request" } }), {
     status, headers: { "Content-Type": "application/json" },
   });

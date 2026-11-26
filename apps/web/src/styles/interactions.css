@@ -1,0 +1,140 @@
+:root {
+  --rm-control-duration: 160ms;
+  --rm-card-duration: 200ms;
+  --rm-interaction-ease: cubic-bezier(0.2, 0.65, 0.3, 1);
+  --rm-edge-highlight: inset 0 0 0 1px theme(colors.brand.DEFAULT / 12%);
+  --rm-press-shadow: inset 0 1px 3px theme(colors.ink / 18%);
+  --rm-primary-highlight: inset 0 1px 0 0 rgb(255 255 255 / 22%);
+  --rm-primary-depth: 0 4px 12px -2px theme(colors.brand.DEFAULT / 34%);
+}
+
+/* Keep Tailwind's focus ring and base shadow alongside the two interaction shadows. */
+:root body :is(button, summary, [role="button"], .rm-button, .rm-button-primary, .rm-control, .rm-card-action, .rm-card-face, .rm-card-preview-face) {
+  --rm-interaction-inset: inset 0 0 0 0 transparent;
+  --rm-interaction-depth: 0 0 0 0 transparent;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow, 0 0 #0000), var(--rm-interaction-inset), var(--rm-interaction-depth);
+}
+
+:is(button, summary, [role="button"], .rm-button, .rm-button-primary, .rm-control):not(.rm-card-action) {
+  transition: background-color var(--rm-control-duration) var(--rm-interaction-ease),
+    border-color var(--rm-control-duration) var(--rm-interaction-ease),
+    color var(--rm-control-duration) var(--rm-interaction-ease),
+    box-shadow var(--rm-control-duration) var(--rm-interaction-ease),
+    opacity var(--rm-control-duration) var(--rm-interaction-ease);
+}
+
+:is(.rm-card-action, .rm-card-face, .rm-card-preview-face) {
+  transition: background-color var(--rm-card-duration) var(--rm-interaction-ease),
+    border-color var(--rm-card-duration) var(--rm-interaction-ease),
+    box-shadow var(--rm-card-duration) var(--rm-interaction-ease),
+    translate var(--rm-card-duration) var(--rm-interaction-ease);
+}
+
+:is(.rm-card-panel, .admin-panel, .rm-account-card:not(:where(.rm-card-action, .rm-card-face))) {
+  transition: border-color var(--rm-card-duration) var(--rm-interaction-ease);
+}
+
+:is(.rm-card-title, .rm-card-icon, .rm-icon-forward) {
+  transition: background-color var(--rm-card-duration) var(--rm-interaction-ease),
+    color var(--rm-card-duration) var(--rm-interaction-ease),
+    translate var(--rm-card-duration) var(--rm-interaction-ease);
+}
+
+/* Linked and keyboard-focused surfaces get a consistent edge without moving. */
+.rm-card-link:focus-visible > .rm-card-preview-face,
+.rm-card-tile:focus-visible > .rm-card-face,
+.rm-card-action:focus-visible:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+  @apply border-brand/45;
+}
+
+.rm-card-preview:has(> .rm-card-link:focus-visible) .rm-card-title,
+.rm-card-action:focus-visible .rm-icon-forward {
+  @apply text-brand;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(button, summary, [role="button"], .rm-button, .rm-button-primary, .rm-control):hover:not(:where(.rm-card-action, :disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    --rm-interaction-inset: var(--rm-edge-highlight);
+  }
+
+  .rm-button-primary:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    @apply bg-brand-hover;
+    --rm-interaction-inset: var(--rm-primary-highlight);
+    --rm-interaction-depth: var(--rm-primary-depth);
+  }
+
+  .rm-button-secondary:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    @apply bg-brand-soft border-brand-hover;
+  }
+
+  .rm-button-ghost:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    @apply bg-surface-subtle;
+    --rm-interaction-inset: inset 0 0 0 0 transparent;
+  }
+
+  .rm-button-danger:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    @apply bg-danger;
+    background-color: color-mix(in srgb, theme(colors.danger.DEFAULT) 91%, theme(colors.ink));
+    --rm-interaction-inset: inset 0 1px 0 0 rgb(255 255 255 / 18%);
+    --rm-interaction-depth: 0 4px 10px -2px theme(colors.danger.DEFAULT / 28%);
+  }
+
+  .rm-card-link:hover > .rm-card-preview-face,
+  .rm-card-tile:hover > .rm-card-face,
+  .rm-card-action:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    @apply border-brand/45;
+  }
+
+  .rm-card-link:hover > .rm-card-preview-face,
+  .rm-card-tile:hover > .rm-card-face {
+    --rm-interaction-depth: 0 8px 18px -7px theme(colors.brand.DEFAULT / 35%);
+  }
+
+  .rm-card-tile:hover > .rm-card-face {
+    @apply bg-brand-soft/65;
+  }
+
+  .rm-card-action:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    --rm-interaction-inset: var(--rm-edge-highlight);
+  }
+
+  :is(.rm-card-panel, .admin-panel, .rm-account-card:not(:where(.rm-card-action, .rm-card-face))):hover {
+    @apply border-brand/25;
+  }
+
+  .rm-card-preview:has(> .rm-card-link:hover) .rm-card-title,
+  .rm-card-action:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) .rm-icon-forward {
+    @apply text-brand;
+  }
+
+  .rm-card-tile:hover .rm-card-icon {
+    @apply bg-surface;
+  }
+}
+
+/* Press feedback also works on touch. Native and ARIA-disabled controls stay quiet. */
+:root :is(button, summary, [role="button"], .rm-button, .rm-button-primary, .rm-control, .rm-card-action):active:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])),
+.rm-card-tile:active > .rm-card-face,
+.rm-card-link:active > .rm-card-preview-face {
+  --rm-interaction-inset: var(--rm-press-shadow);
+  --rm-interaction-depth: 0 0 0 0 transparent;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :is(.rm-photo-control img, .rm-icon-favorite) {
+    transition: scale var(--rm-card-duration) var(--rm-interaction-ease);
+  }
+
+  .rm-photo-control:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) img {
+    scale: 1.035;
+  }
+
+  :is(button, .rm-button, .rm-control, .rm-card-action, .rm-card-tile):hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) .rm-icon-forward {
+    translate: 3px 0;
+  }
+
+  button:hover:not(:where(:disabled, [aria-disabled="true"], [aria-busy="true"])) .rm-icon-favorite {
+    scale: 1.1;
+  }
+}

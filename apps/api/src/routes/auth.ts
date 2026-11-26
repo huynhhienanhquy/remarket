@@ -50,6 +50,13 @@ const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000;
 const RESET_PASSWORD_TTL_MS = 15 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
+/** Recheck after taking the same user lock used by account moderation. */
+async function lockActiveProfileUser(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+  await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+  const liveUser = await tx.user.findUnique({ where: { id: userId }, select: { status: true } });
+  if (!liveUser || liveUser.status !== "ACTIVE") throw accountLocked();
+}
+
 /* ------------------------------------------------------------------ *
  * Session + email token primitives
  * ------------------------------------------------------------------ */
@@ -105,8 +112,6 @@ const loginSchema = z
 const tokenSchema = z.object({ token: z.string().min(1).max(200) }).strict();
 
 const emailSchema = z.object({ email: z.string().max(254) }).strict();
-
-const resendSchema = z.object({ email: z.string().max(254) }).strict();
 
 const resetSchema = z
   .object({
@@ -532,7 +537,7 @@ router.post(
   requireEmailDelivery,
   emailTokenRateLimit,
   asyncHandler(async (req, res) => {
-    const data = resendSchema.parse(req.body);
+    const data = emailSchema.parse(req.body);
     const email = data.email.trim().toLowerCase();
     if (email === "") {
       throw validationError("Cần email để gửi lại liên kết xác minh.", {
@@ -682,14 +687,7 @@ router.patch(
     }
 
     const user = await prisma.$transaction(async (tx) => {
-      // Serialize profile writes with the admin account-lock orchestration.
-      // A request that waited behind a lock must not mutate a now-locked user.
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${authUser.id} FOR UPDATE`;
-      const liveUser = await tx.user.findUnique({
-        where: { id: authUser.id },
-        select: { status: true },
-      });
-      if (!liveUser || liveUser.status !== "ACTIVE") throw accountLocked();
+      await lockActiveProfileUser(tx, authUser.id);
       return tx.user.update({ where: { id: authUser.id }, data: update });
     });
     ok(res, toSessionUser(user));
@@ -738,12 +736,7 @@ router.patch(
     }
 
     const user = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${authUser.id} FOR UPDATE`;
-      const liveUser = await tx.user.findUnique({
-        where: { id: authUser.id },
-        select: { status: true },
-      });
-      if (!liveUser || liveUser.status !== "ACTIVE") throw accountLocked();
+      await lockActiveProfileUser(tx, authUser.id);
 
       await tx.$queryRaw`SELECT "id" FROM "UploadAsset" WHERE "storagePath" = ${storagePath} FOR UPDATE`;
       const asset = await tx.uploadAsset.findUnique({ where: { storagePath } });

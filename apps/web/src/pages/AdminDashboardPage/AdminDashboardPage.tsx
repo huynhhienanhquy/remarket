@@ -69,12 +69,14 @@ function KpiCard({
   } as const;
   const note = warning ? "Cần phản hồi" : metric === "unresolved_tickets" ? "Cần hỗ trợ" : scope === "current" ? "Tổng hiện tại" : "Theo kỳ đã chọn";
   return (
-    <div className="admin-panel dashboard-kpi" data-highlight={highlight || undefined}>
-      <div className="dashboard-kpi-top">
-        <p>{label}</p>
-        <span className="admin-metric-icon" data-warning={warning || undefined}><Icon name={icons[metric]} size={18} /></span>
+    <div className="rm-dashboard-card" data-highlight={highlight || undefined}>
+      <div className="admin-panel dashboard-kpi">
+        <div className="dashboard-kpi-top">
+          <p>{label}</p>
+          <span className="admin-metric-icon" data-warning={warning || undefined}><Icon name={icons[metric]} size={18} /></span>
+        </div>
+        <div className="dashboard-kpi-value"><strong>{value}</strong><small>{highlight ? "Tổng phát sinh hoàn tất" : note}</small></div>
       </div>
-      <div className="dashboard-kpi-value"><strong>{value}</strong><small>{highlight ? "Tổng phát sinh hoàn tất" : note}</small></div>
     </div>
   );
 }
@@ -182,7 +184,7 @@ export function AdminDashboardPage() {
           <p className="mb-6 mt-1 text-[13px] text-muted">Tổng hiện tại, không bao gồm tin đã xóa. Tin bị hạn chế vẫn được tính theo trạng thái giao dịch.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {(Object.keys(PRODUCT_STATUS_LABELS) as ProductStatus[]).map((status) => (
-              <Link key={status} to={`/admin/products?status=${status}`} className="dashboard-status-tile">
+              <Link key={status} to={`/admin/products?status=${status}`} className="dashboard-status-tile rm-card-nav">
                 <p className="dashboard-status-label">{PRODUCT_STATUS_LABELS[status].label}</p>
                 <p className="dashboard-status-value">{query.data.products_by_status[status].toLocaleString("vi-VN")}</p>
               </Link>
@@ -195,10 +197,10 @@ export function AdminDashboardPage() {
       {query.data && !query.isError && (
         <div className="dashboard-queues">
           <SectionCard className="admin-section-flush" title="Tin chờ duyệt" actions={<Link to="/admin/products" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="p-0 lg:p-0">
-            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="flex items-center gap-3.5 px-5 py-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" /> : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><AdminPill tone="warning">{PRODUCT_STATUS_LABELS.PENDING.label}</AdminPill></Link></li>)}</ul>}
+            {query.data.pending_products_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có tin đang chờ duyệt.</p> : <ul className="divide-y divide-line">{query.data.pending_products_queue.map((product) => <li key={product.id}><Link to={`/admin/products?selected=${encodeURIComponent(product.id)}`} className="rm-card-action flex items-center gap-3.5 px-5 py-4 hover:bg-surface-subtle">{product.image_url ? <ApiImage src={product.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" /> : <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-soft" />}<div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{product.title}</p><p className="t-meta text-muted">{product.seller.name} · {formatDateTime(product.created_at)}</p></div><AdminPill tone="warning">{PRODUCT_STATUS_LABELS.PENDING.label}</AdminPill></Link></li>)}</ul>}
           </SectionCard>
           <SectionCard className="dashboard-support" title="Yêu cầu hỗ trợ mới" actions={<Link to="/admin/support?status=OPEN" className="t-label text-brand hover:underline">Xem tất cả</Link>} bodyClassName="dashboard-support-body">
-            {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="space-y-2">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="flex items-center gap-3 rounded-xl border border-line bg-page px-4 py-3.5 hover:bg-brand-soft"><span className="admin-avatar admin-avatar-sm"><Icon name="help" size={15} /></span><div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><AdminPill tone="warning">{TICKET_STATUS_LABELS.OPEN.label}</AdminPill></Link></li>)}</ul>}
+            {query.data.open_tickets_queue.length === 0 ? <p className="p-5 t-body text-muted">Không có yêu cầu hỗ trợ mới.</p> : <ul className="space-y-2">{query.data.open_tickets_queue.map((ticket) => <li key={ticket.id}><Link to={`/admin/support?selected=${encodeURIComponent(ticket.id)}`} className="rm-card-action flex items-center gap-3 rounded-xl border border-line bg-page px-4 py-3.5 hover:bg-brand-soft"><span className="admin-avatar admin-avatar-sm"><Icon name="help" size={15} /></span><div className="min-w-0 flex-1"><p className="truncate t-label text-ink">{ticket.code} · {ticket.subject}</p><p className="t-meta text-muted">{ticket.user.name} · {formatDateTime(ticket.updated_at)}</p></div><AdminPill tone="warning">{TICKET_STATUS_LABELS.OPEN.label}</AdminPill></Link></li>)}</ul>}
             <div className="dashboard-sla"><Icon name="clock" size={18} /><p>Mục tiêu SLA là phản hồi yêu cầu hỗ trợ trong vòng 30 phút.</p></div>
           </SectionCard>
         </div>
