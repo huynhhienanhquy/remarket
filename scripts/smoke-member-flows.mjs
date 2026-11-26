@@ -16,6 +16,7 @@ await mkdir(artifacts, { recursive: true });
 const chrome = spawn(process.env.CHROME_BIN ?? "C:/Program Files/Google/Chrome/Application/chrome.exe", ["--headless=new", "--disable-dev-shm-usage", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "about:blank"], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] });
 const clients = [], exceptions = [], failures = [], checks = [], requests = [];
 let browser;
+let currentCheck = "browser startup";
 function connect(url) {
   const ws = new WebSocket(url); let seq = 0; const pending = new Map(); const frames = [];
   const ready = new Promise((resolve, reject) => { ws.addEventListener("open", resolve, { once: true }); ws.addEventListener("error", reject, { once: true }); });
@@ -52,6 +53,7 @@ async function screenshot(tab, label) {
   await writeFile(path.join(artifacts, `${label}.png`), Buffer.from(r.data, "base64"));
 }
 async function wait(tab, expression, label) {
+  currentCheck = label;
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) { if (await evaluate(tab, expression)) return; await new Promise((resolve) => setTimeout(resolve, 200)); }
   await screenshot(tab, "failure");
@@ -75,6 +77,7 @@ async function visit(tab, route, visible, label, mobile = false) {
   // wait for the logged-in identity instead of racing bootstrap in the harness.
   await wait(tab, "import('/src/services/http.ts').then(m => Boolean(m.getAccessToken()))", label + " session ready");
   await wait(tab, "[...document.querySelectorAll('img')].filter(img => new URL(img.src).pathname.startsWith('/api/v1/uploads/')).every(img => img.complete && img.naturalWidth > 0)", label + " uploaded images decoded");
+  currentCheck = label;
   const dimensions = await evaluate(tab, "({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth })");
   assert(dimensions.scroll <= dimensions.width + 1, `Horizontal overflow ${label}: ${JSON.stringify(dimensions)}`);
   assert(!await evaluate(tab, "document.body.innerText.includes('Chưa tải được dữ liệu') || document.body.innerText.includes('Không tải được dữ liệu')"), `Query error ${label}`);
@@ -336,6 +339,13 @@ try {
   assert.equal(failures.length, 0, `5xx responses: ${JSON.stringify(failures)}`);
   await writeFile(path.join(artifacts, process.env.SMOKE_CHAT_ONLY === "true" ? "results-chat-badge.json" : process.env.SMOKE_EMAIL_ONLY === "true" ? "results-email.json" : process.env.SMOKE_LIFECYCLE_ONLY === "true" ? "results-lifecycle.json" : "results.json"), JSON.stringify({ checks, uncaughtErrors: exceptions, serverFailures: failures }, null, 2));
   console.log(`PASS: ${checks.length} responsive screen checks; no uncaught browser exceptions or 5xx responses`);
+} catch (error) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    const frame = error.stack?.match(/\/scripts\/smoke-member-flows\.mjs:(\d+):\d+/);
+    const location = frame ? ` file=scripts/smoke-member-flows.mjs,line=${frame[1]}` : "";
+    console.error(`::error${location}::Browser smoke failed at ${currentCheck} after ${checks.length} checks.`);
+  }
+  throw error;
 } finally {
   if (browser) await browser.send("Browser.close").catch(() => undefined);
   for (const client of clients) client.close();
