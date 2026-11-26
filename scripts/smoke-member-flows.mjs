@@ -55,7 +55,12 @@ async function screenshot(tab, label) {
 async function wait(tab, expression, label) {
   currentCheck = label;
   const deadline = Date.now() + 90000;
-  while (Date.now() < deadline) { if (await evaluate(tab, expression)) return; await new Promise((resolve) => setTimeout(resolve, 200)); }
+  // Page.navigate can resolve before Chromium has created the new document body.
+  const condition = `document.body !== null && (${expression})`;
+  while (Date.now() < deadline) {
+    if (await evaluate(tab, condition)) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
   await screenshot(tab, "failure");
   console.error(JSON.stringify({ stage: label, requests: requests.slice(-20), cookies: (await tab.send('Network.getAllCookies')).cookies.map(({name,domain,path,secure,expires}) => ({name,domain,path,secure,expires})) }));
   console.error(JSON.stringify(await evaluate(tab, "({visibility:document.visibilityState, receivedMessages:document.querySelectorAll('[data-received-id]').length})")));
@@ -78,6 +83,7 @@ async function visit(tab, route, visible, label, mobile = false) {
   await wait(tab, "import('/src/services/http.ts').then(m => Boolean(m.getAccessToken()))", label + " session ready");
   await wait(tab, "[...document.querySelectorAll('img')].filter(img => new URL(img.src).pathname.startsWith('/api/v1/uploads/')).every(img => img.complete && img.naturalWidth > 0)", label + " uploaded images decoded");
   currentCheck = label;
+  await evaluate(tab, "document.fonts.ready.then(() => true)");
   const dimensions = await evaluate(tab, "({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth })");
   assert(dimensions.scroll <= dimensions.width + 1, `Horizontal overflow ${label}: ${JSON.stringify(dimensions)}`);
   assert(!await evaluate(tab, "document.body.innerText.includes('Chưa tải được dữ liệu') || document.body.innerText.includes('Không tải được dữ liệu')"), `Query error ${label}`);
